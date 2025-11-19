@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<LanguageData>
+	<!-- Checkbox 標籤 -->
+	<RimTalk.Settings.EnableAutoPersonalityUpdate>自动依最近互动微调人格描述</RimTalk.Settings.EnableAutoPersonalityUpdate>
+
+	<!-- Tooltip 文案 -->
+	<RimTalk.Settings.EnableAutoPersonalityUpdateTooltip>启用后，模组会定期把最近对话纪录送给 LLM，根据互动自动微调角色人格描述（可能增加额外 API 消耗）。</RimTalk.Settings.EnableAutoPersonalityUpdateTooltip>
+</LanguageData>

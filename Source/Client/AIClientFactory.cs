@@ -25,6 +25,17 @@ public static class AIClientFactory
         return _instance;
     }
 
+    public static IAIClient GetAIClientForConfig(ApiConfig config)
+    {
+        if (config == null)
+        {
+            return null;
+        }
+
+        // 不動快取的 _instance，避免影響一般對話的使用 API
+        return CreateServiceInstance(config);
+    }
+
     private static IAIClient CreateServiceInstance(ApiConfig config)
     {
         switch (config.Provider)

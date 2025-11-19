@@ -24,10 +24,15 @@ public class PawnMessageHistoryRecord : IExposable
     public Pawn Pawn;
     public List<TalkMessageEntry> Messages = new();
 
+    // 每個 pawn 累積的新訊息數，用來決定何時觸發 batch
+    public int PendingMessagesSinceLastBatch;
+
     public void ExposeData()
     {
         Scribe_References.Look(ref Pawn, "pawn");
+        Scribe_Values.Look(ref PendingMessagesSinceLastBatch, "pendingMessagesSinceLastBatch", 0);
         Scribe_Collections.Look(ref Messages, "messages", LookMode.Deep);
+        
     }
 }
 

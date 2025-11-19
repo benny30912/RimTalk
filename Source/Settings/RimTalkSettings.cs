@@ -27,6 +27,7 @@ public class RimTalkSettings : ModSettings
     public bool AllowOtherFactionsToTalk = false;
     public bool AllowEnemiesToTalk = false;
     public bool AllowCustomConversation = true;
+    public bool EnableAutoPersonalityUpdate = false;
     public int DisableAiAtSpeed = 0;
     public ButtonDisplayMode ButtonDisplay = ButtonDisplayMode.Tab;
 
@@ -154,6 +155,7 @@ public class RimTalkSettings : ModSettings
         Scribe_Values.Look(ref AllowPrisonersToTalk, "allowPrisonersToTalk", true);
         Scribe_Values.Look(ref AllowOtherFactionsToTalk, "allowOtherFactionsToTalk", false);
         Scribe_Values.Look(ref AllowEnemiesToTalk, "allowEnemiesToTalk", false);
+        Scribe_Values.Look(ref EnableAutoPersonalityUpdate, "EnableAutoPersonalityUpdate", false);
         Scribe_Values.Look(ref DisableAiAtSpeed, "DisableAiAtSpeed", 0);
         Scribe_Collections.Look(ref EnabledArchivableTypes, "enabledArchivableTypes", LookMode.Value, LookMode.Value);
 

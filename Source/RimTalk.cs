@@ -41,24 +41,23 @@ public class RimTalk : GameComponent
             settings.CurrentCloudConfigIndex = 0;
         }
 
-        if (!soft)
-        {
-            TalkHistory.Clear();
-        }
-
         AIErrorHandler.ResetQuotaWarning();
         TickManagerPatch.Reset();
         AIClientFactory.Clear();
         AIService.Clear();
         PatchThoughtHandlerGetDistinctMoodThoughtGroups.Clear();
+
+        // 讓現有 pawn 把排隊回應全部丟棄
         Cache.GetAll().ToList().ForEach(pawnState => pawnState.IgnoreAllTalkResponses());
+
+        Cache.Clear();           // PawnState 快取，裡面直指 Pawn，世界換了就全是舊人
+        ApiHistory.Clear();      //都清掉上一輪的 API 紀錄
+        TalkRequestPool.Clear(); // 排隊中的 TalkRequest，裡面也會綁 Pawn/Map 狀態
 
         if (soft) return;
 
-        Counter.Tick = 0;
-        Cache.Clear();
-        Stats.Reset();
-        TalkRequestPool.Clear();
-        ApiHistory.Clear();
+        TalkHistory.Clear();     // 只有完全重置時才清跨存檔的訊息歷史
+        Counter.Tick = 0;        // 給統計用的時間基準
+        Stats.Reset();           // 呼叫次數 / token 統計，跟 ApiHistory 一樣是本世界的 debug 狀態
     }
 }
