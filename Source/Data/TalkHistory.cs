@@ -8,7 +8,7 @@ namespace RimTalk.Data;
 
 public static class TalkHistory
 {
-    private const int MaxMessages = 6;
+    private const int MaxMessages = 30; //Default = 6;
     private static readonly ConcurrentDictionary<int, List<(Role role, string message)>> MessageHistory = new();
     private static readonly ConcurrentDictionary<Guid, int> SpokenTickCache = new() { [Guid.Empty] = 0 };
     private static readonly ConcurrentBag<Guid> IgnoredCache = [];

@@ -16,7 +16,7 @@ public class RimTalkSettings : ModSettings
     public readonly bool IsUsingFallbackModel = false;
     public bool IsEnabled = true;
     public int TalkInterval = 7;
-    public const int ReplyInterval = 4;
+    public const int ReplyInterval = 2; //Default = 4
     public bool ProcessNonRimTalkInteractions;
     public bool AllowSimultaneousConversations;
     public string CustomInstruction = "";

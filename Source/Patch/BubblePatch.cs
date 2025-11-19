@@ -65,13 +65,13 @@ public static class Bubbler_Add
         PawnState pawnState = Cache.Get(initiator);
 
         // chitchat is ignored if talkRequest exists
-        if (pawnState == null || (isChitchat && pawnState.TalkRequests.Count > 0))
-            return false;
+        if (pawnState == null)
+            return false; // 找不到狀態就什麼都不做（也不顯示原泡泡）// 不再因為隊列裡有東西就擋 chitchat
 
         // Otherwise, block normal bubble and generate talk
         prompt = $"{prompt} ({interactionDef.label})";
         pawnState.AddTalkRequest(prompt, recipient, TalkType.Chitchat);
-        return false;
+        return false;// 照樣接管原本泡泡
     }
 
     public static void Postfix()

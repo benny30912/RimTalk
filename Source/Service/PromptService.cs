@@ -30,7 +30,8 @@ public static class PromptService
         foreach (Pawn pawn in pawns)
         {
             // Main pawn gets more detail, others get basic info
-            InfoLevel infoLevel = pawn == pawns[0] ? InfoLevel.Normal : InfoLevel.Short;
+            InfoLevel infoLevel = InfoLevel.Normal;
+            //InfoLevel infoLevel = pawn == pawns[0] ? InfoLevel.Normal : InfoLevel.Short;
             string pawnContext = CreatePawnContext(pawn, infoLevel);
             Cache.Get(pawn).Context = pawnContext;
             count++;
@@ -160,16 +161,37 @@ public static class PromptService
         var method = AccessTools.Method(typeof(HealthCardUtility), "VisibleHediffs");
         IEnumerable<Hediff> hediffs = (IEnumerable<Hediff>)method.Invoke(null, new object[] { pawn, false });
 
-        var hediffDict = hediffs
-            .GroupBy(hediff => hediff.def)
-            .ToDictionary(
-                group => group.Key,
-                group => string.Join(",",
-                    group.Select(hediff => hediff.Part?.Label ?? ""))); // Values are concatenated body parts
+        var hediffGroups = hediffs
+            .GroupBy(h => new
+            {
+                h.def,
+                IsPermanent = h is Hediff_Injury inj && inj.IsPermanent()
+            })
+            .Select(g =>
+            {
+                var sample = g.First();
+                string label = sample.LabelCap; // 會有 old injury / scar 等資訊
 
-        var healthInfo = string.Join(",", hediffDict.Select(kvp => $"{kvp.Key.label}({kvp.Value})"));
+                // 收集有名字的部位，去掉 null/空字串，順便 Distinct
+                var partsList = g
+                    .Select(h => h.Part?.Label)
+                    .Where(p => !string.IsNullOrEmpty(p))
+                    .Distinct()
+                    .ToList();
 
-        if (healthInfo != "")
+                if (partsList.Count == 0)
+                {
+                    // 全身 hediff 或沒有具體部位 → 只顯示 label，不加 ()
+                    return label;
+                }
+
+                string parts = string.Join(",", partsList);
+                return $"{label}({parts})";
+            });
+
+        var healthInfo = string.Join(", ", hediffGroups);
+
+        if (!healthInfo.NullOrEmpty())
             sb.AppendLine($"Health: {healthInfo}");
 
         var personality = Cache.Get(pawn).Personality;
@@ -314,11 +336,25 @@ public static class PromptService
             return null;
 
         Room room = pawn.GetRoom();
-        if (room != null && !room.PsychologicallyOutdoors)
-            return "Indoors".Translate();
-        return "Outdoors".Translate();
+        if (room == null)
+            return null;
+
+        // 先決定室內 / 室外
+        string baseLocation = room.PsychologicallyOutdoors
+            ? "Outdoors".Translate()
+            : "Indoors".Translate();
+
+        // 嘗試讀房間角色
+        var role = room.Role;
+        if (role != null && role != RoomRoleDefOf.None)
+        {
+            // 例如：Hospital / Bedroom
+            return $"{role.LabelCap}";
+        }
+
+        return baseLocation;
     }
-    
+
     public static Dictionary<Thought, float> GetThoughts(Pawn pawn)
     {
         var thoughts = new List<Thought>();
