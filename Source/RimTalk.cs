@@ -30,7 +30,7 @@ public class RimTalk : GameComponent
     public override void LoadedGame()
     {
         base.LoadedGame();
-        Reset();
+        Reset(soft: true);
     }
 
     public static void Reset(bool soft = false)
@@ -41,11 +41,15 @@ public class RimTalk : GameComponent
             settings.CurrentCloudConfigIndex = 0;
         }
 
+        if (!soft)
+        {
+            TalkHistory.Clear();
+        }
+
         AIErrorHandler.ResetQuotaWarning();
         TickManagerPatch.Reset();
         AIClientFactory.Clear();
         AIService.Clear();
-        TalkHistory.Clear();
         PatchThoughtHandlerGetDistinctMoodThoughtGroups.Clear();
         Cache.GetAll().ToList().ForEach(pawnState => pawnState.IgnoreAllTalkResponses());
 

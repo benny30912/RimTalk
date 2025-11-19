@@ -8,12 +8,16 @@ namespace RimTalk.Data;
 
 public static class TalkHistory
 {
-    private const int MaxMessages = 30; //Default = 6;
-    private static readonly ConcurrentDictionary<int, List<(Role role, string message)>> MessageHistory = new();
+    private const int MaxMessages = 30;
     private static readonly ConcurrentDictionary<Guid, int> SpokenTickCache = new() { [Guid.Empty] = 0 };
     private static readonly ConcurrentBag<Guid> IgnoredCache = [];
 
-        
+    private static RimTalkWorldComponent WorldComp =>
+        Find.World?.GetComponent<RimTalkWorldComponent>();
+
+    private static List<PawnMessageHistoryRecord> Histories =>
+        WorldComp?.SavedTalkHistories;
+
     // Add a new talk with the current game tick
     public static void AddSpoken(Guid id)
     {
@@ -37,40 +41,51 @@ public static class TalkHistory
 
     public static void AddMessageHistory(Pawn pawn, string request, string response)
     {
-        var messages = MessageHistory.GetOrAdd(pawn.thingIDNumber, _ => []);
+        if (pawn == null || Histories == null) return;
 
-        lock (messages)
+        var record = Histories.FirstOrDefault(r => r.Pawn == pawn);
+        if (record == null)
         {
-            messages.Add((Role.User, request));
-            messages.Add((Role.AI, response));
-            EnsureMessageLimit(messages);
+            record = new PawnMessageHistoryRecord { Pawn = pawn };
+            Histories.Add(record);
         }
+
+        var list = record.Messages;
+
+        // 照舊加兩條：User + AI
+        list.Add(new TalkMessageEntry { Role = Role.User, Text = request });
+        list.Add(new TalkMessageEntry { Role = Role.AI, Text = response });
+
+        EnsureMessageLimit(list);
     }
+
 
     public static List<(Role role, string message)> GetMessageHistory(Pawn pawn)
     {
-        if (!MessageHistory.TryGetValue(pawn.thingIDNumber, out var history))
-            return [];
-            
-        lock (history)
-        {
-            return [..history];
-        }
+        if (pawn == null || Histories == null) return [];
+
+        var record = Histories.FirstOrDefault(r => r.Pawn == pawn);
+        if (record == null || record.Messages == null) return [];
+
+        // 回傳一份 tuple list 給 AIService 用，外部呼叫不用改
+        return record.Messages
+            .Select(m => (m.Role, m.Text))
+            .ToList();
     }
 
-    private static void EnsureMessageLimit(List<(Role role, string message)> messages)
+    private static void EnsureMessageLimit(List<TalkMessageEntry> messages)
     {
-        // First, ensure alternating pattern by removing consecutive duplicates from the end
+        // 先把連續同 Role 的舊訊息砍掉，維持 User/AI 交錯
         for (int i = messages.Count - 1; i > 0; i--)
         {
-            if (messages[i].role == messages[i - 1].role)
+            if (messages[i].Role == messages[i - 1].Role)
             {
-                // Remove the earlier message of the consecutive pair
+                // 刪掉較舊的那一個
                 messages.RemoveAt(i - 1);
             }
         }
 
-        // Then, enforce the maximum message limit by removing the oldest messages
+        // 再套上總長度上限（最舊的先移除）
         while (messages.Count > MaxMessages)
         {
             messages.RemoveAt(0);
@@ -79,7 +94,7 @@ public static class TalkHistory
 
     public static void Clear()
     {
-        MessageHistory.Clear();
-        // clearing spokenCache may block child talks waiting to display
+        if (Histories == null) return;
+        Histories.Clear();
     }
 }

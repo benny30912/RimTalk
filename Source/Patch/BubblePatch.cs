@@ -71,7 +71,7 @@ public static class Bubbler_Add
         // Otherwise, block normal bubble and generate talk
         prompt = $"{prompt} ({interactionDef.label})";
         pawnState.AddTalkRequest(prompt, recipient, TalkType.Chitchat);
-        return false;// 照樣接管原本泡泡
+        return false;
     }
 
     public static void Postfix()
