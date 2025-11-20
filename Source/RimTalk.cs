@@ -41,6 +41,9 @@ public class RimTalk : GameComponent
             settings.CurrentCloudConfigIndex = 0;
         }
 
+        // ★ 回主選單 / 讀檔時，先取消所有人格更新重試
+        PersonaService.CancelAllRetries();
+
         AIErrorHandler.ResetQuotaWarning();
         TickManagerPatch.Reset();
         AIClientFactory.Clear();

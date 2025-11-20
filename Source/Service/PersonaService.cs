@@ -1,4 +1,5 @@
-﻿using RimTalk.Client;
+﻿using System.Threading;
+using RimTalk.Client;
 using RimTalk.Service;
 using RimTalk.Util;
 using System;
@@ -14,6 +15,28 @@ public static class PersonaService
     static PersonaService()
     {
         TalkHistory.OnHistoryBatchReady += OnHistoryBatchReady;
+    }
+
+    // ★ 全域重試用的 CancellationTokenSource
+    private static CancellationTokenSource _retryCts = new CancellationTokenSource();
+
+    /// <summary>
+    /// 取消目前所有人格更新重試，並建立新的 Token。
+    /// 在回主選單 / 讀檔時呼叫。
+    /// </summary>
+    public static void CancelAllRetries()
+    {
+        try
+        {
+            _retryCts.Cancel();
+        }
+        catch
+        {
+            // 忽略取消時的例外
+        }
+
+        _retryCts.Dispose();
+        _retryCts = new CancellationTokenSource();
     }
 
     private static bool AutoUpdateEnabled =>
@@ -65,24 +88,20 @@ public static class PersonaService
 
     private static async void OnHistoryBatchReady(Pawn pawn, List<(Role role, string message)> batch)
     {
+        if (!AutoUpdateEnabled) return;
+        if (pawn == null || pawn.Dead || pawn.Destroyed) return;
+        if (batch == null || batch.Count == 0) return;
+
+        // ★ 每次進來時擷取當前的 token
+        var token = _retryCts.Token;
+
         try
         {
-            if (!AutoUpdateEnabled) return;
-            if (pawn == null || pawn.Dead || pawn.Destroyed) return;
-            if (batch == null || batch.Count == 0) return;
-
-            // 目前人格全文
-            string currentPersona = GetPersonality(pawn);
-            if (string.IsNullOrWhiteSpace(currentPersona)) return;
-
-            // 拆成「人格主體」＋「最後一段長期記憶（可空）」
-            SplitPersonality(currentPersona, out var corePersonaHead, out var longTermMemory, out var corePersonaTail);
-
             // ====== 先選好這次要用的 API client + config ======
             var settings = Settings.Get();
-            IAIClient client;
             ApiConfig usedConfig = null;
 
+            // 依你現在的規則選 config：簡單模式 = 當前 config；進階模式 = 列表最後一個
             if (settings.UseSimpleConfig)
             {
                 // 基本模式：複製主系統現在的選擇邏輯
@@ -94,15 +113,12 @@ public static class PersonaService
                         idx = 0;
                         settings.CurrentCloudConfigIndex = 0;
                     }
-
                     usedConfig = settings.CloudConfigs[idx];
                 }
                 else
                 {
                     usedConfig = settings.LocalConfig;
                 }
-
-                client = AIClientFactory.GetAIClient();
             }
             else
             {
@@ -115,20 +131,83 @@ public static class PersonaService
                 {
                     usedConfig = settings.LocalConfig;
                 }
-
-                if (usedConfig == null || !usedConfig.IsValid())
-                {
-                    return;
-                }
-
-                client = AIClientFactory.GetAIClientForConfig(usedConfig);
+            }
+            if (usedConfig == null || !usedConfig.IsValid())
+            {
+                Messages.Message($"[RimTalk] {pawn.LabelShortCap} 的人格更新失败：API 设定无效。", MessageTypeDefOf.RejectInput);
+                return;
             }
 
-            if (client == null) return;
+            const int maxRetry = 10; // 若你真想「直到成功」，可設為 0，或用 int.MaxValue，比較保險建議設一個上限
+            int attempt = 0;
+            bool success = false;
 
-            // ======================================================
-            // Step 1：把這批 MessageHistory 濃縮成「短期記憶」
-            // ======================================================
+            while (true)
+            {
+                // ★ 若已被取消（回主選單 / 讀檔），直接跳出
+                if (token.IsCancellationRequested) break;
+
+                if (pawn.Dead || pawn.Destroyed) break;
+                if (!AutoUpdateEnabled) break;
+
+                success = await TryUpdatePersonaFromBatch(pawn, batch, usedConfig);
+                attempt++;
+
+                if (success)
+                {
+                    // 顯示使用的模型
+                    var modelName = usedConfig.SelectedModel;
+                    if (string.IsNullOrWhiteSpace(modelName))
+                        modelName = "未知模型";
+                    Messages.Message( $"[RimTalk] {pawn.LabelShortCap} 的人格记忆已根据近期对话更新（模型：{modelName}）。", MessageTypeDefOf.PositiveEvent);
+                    break;
+                }
+                // 若有設上限，超過就停止
+                if (maxRetry > 0 && attempt >= maxRetry)
+                {
+                    Messages.Message($"[RimTalk] {pawn.LabelShortCap} 的人格更新失败 {maxRetry} 次，已放弃重试。", MessageTypeDefOf.RejectInput);
+                    break;
+                }
+                // 失敗：失敗時提示
+                Messages.Message($"[RimTalk] {pawn.LabelShortCap} 的人格更新失败，将在约 1 分钟后重试。", MessageTypeDefOf.NegativeEvent);
+                // ★ 等候 1 分鐘，使用 token，可在 Reset 時被取消
+                try
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(1), token);
+                }
+                catch (TaskCanceledException)
+                {
+                    // 被回主選單 / 讀檔取消，不需要顯示錯誤，靜靜結束即可
+                    break;
+                }
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            // 另一層保險：若 delay 之外的 await 也被 token 取消
+            // 一樣靜默結束，不提示玩家
+        }
+        catch (Exception e)
+        {
+            Messages.Message( $"[RimTalk] {pawn?.LabelShortCap ?? "角色"} 的人格更新失败：{e.Message}", MessageTypeDefOf.NegativeEvent);
+        }
+    }
+
+    private static async Task<bool> TryUpdatePersonaFromBatch(Pawn pawn, List<(Role role, string message)> batch, ApiConfig usedConfig)
+    {
+        try
+        {
+            // 目前人格全文
+            string currentPersona = GetPersonality(pawn);
+            if (string.IsNullOrWhiteSpace(currentPersona)) return false;
+
+            // 拆成：人格頭部、長期記憶、尾部（你之前寫好的 split/compose）
+            SplitPersonality(currentPersona, out var corePersonaHead, out var longTermMemory, out var corePersonaTail);
+
+            var client = AIClientFactory.GetAIClientForConfig(usedConfig);
+            if (client == null) return false;
+
+            // ===== Step 1：batch → 短期記憶 =====
             var shortSb = new System.Text.StringBuilder();
             shortSb.AppendLine($"以下是 {pawn.LabelShortCap} 最近的一些对话与互动记录。");
             shortSb.AppendLine("请你将这些内容整理成一段简短的「短期记忆」，用于描述近期发生的重要事件、情绪变化、人际关系与心态。");
@@ -136,8 +215,7 @@ public static class PersonaService
             shortSb.AppendLine("1. 提炼地点、人物、事件，将相似事件合并，标注频率。");
             shortSb.AppendLine("2. 只描述事实与心理，不要加入系统说明或指令。");
             shortSb.AppendLine($"3. 请始终以 {pawn.LabelShortCap} 的主观视角来理解。");
-            shortSb.AppendLine("4. 控制在100字以内。");
-            shortSb.AppendLine("5. 只输出短期记忆内容本身，不要加任何标题或额外说明。");
+            shortSb.AppendLine("4. 只输出短期记忆内容本身，不要加任何标题或额外说明，字数≤100字。");
             shortSb.AppendLine();
             shortSb.AppendLine("最近互动记录：");
 
@@ -149,30 +227,22 @@ public static class PersonaService
             }
 
             string shortTermSystemInstruction =
-                "你是一个帮忙整理角色记忆的助手。你的任务是根据提供的对话与事件记录，" +
+                "你是一个帮忙整理游戏角色记忆的助手。你的任务是根据提供的对话与事件记录，" +
                 "写出一段可作为角色「短期记忆」的总结文字。";
 
             var shortPayload = await client.GetChatCompletionAsync(
                 shortTermSystemInstruction,
-                new List<(Role role, string message)>
-                {
-                (Role.User, shortSb.ToString())
-                });
+                new List<(Role role, string message)> { (Role.User, shortSb.ToString()) });
 
             if (shortPayload == null || string.IsNullOrWhiteSpace(shortPayload.Response))
             {
-                Messages.Message(
-                    $"[RimTalk] {pawn.LabelShortCap} 的人格更新失败：短期记忆生成失败。",
-                    MessageTypeDefOf.RejectInput);
-                return;
+                return false;
             }
 
             // 短期記憶用完即丟，不另存，只傳給下一步
             string shortMemory = shortPayload.Response.Trim();
 
-            // ======================================================
-            // Step 2：用「短期記憶 + 舊的長期記憶」生成新的長期記憶
-            // ======================================================
+            // ===== Step 2：用短期記憶 + 舊長期記憶 → 新長期記憶 =====
             var archiveSb = new System.Text.StringBuilder();
             archiveSb.AppendLine($"下面是 {pawn.LabelShortCap} 的人格描述（不包含记忆部分）：");
             archiveSb.AppendLine(corePersonaHead);
@@ -193,8 +263,7 @@ public static class PersonaService
             archiveSb.AppendLine("2. 将这次短期记忆中，可能持续影响角色的体验与情绪浓缩进去。");
             archiveSb.AppendLine("3. 总结重要里程碑事件和转折点，合并相似经历，突出长期趋势。");
             archiveSb.AppendLine($"4. 请始终以 {pawn.LabelShortCap} 的主观视角来理解。");
-            archiveSb.AppendLine("5. 控制在80字以内。");
-            archiveSb.AppendLine("6. 只输出更新后的长期记忆内容本身，不要加标题或任何额外说明。");
+            archiveSb.AppendLine("5. 只输出更新后的长期记忆内容本身，不要加标题或任何额外说明，字数≤80字。");
 
             string archiveSystemInstruction =
                 "你是一个帮忙管理角色记忆档案的助手。根据人格描述、旧的长期记忆和新的短期记忆，" +
@@ -202,42 +271,25 @@ public static class PersonaService
 
             var archivePayload = await client.GetChatCompletionAsync(
                 archiveSystemInstruction,
-                new List<(Role role, string message)>
-                {
-                (Role.User, archiveSb.ToString())
-                });
+                new List<(Role role, string message)> { (Role.User, archiveSb.ToString()) });
 
             if (archivePayload == null || string.IsNullOrWhiteSpace(archivePayload.Response))
             {
-                Messages.Message(
-                    $"[RimTalk] {pawn.LabelShortCap} 的人格更新失败：长期记忆归档失败。",
-                    MessageTypeDefOf.RejectInput);
-                return;
+                return false;
             }
 
             string newLongTermMemory = archivePayload.Response.Trim();
 
-            // 用「人格主體 + 新長期記憶」重組 Personality，短期記憶不保留
+            // 用「人格主體 + 新長期記憶 + 尾部」重組 Personality
             string newPersonality = ComposePersonality(corePersonaHead, newLongTermMemory, corePersonaTail);
             SetPersonality(pawn, newPersonality);
 
-            // 顯示使用的模型
-            var modelName = usedConfig?.SelectedModel;
-            if (string.IsNullOrWhiteSpace(modelName))
-            {
-                modelName = "未知模型";
-            }
-
-            Messages.Message(
-                $"[RimTalk] {pawn.LabelShortCap} 的人格记忆已根据近期对话更新（模型：{modelName}）。",
-                MessageTypeDefOf.PositiveEvent);
+            return true;
         }
         catch (Exception e)
         {
-            Logger.Warning($"Auto persona update failed for {pawn}: {e}");
-            Messages.Message(
-                $"[RimTalk] {pawn?.LabelShortCap ?? "角色"} 的人格更新失败：{e.Message}",
-                MessageTypeDefOf.NegativeEvent);
+            Messages.Message($"[RimTalk] {pawn?.LabelShortCap ?? "角色"} 的人格更新失败：{e.Message}", MessageTypeDefOf.NegativeEvent);
+            return false;
         }
     }
 

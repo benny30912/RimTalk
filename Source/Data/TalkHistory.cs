@@ -60,12 +60,11 @@ public static class TalkHistory
         list.Add(new TalkMessageEntry { Role = Role.User, Text = request });
         list.Add(new TalkMessageEntry { Role = Role.AI, Text = response });
 
-        EnsureMessageLimit(list);
-
         // 先更新 batch 計數，再決定要不要做事
         int added = list.Count - beforeCount; // 通常是 2，但這樣寫比較保險
         ProcessBatchIfNeeded(record, added);
 
+        EnsureMessageLimit(list);
     }
     private static void ProcessBatchIfNeeded(PawnMessageHistoryRecord record, int added)
     {
