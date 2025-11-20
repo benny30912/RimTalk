@@ -131,6 +131,12 @@ public static class AIService
 
         var jsonData = JsonUtil.DeserializeFromJson<T>(payload.Response);
 
+        if (jsonData == null)
+        {
+            apiLog.Response = "Failed";
+            return null;
+        }
+
         ApiHistory.AddResponse(apiLog.Id, jsonData.ToString(), payload: payload);
 
         return jsonData;
