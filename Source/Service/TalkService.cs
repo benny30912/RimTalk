@@ -98,12 +98,16 @@ public static class TalkService
             var playerDict = allInvolvedPawns.ToDictionary(p => p.LabelShort, p => p);
             var receivedResponses = new List<TalkResponse>();
 
-            var userHistory = TalkHistory.GetMessageHistory(initiator).Where(m => m.role == Role.User).ToList();// ★ 只取 User 歷史，不要把過去的 AI 回覆丟給模型
+            // 1. 先抓這個 pawn 的完整歷史（User + AI）
+            var fullHistory = TalkHistory.GetMessageHistory(initiator);
+
+            // 2. 把歷史轉成「只保留情境的 user 記憶區塊」
+            var memoryBlockHistory = PromptService.BuildMemoryBlockFromHistory(fullHistory);
 
             // Call the streaming chat service. The callback is executed as each piece of dialogue is parsed.
             await AIService.ChatStreaming(
                 talkRequest,
-                userHistory,  // ★ 這裡改成 userHistory
+                memoryBlockHistory,  // 3. 把這個「記憶區塊」當作 history 傳給 LLM
                 playerDict,
                 (pawn, talkResponse) =>
                 {
