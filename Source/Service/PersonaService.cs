@@ -224,7 +224,7 @@ public static class PersonaService
                 archiveSb.AppendLine($"下面是 {pawn.LabelShortCap} 目前的「长期记忆」（可能为空）：");
                 archiveSb.AppendLine(string.IsNullOrWhiteSpace(oldLongTerm)? "（目前没有长期记忆记录。）": oldLongTerm);
                 archiveSb.AppendLine();
-                archiveSb.AppendLine($"下面是 {pawn.LabelShortCap} 近期的「短期记忆」（可能为空）：");
+                archiveSb.AppendLine($"下面是 {pawn.LabelShortCap} 之前累积的「短期记忆」（可能为空）：");
                 archiveSb.AppendLine(string.IsNullOrWhiteSpace(oldShortTerm)? "（目前没有短期记忆记录。）": oldShortTerm);
                 archiveSb.AppendLine();
                 archiveSb.AppendLine($"请在不改变角色人格基调的前提下，将短期记忆整合进长期记忆，生成一段更新后的「{pawn.LabelShortCap} 的长期记忆」。");
@@ -234,7 +234,7 @@ public static class PersonaService
                 archiveSb.AppendLine("3. 总结重要里程碑事件和转折点，合并相似经历，突出长期趋势。");
                 archiveSb.AppendLine("4. 只输出更新后的长期记忆内容本身，不要加标题或任何额外说明，字数必须控制在120字以内。");
 
-                string archiveSystemInstruction = "你是一个帮忙管理角色记忆档案的助手。根据人格描述、旧的长期记忆和短期记忆，" + "生成一份更新后的长期记忆。";
+                string archiveSystemInstruction = "你是一个帮忙管理角色记忆档案的助手。根据人格描述、旧的长期记忆和旧的短期记忆，" + "生成一份更新后的长期记忆。";
 
                 var archivePayload = await client.GetChatCompletionAsync(archiveSystemInstruction, new List<(Role role, string message)>{(Role.User, archiveSb.ToString())});
 
