@@ -134,7 +134,7 @@ public static class PersonaService
             }
             if (usedConfig == null || !usedConfig.IsValid())
             {
-                Messages.Message($"[RimTalk] {pawn.LabelShortCap} 的人格更新失败：API 设定无效。", MessageTypeDefOf.RejectInput);
+                Messages.Message($"[RimTalk] {pawn.LabelShortCap} 的人格更新失败：API 设定无效。", MessageTypeDefOf.RejectInput, false);
                 return;
             }
 
@@ -159,17 +159,17 @@ public static class PersonaService
                     var modelName = usedConfig.SelectedModel;
                     if (string.IsNullOrWhiteSpace(modelName))
                         modelName = "未知模型";
-                    Messages.Message( $"[RimTalk] {pawn.LabelShortCap} 的人格记忆已根据近期对话更新（模型：{modelName}）。", MessageTypeDefOf.PositiveEvent);
+                    Messages.Message( $"[RimTalk] {pawn.LabelShortCap} 的人格记忆已根据近期对话更新（模型：{modelName}）。", MessageTypeDefOf.PositiveEvent, false);
                     break;
                 }
                 // 若有設上限，超過就停止
                 if (maxRetry > 0 && attempt >= maxRetry)
                 {
-                    Messages.Message($"[RimTalk] {pawn.LabelShortCap} 的人格更新失败 {maxRetry} 次，已放弃重试。", MessageTypeDefOf.RejectInput);
+                    Messages.Message($"[RimTalk] {pawn.LabelShortCap} 的人格更新失败 {maxRetry} 次，已放弃重试。", MessageTypeDefOf.RejectInput, false);
                     break;
                 }
                 // 失敗：失敗時提示
-                Messages.Message($"[RimTalk] {pawn.LabelShortCap} 的人格更新失败，将在约 1 分钟后重试。", MessageTypeDefOf.NegativeEvent);
+                Messages.Message($"[RimTalk] {pawn.LabelShortCap} 的人格更新失败，将在约 1 分钟后重试。", MessageTypeDefOf.NegativeEvent, false);
                 // ★ 等候 1 分鐘，使用 token，可在 Reset 時被取消
                 try
                 {
@@ -189,7 +189,7 @@ public static class PersonaService
         }
         catch (Exception e)
         {
-            Messages.Message( $"[RimTalk] {pawn?.LabelShortCap ?? "角色"} 的人格更新失败：{e.Message}", MessageTypeDefOf.NegativeEvent);
+            Messages.Message( $"[RimTalk] {pawn?.LabelShortCap ?? "角色"} 的人格更新失败：{e.Message}", MessageTypeDefOf.NegativeEvent, false);
         }
     }
 
@@ -201,21 +201,55 @@ public static class PersonaService
             string currentPersona = GetPersonality(pawn);
             if (string.IsNullOrWhiteSpace(currentPersona)) return false;
 
-            // 拆成：人格頭部、長期記憶、尾部（你之前寫好的 split/compose）
-            SplitPersonality(currentPersona, out var corePersonaHead, out var longTermMemory, out var corePersonaTail);
+            // 拆成：人格主體、長期記憶、短期記憶、尾部
+            SplitPersonality(currentPersona, out var corePersonaHead, out var oldLongTerm, out var oldShortTerm, out var corePersonaTail);
 
             var client = AIClientFactory.GetAIClientForConfig(usedConfig);
             if (client == null) return false;
 
-            // ===== Step 1：batch → 短期記憶 =====
+            // Step 1：舊長期記憶 + 舊短期記憶 → 新長期記憶
+            string newLongTerm = oldLongTerm;
+            // 只有真的有東西需要歸檔時才叫 LLM
+            if (!string.IsNullOrWhiteSpace(oldLongTerm) || !string.IsNullOrWhiteSpace(oldShortTerm))
+            {
+                var archiveSb = new System.Text.StringBuilder();
+                archiveSb.AppendLine($"下面是 {pawn.LabelShortCap} 的人格描述（不包含记忆部分）：");
+                archiveSb.AppendLine(corePersonaHead);
+                if (!string.IsNullOrWhiteSpace(corePersonaTail))
+                {
+                    archiveSb.AppendLine();
+                    archiveSb.AppendLine(corePersonaTail);
+                }
+                archiveSb.AppendLine();
+                archiveSb.AppendLine($"下面是 {pawn.LabelShortCap} 目前的「长期记忆」（可能为空）：");
+                archiveSb.AppendLine(string.IsNullOrWhiteSpace(oldLongTerm)? "（目前没有长期记忆记录。）": oldLongTerm);
+                archiveSb.AppendLine();
+                archiveSb.AppendLine($"下面是 {pawn.LabelShortCap} 近期的「短期记忆」（可能为空）：");
+                archiveSb.AppendLine(string.IsNullOrWhiteSpace(oldShortTerm)? "（目前没有短期记忆记录。）": oldShortTerm);
+                archiveSb.AppendLine();
+                archiveSb.AppendLine($"请在不改变角色人格基调的前提下，将短期记忆整合进长期记忆，生成一段更新后的「{pawn.LabelShortCap} 的长期记忆」。");
+                archiveSb.AppendLine("要求：");
+                archiveSb.AppendLine("1. 保留仍会持续影响角色的长期经历、关系与价值观。");
+                archiveSb.AppendLine("2. 将短期记忆中，可能持续影响角色的体验与情绪浓缩进去。");
+                archiveSb.AppendLine("3. 总结重要里程碑事件和转折点，合并相似经历，突出长期趋势。");
+                archiveSb.AppendLine("4. 只输出更新后的长期记忆内容本身，不要加标题或任何额外说明，字数必须控制在120字以内。");
+
+                string archiveSystemInstruction = "你是一个帮忙管理角色记忆档案的助手。根据人格描述、旧的长期记忆和短期记忆，" + "生成一份更新后的长期记忆。";
+
+                var archivePayload = await client.GetChatCompletionAsync(archiveSystemInstruction, new List<(Role role, string message)>{(Role.User, archiveSb.ToString())});
+
+                if (archivePayload == null || string.IsNullOrWhiteSpace(archivePayload.Response)){return false;}
+
+                newLongTerm = archivePayload.Response.Trim();
+            }
+            // Step 2：這一批 batch → 新「短期記憶」
             var shortSb = new System.Text.StringBuilder();
             shortSb.AppendLine($"以下是 {pawn.LabelShortCap} 最近的一些对话与互动记录。");
-            shortSb.AppendLine("请你将这些内容整理成一段简短的「短期记忆」，用于描述近期发生的重要事件、情绪变化、人际关系与心态。");
+            shortSb.AppendLine($"请你将这些内容整理成一段简短的「{pawn.LabelShortCap} 的短期记忆」，用于描述近期发生的重要事件、情绪变化、人际关系与心态。");
             shortSb.AppendLine("要求：");
             shortSb.AppendLine("1. 提炼地点、人物、事件，将相似事件合并，标注频率。");
             shortSb.AppendLine("2. 只描述事实与心理，不要加入系统说明或指令。");
-            shortSb.AppendLine($"3. 请始终以 {pawn.LabelShortCap} 的主观视角来理解。");
-            shortSb.AppendLine("4. 只输出短期记忆内容本身，不要加任何标题或额外说明，字数≤100字。");
+            shortSb.AppendLine("3. 只输出短期记忆内容本身，不要加任何标题或额外说明，字数必须控制在80字以内。");
             shortSb.AppendLine();
             shortSb.AppendLine("最近互动记录：");
 
@@ -226,83 +260,36 @@ public static class PersonaService
                 shortSb.AppendLine($"{prefix} {msg}");
             }
 
-            string shortTermSystemInstruction =
-                "你是一个帮忙整理游戏角色记忆的助手。你的任务是根据提供的对话与事件记录，" +
-                "写出一段可作为角色「短期记忆」的总结文字。";
+            string shortTermSystemInstruction = "你是一个帮忙整理角色记忆的助手。你的任务是根据提供的对话与事件记录，" + "写出一段可作为角色「短期记忆」的总结文字。";
 
-            var shortPayload = await client.GetChatCompletionAsync(
-                shortTermSystemInstruction,
-                new List<(Role role, string message)> { (Role.User, shortSb.ToString()) });
+            var shortPayload = await client.GetChatCompletionAsync(shortTermSystemInstruction, new List<(Role role, string message)>{(Role.User, shortSb.ToString())});
 
-            if (shortPayload == null || string.IsNullOrWhiteSpace(shortPayload.Response))
-            {
-                return false;
-            }
+            if (shortPayload == null || string.IsNullOrWhiteSpace(shortPayload.Response)){return false;}
 
-            // 短期記憶用完即丟，不另存，只傳給下一步
-            string shortMemory = shortPayload.Response.Trim();
-
-            // ===== Step 2：用短期記憶 + 舊長期記憶 → 新長期記憶 =====
-            var archiveSb = new System.Text.StringBuilder();
-            archiveSb.AppendLine($"下面是 {pawn.LabelShortCap} 的人格描述（不包含记忆部分）：");
-            archiveSb.AppendLine(corePersonaHead);
-            archiveSb.AppendLine();
-            archiveSb.AppendLine(corePersonaTail);
-            archiveSb.AppendLine();
-            archiveSb.AppendLine($"下面是 {pawn.LabelShortCap} 目前的「长期记忆」摘要（可能为空）：");
-            archiveSb.AppendLine(string.IsNullOrWhiteSpace(longTermMemory)
-                ? "（目前没有长期记忆记录。）"
-                : longTermMemory);
-            archiveSb.AppendLine();
-            archiveSb.AppendLine($"下面是 {pawn.LabelShortCap} 近期的「短期记忆」：");
-            archiveSb.AppendLine(shortMemory);
-            archiveSb.AppendLine();
-            archiveSb.AppendLine("请在不改变角色人格基调的前提下，将新的短期记忆整合进长期记忆，生成一段更新后的「长期记忆」。");
-            archiveSb.AppendLine("要求：");
-            archiveSb.AppendLine("1. 保留以往长期记忆中仍然重要的部分。");
-            archiveSb.AppendLine("2. 将这次短期记忆中，可能持续影响角色的体验与情绪浓缩进去。");
-            archiveSb.AppendLine("3. 总结重要里程碑事件和转折点，合并相似经历，突出长期趋势。");
-            archiveSb.AppendLine($"4. 请始终以 {pawn.LabelShortCap} 的主观视角来理解。");
-            archiveSb.AppendLine("5. 只输出更新后的长期记忆内容本身，不要加标题或任何额外说明，字数≤80字。");
-
-            string archiveSystemInstruction =
-                "你是一个帮忙管理角色记忆档案的助手。根据人格描述、旧的长期记忆和新的短期记忆，" +
-                "生成一份更新后的长期记忆摘要。";
-
-            var archivePayload = await client.GetChatCompletionAsync(
-                archiveSystemInstruction,
-                new List<(Role role, string message)> { (Role.User, archiveSb.ToString()) });
-
-            if (archivePayload == null || string.IsNullOrWhiteSpace(archivePayload.Response))
-            {
-                return false;
-            }
-
-            string newLongTermMemory = archivePayload.Response.Trim();
-
-            // 用「人格主體 + 新長期記憶 + 尾部」重組 Personality
-            string newPersonality = ComposePersonality(corePersonaHead, newLongTermMemory, corePersonaTail);
+            string newShortTerm = shortPayload.Response.Trim();
+            // Step 3：用「人格主體 + 新長期 + 新短期 + 尾部」重組 Personality
+            string newPersonality = ComposePersonality(corePersonaHead, newLongTerm, newShortTerm, corePersonaTail);
             SetPersonality(pawn, newPersonality);
 
             return true;
         }
         catch (Exception e)
         {
-            Messages.Message($"[RimTalk] {pawn?.LabelShortCap ?? "角色"} 的人格更新失败：{e.Message}", MessageTypeDefOf.NegativeEvent);
+            Messages.Message($"[RimTalk] {pawn?.LabelShortCap ?? "角色"} 的人格更新失败：{e.Message}", MessageTypeDefOf.NegativeEvent, false);
             return false;
         }
     }
 
     private const string MemorySeparatorLine = "---";
 
-    private static void SplitPersonality(string personality, out string head, out string longTerm, out string tail)
+    private static void SplitPersonality(string personality, out string head, out string longTerm, out string shortTerm, out string tail)
     {
         head = string.Empty;
         longTerm = string.Empty;
+        shortTerm = string.Empty;
         tail = string.Empty;
 
-        if (string.IsNullOrWhiteSpace(personality))
-            return;
+        if (string.IsNullOrWhiteSpace(personality))return;
 
         // 正規化換行
         var text = personality.Replace("\r\n", "\n");
@@ -329,8 +316,7 @@ public static class PersonaService
         // 收尾
         sections.Add(current);
 
-        string JoinSection(List<string> s) =>
-            string.Join("\n", s).TrimEnd('\r', '\n');
+        string JoinSection(List<string> s) => string.Join("\n", s).TrimEnd('\r', '\n');
 
         if (sections.Count == 1)
         {
@@ -341,18 +327,28 @@ public static class PersonaService
 
         if (sections.Count == 2)
         {
-            // 只有一條 "---"
+            // 兩段 → 人格主體 + 尾部，其餘視為空
             head = JoinSection(sections[0]);
-            longTerm = JoinSection(sections[1]);
+            tail = JoinSection(sections[1]);
             return;
         }
 
-        // 三段以上：第一段 = 人格小傳；第二段 = 長期記憶；剩下全部合成 tail（其他資訊）
+        if (sections.Count == 3)
+        {
+            // 三段 → 人格主體 + 長期記憶 + 尾部，短期記憶為空
+            head = JoinSection(sections[0]);
+            longTerm = JoinSection(sections[1]);
+            tail = JoinSection(sections[2]);
+            return;
+        }
+
+        // 四段以上：第一段 = 人格主體 第二段 = 長期記憶 第三段 = 短期記憶 其餘段落合併為尾部，中間保留分隔線結構
         head = JoinSection(sections[0]);
         longTerm = JoinSection(sections[1]);
+        shortTerm = JoinSection(sections[2]);
 
         var tailSections = new List<string>();
-        for (int i = 2; i < sections.Count; i++)
+        for (int i = 3; i < sections.Count; i++)
         {
             if (tailSections.Count > 0)
             {
@@ -360,50 +356,39 @@ public static class PersonaService
                 tailSections.Add(MemorySeparatorLine);
             }
             var secText = JoinSection(sections[i]);
-            if (!string.IsNullOrEmpty(secText))
-                tailSections.Add(secText);
+            if (!string.IsNullOrEmpty(secText))tailSections.Add(secText);
         }
 
         tail = string.Join("\n", tailSections).TrimEnd('\r', '\n');
     }
 
-    private static string ComposePersonality(string head, string longTerm, string tail)
+    private static string ComposePersonality(string head, string longTerm, string shortTerm, string tail)
     {
         head = head?.TrimEnd('\r', '\n') ?? string.Empty;
         longTerm = longTerm?.TrimEnd('\r', '\n') ?? string.Empty;
+        shortTerm = shortTerm?.TrimEnd('\r', '\n') ?? string.Empty;
         tail = tail?.TrimEnd('\r', '\n') ?? string.Empty;
 
         var sb = new System.Text.StringBuilder();
 
-        // 第一段：人格小傳（head）
-        if (!string.IsNullOrEmpty(head))
+        // 第一段：人格主體
+        if (!string.IsNullOrEmpty(head)){sb.Append(head);}
+
+        // 往後只要有任一記憶或尾部，就輸出標準 4 段結構
+        bool hasAnyMemoryOrTail = !string.IsNullOrEmpty(longTerm) || !string.IsNullOrEmpty(shortTerm) || !string.IsNullOrEmpty(tail);
+
+        if (hasAnyMemoryOrTail)
         {
-            sb.Append(head);
-        }
+            sb.AppendLine();
+            sb.AppendLine(MemorySeparatorLine);   // head 與長期記憶之間
 
-        // 中間和後面只要有任一段有東西，就插入分隔線
-        bool hasMiddleOrTail = !string.IsNullOrEmpty(longTerm) || !string.IsNullOrEmpty(tail);
+            sb.AppendLine(longTerm ?? string.Empty);
+            sb.AppendLine(MemorySeparatorLine);   // 長期與短期之間
 
-        if (hasMiddleOrTail)
-        {
-            if (sb.Length > 0)
-                sb.Append('\n');
+            sb.AppendLine(shortTerm ?? string.Empty);
+            sb.AppendLine(MemorySeparatorLine);   // 短期與尾部之間
 
-            // 第一條分隔線
-            sb.AppendLine(MemorySeparatorLine);
-
-            // 第二段：長期記憶（可以是空，空的話就讓 "---" 上下貼著）
-            if (!string.IsNullOrEmpty(longTerm))
-            {
-                sb.AppendLine(longTerm);
-            }
-
-            // 如果有 tail，補上第二條分隔線 + 其他資訊
-            if (!string.IsNullOrEmpty(tail))
-            {
-                sb.AppendLine(MemorySeparatorLine);
-                sb.Append(tail);
-            }
+            sb.Append(tail ?? string.Empty);
         }
 
         return sb.ToString().TrimEnd('\r', '\n');

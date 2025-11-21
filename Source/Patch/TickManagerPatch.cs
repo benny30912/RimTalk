@@ -39,8 +39,7 @@ internal static class TickManagerPatch
 
         if (!_noApiKeyMessageShown && Settings.Get().GetActiveConfig() == null)
         {
-            Messages.Message("RimTalk.TickManager.ApiKeyMissing".Translate(), MessageTypeDefOf.NegativeEvent,
-                false);
+            Messages.Message("RimTalk.TickManager.ApiKeyMissing".Translate(), MessageTypeDefOf.NegativeEvent, false);
             _noApiKeyMessageShown = true;
         }
 

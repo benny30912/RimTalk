@@ -94,7 +94,7 @@ public class PawnState(Pawn pawn)
     public bool CanGenerateTalk()
     {
         return !IsGeneratingTalk && CanDisplayTalk() && TalkResponses.Empty() 
-               && CommonUtil.HasPassed(LastTalkTick, Settings.Get().TalkInterval);;
+               && CommonUtil.HasPassed(LastTalkTick, Settings.Get().TalkInterval);
     }
     
     public void IgnoreTalkResponse()
