@@ -49,7 +49,7 @@ public static class PromptService
         StringBuilder sb = new StringBuilder();
 
         var name = pawn.LabelShort;
-        var title = pawn.story.title == null ? "" : $"({pawn.story.title})";
+        var title = pawn.story?.title == null ? "" : $"({pawn.story.title})";
         var genderAndAge = Regex.Replace(pawn.MainDesc(false), @"\(\d+\)", "");
         sb.AppendLine($"{name} {title} ({genderAndAge})");
 
@@ -60,7 +60,7 @@ public static class PromptService
         {
             var xenotypeInfo = $"Race: {pawn.genes.Xenotype.LabelCap}";
             // if (!pawn.genes.Xenotype.descriptionShort.NullOrEmpty())
-                // xenotypeInfo += $" - {pawn.genes.Xenotype.descriptionShort}";
+            // xenotypeInfo += $" - {pawn.genes.Xenotype.descriptionShort}";
             sb.AppendLine(xenotypeInfo);
         }
 
@@ -103,7 +103,7 @@ public static class PromptService
         if (pawn.IsEnemy() || pawn.IsVisitor())
             return sb.ToString();
 
-        if (pawn.story.Childhood != null)
+        if (pawn.story?.Childhood != null)
         {
             var childHood =
                 $"Childhood: {pawn.story.Childhood.title}({pawn.story.Childhood.titleShort})";
@@ -111,7 +111,7 @@ public static class PromptService
             sb.AppendLine(childHood);
         }
 
-        if (pawn.story.Adulthood != null)
+        if (pawn.story?.Adulthood != null)
         {
             var adulthood =
                 $"Adulthood: {pawn.story.Adulthood.title}({pawn.story.Adulthood.titleShort})";
@@ -120,17 +120,14 @@ public static class PromptService
         }
 
         var traits = "Traits: ";
-        foreach (Trait trait in pawn.story.traits.TraitsSorted)
+        foreach (Trait trait in pawn.story?.traits?.TraitsSorted ?? Enumerable.Empty<Trait>())
         {
-            foreach (TraitDegreeData degreeData in trait.def.degreeDatas)
+            foreach (var degreeData in trait.def.degreeDatas.Where(degreeData => degreeData.degree == trait.Degree))
             {
-                if (degreeData.degree == trait.Degree)
-                {
-                    traits += degreeData.label + (infoLevel == InfoLevel.Full
-                        ? $":{Sanitize(degreeData.description, pawn)}\n"
-                        : ",");
-                    break;
-                }
+                traits += degreeData.label + (infoLevel == InfoLevel.Full
+                    ? $":{Sanitize(degreeData.description, pawn)}\n"
+                    : ",");
+                break;
             }
         }
 
@@ -139,7 +136,7 @@ public static class PromptService
         if (infoLevel != InfoLevel.Short)
         {
             var skills = "Skills: ";
-            foreach (SkillRecord skillRecord in pawn.skills.skills)
+            foreach (SkillRecord skillRecord in pawn.skills?.skills ?? Enumerable.Empty<SkillRecord>())
             {
                 skills += $"{skillRecord.def.label}: {skillRecord.Level}, ";
             }
@@ -243,7 +240,7 @@ public static class PromptService
 
             var wornApparel = pawn.apparel?.WornApparel;
             var apparelLabels =
-                wornApparel != null ? wornApparel.Select(a => a.LabelCap) : Enumerable.Empty<string>();
+                wornApparel != null ? wornApparel.Select(a => a.LabelCap) : [];
 
             if (apparelLabels.Any())
             {
@@ -261,22 +258,18 @@ public static class PromptService
     {
         var sb = new StringBuilder();
         CommonUtil.InGameData gameData = CommonUtil.GetInGameData();
-        
+
         string shortName = $"{pawns[0].LabelShort}({pawns[0].GetRole()})";
 
         // Add the conversation part
         if (talkRequest.TalkType == TalkType.User)
         {
-            if (talkRequest.Initiator == talkRequest.Recipient)
-                sb.Append(
-                    $"A voice from beyond says '{pawns[0].LabelShort}({pawns[0].GetRole()}):{talkRequest.Prompt}'");
-            else
-                sb.Append(
-                    $"{pawns[1].LabelShort}({pawns[1].GetRole()}) said to '{pawns[0].LabelShort}({pawns[0].GetRole()}):{talkRequest.Prompt}'. Generate multi turn dialogues, starting with {pawns[0].LabelShort}, ");
+            sb.Append($"{pawns[1].LabelShort}({pawns[1].GetRole()}) said to '{pawns[0].LabelShort}({pawns[0].GetRole()}): {talkRequest.Prompt}'.");
+            sb.Append($"Generate multi turn dialogues starting after this (do not repeat initial dialogue), beginning with {pawns[0].LabelShort}");
         }
         else
         {
-            if (pawns.Count == 1) 
+            if (pawns.Count == 1)
                 sb.Append($"{shortName} short monologue");
             else if (pawns[0].IsInCombat() || pawns[0].GetMapRole() == MapRole.Invading)
             {
@@ -284,11 +277,13 @@ public static class PromptService
                 {
                     talkRequest.Prompt = null;
                 }
+
                 talkRequest.TalkType = TalkType.Urgent;
                 if (pawns[0].IsSlave || pawns[0].IsPrisoner)
                     sb.Append($"{shortName} dialogue short (worry)");
-                else 
-                    sb.Append($"{shortName} dialogue short, urgent tone ({pawns[0].GetMapRole().ToString().ToLower()}/command)");
+                else
+                    sb.Append(
+                        $"{shortName} dialogue short, urgent tone ({pawns[0].GetMapRole().ToString().ToLower()}/command)");
             }
             else
             {
@@ -302,7 +297,7 @@ public static class PromptService
             else
                 sb.Append($"\n{talkRequest.Prompt}");
         }
-        
+
 
         // add pawn status
         sb.Append($"\n{status}");
