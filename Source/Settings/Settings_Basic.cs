@@ -79,6 +79,10 @@ public partial class Settings
         leftListing.CheckboxLabeled("RimTalk.Settings.AllowCustomConversation".Translate().ToString(),
             ref settings.AllowCustomConversation,
             "RimTalk.Settings.AllowCustomConversationTooltip".Translate().ToString());
+        leftListing.Gap(12f);
+        leftListing.CheckboxLabeled("RimTalk.Settings.ContinueDialogueWhileSleeping".Translate().ToString(),
+            ref settings.ContinueDialogueWhileSleeping,
+            "RimTalk.Settings.ContinueDialogueWhileSleepingTooltip".Translate().ToString());
         leftListing.Gap(12f); // ← 新增間距
         leftListing.CheckboxLabeled("RimTalk.Settings.EnableAutoPersonalityUpdate".Translate().ToString(),
             ref settings.EnableAutoPersonalityUpdate,
@@ -202,6 +206,7 @@ public partial class Settings
             settings.AllowOtherFactionsToTalk = false;
             settings.AllowEnemiesToTalk = false;
             settings.AllowCustomConversation = true;
+            settings.ContinueDialogueWhileSleeping = false;
             settings.EnableAutoPersonalityUpdate = true; // ← 新增
             settings.UseSimpleConfig = true;
             settings.DisableAiAtSpeed = 0;
