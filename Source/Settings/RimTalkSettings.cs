@@ -32,6 +32,8 @@ public class RimTalkSettings : ModSettings
     public int DisableAiAtSpeed = 0;
     public ButtonDisplayMode ButtonDisplay = ButtonDisplayMode.Tab;
 
+    public bool AllowBabiesToTalk = false;
+
     // Debug mode settings
     public bool DebugModeEnabled = false;
     public bool DebugGroupingEnabled = false;
@@ -161,6 +163,7 @@ public class RimTalkSettings : ModSettings
         Scribe_Values.Look(ref EnableAutoPersonalityUpdate, "EnableAutoPersonalityUpdate", false);
         Scribe_Values.Look(ref DisableAiAtSpeed, "DisableAiAtSpeed", 0);
         Scribe_Collections.Look(ref EnabledArchivableTypes, "enabledArchivableTypes", LookMode.Value, LookMode.Value);
+        Scribe_Values.Look(ref AllowBabiesToTalk, "allowBabiesToTalk", false);
 
         // Debug window settings
         Scribe_Values.Look(ref ButtonDisplay, "buttonDisplay", ButtonDisplayMode.Tab, true);
