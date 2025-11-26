@@ -253,12 +253,24 @@ public static class PersonaService
             shortSb.AppendLine();
             shortSb.AppendLine("最近互动记录：");
 
+            int lineCountBefore = shortSb.Length;
+
             foreach (var (role, msg) in batch)
             {
                 if (string.IsNullOrWhiteSpace(msg)) continue;
-                string prefix = role == Role.User ? "[情境]" : "[对话]";
-                shortSb.AppendLine($"{prefix} {msg}");
+                string ctx = msg;
+                string prefix = "[对话]";
+                if (role == Role.User) {
+                    // 抽出情境：去掉模板頭、語言行、各種「Talk about ...」「be dramatic」指令
+                    ctx = PromptService.ExtractContextFromPrompt(msg);
+                    if (string.IsNullOrWhiteSpace(ctx)) continue;
+                    prefix = "[情境]";
+                }
+                shortSb.AppendLine($"{prefix} {ctx.Trim()}");
             }
+
+            // 如果完全沒有任何可用內容，就不要更新短期記憶
+            if (shortSb.Length == lineCountBefore){return false;}
 
             string shortTermSystemInstruction = "你是一个帮忙整理角色记忆的助手。你的任务是根据提供的对话与事件记录，" + "写出一段可作为角色「短期记忆」的总结文字。";
 

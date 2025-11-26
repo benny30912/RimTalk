@@ -29,10 +29,13 @@ Visitor: polite, curious, deferential; treat other visitors in the same group as
 Enemy: hostile, aggressive; terse commands/threats
 
 Monologue = 1 turn. Conversation = 4-8 short turns";
+    /*
+        private const string JsonInstruction = @"
 
+    Return JSONL/NDJSON only, with objects containing ""name"" and ""text"" string keys";*/
     private const string JsonInstruction = @"
 
-Return JSONL/NDJSON only, with objects containing ""name"" and ""text"" string keys";
+Return JSON only, with objects containing ""name"" and ""text"" string keys";
 
     // Get the current instruction from settings or fallback to default, always append JSON instruction
     public static string Instruction =>

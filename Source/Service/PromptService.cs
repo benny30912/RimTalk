@@ -218,7 +218,7 @@ public static class PromptService
         }
 
         if (thoughts != "")
-            sb.AppendLine($"Memory: {thoughts}");
+            sb.AppendLine($"Thought: {thoughts}");
 
         if (pawn.IsSlave || pawn.IsPrisoner)
             sb.AppendLine(pawn.GetPrisonerSlaveStatus());
