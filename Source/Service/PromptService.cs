@@ -157,7 +157,7 @@ public static class PromptService
 
         // add Health
         var method = AccessTools.Method(typeof(HealthCardUtility), "VisibleHediffs");
-        IEnumerable<Hediff> hediffs = (IEnumerable<Hediff>)method.Invoke(null, new object[] { pawn, false });
+        IEnumerable<Hediff> hediffs = (IEnumerable<Hediff>)method.Invoke(null, [pawn, false]);
 
         var hediffGroups = hediffs
             .GroupBy(h => new
