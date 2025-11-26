@@ -413,12 +413,15 @@ public static class PromptService
             var trimmedLower = line.Trim().ToLowerInvariant();
 
             // 語言保證行，例如 "in 简体中文" / "in english"
-            if (trimmedLower.StartsWith("in ") && trimmedLower.Length > 3)
+            if (trimmedLower == $"in {Constant.Lang}".ToLowerInvariant())
                 continue;
 
             // 明顯模板字句（保守一點再過濾）
-            if (trimmedLower.Contains("generate multi turn dialogues") ||
-                trimmedLower.Contains("starts conversation, taking turns"))
+            if (trimmedLower.Contains("be dramatic (mental break)") ||
+                trimmedLower.Contains("(downed in pain. Short, strained dialogue)") ||
+                trimmedLower.Contains("(Talk if you want to accept quest)") ||
+                trimmedLower.Contains("(Talk about quest result)") ||
+                trimmedLower.Contains("(Talk about incident)"))
                 continue;
 
             // 其他行視為「情境 / 狀態」
