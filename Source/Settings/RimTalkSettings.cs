@@ -35,6 +35,8 @@ public class RimTalkSettings : ModSettings
     public int DisableAiAtSpeed = 0;
     public Settings.ButtonDisplayMode ButtonDisplay = Settings.ButtonDisplayMode.Tab;
 
+    public ContextSettings Context = new();
+
     // Debug mode settings
     public bool DebugModeEnabled = false;
     public bool DebugGroupingEnabled = false;
@@ -168,6 +170,8 @@ public class RimTalkSettings : ModSettings
         Scribe_Values.Look(ref AllowNonHumanToTalk, "allowNonHumanToTalk", true);
         Scribe_Values.Look(ref ApplyMoodAndSocialEffects, "applyMoodAndSocialEffects", false);
 
+        Scribe_Deep.Look(ref Context, "context");
+
         // Debug window settings
         Scribe_Values.Look(ref ButtonDisplay, "buttonDisplay", Settings.ButtonDisplayMode.Tab, true);
         Scribe_Values.Look(ref DebugModeEnabled, "debugModeEnabled", false);
@@ -217,6 +221,9 @@ public class RimTalkSettings : ModSettings
                 
         if (EnabledArchivableTypes == null)
             EnabledArchivableTypes = new Dictionary<string, bool>();
+
+        if (Context == null)
+            Context = new ContextSettings();
             
         // Ensure we have at least one cloud config
         if (CloudConfigs.Count == 0)
