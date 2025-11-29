@@ -83,7 +83,11 @@ public partial class Settings
         leftListing.CheckboxLabeled("RimTalk.Settings.ContinueDialogueWhileSleeping".Translate().ToString(),
             ref settings.ContinueDialogueWhileSleeping,
             "RimTalk.Settings.ContinueDialogueWhileSleepingTooltip".Translate().ToString());
-        leftListing.Gap(12f); // ← 新增間距
+        leftListing.Gap();
+        leftListing.CheckboxLabeled("RimTalk.Settings.ApplyMoodAndSocialEffects".Translate().ToString(),
+            ref settings.ApplyMoodAndSocialEffects,
+            "RimTalk.Settings.ApplyMoodAndSocialEffectsTooltip".Translate().ToString());
+        leftListing.Gap(); // ← 新增間距
         leftListing.CheckboxLabeled("RimTalk.Settings.EnableAutoPersonalityUpdate".Translate().ToString(),
             ref settings.EnableAutoPersonalityUpdate,
             "RimTalk.Settings.EnableAutoPersonalityUpdateTooltip".Translate().ToString()); // ← 新增 checkbox
@@ -215,6 +219,7 @@ public partial class Settings
             settings.AllowNonHumanToTalk = true;
             settings.AllowCustomConversation = true;
             settings.ContinueDialogueWhileSleeping = false;
+            settings.ApplyMoodAndSocialEffects = false;
             settings.EnableAutoPersonalityUpdate = true; // ← 新增
             settings.UseSimpleConfig = true;
             settings.DisableAiAtSpeed = 0;
