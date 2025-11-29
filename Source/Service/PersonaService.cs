@@ -229,10 +229,11 @@ public static class PersonaService
                 archiveSb.AppendLine();
                 archiveSb.AppendLine($"请在不改变角色人格基调的前提下，将短期记忆整合进长期记忆，生成一段更新后的「{pawn.LabelShortCap} 的长期记忆」。");
                 archiveSb.AppendLine("要求：");
-                archiveSb.AppendLine("1. 保留仍会持续影响角色的长期经历、关系与价值观。");
-                archiveSb.AppendLine("2. 将短期记忆中，可能持续影响角色的体验与情绪浓缩进去。");
-                archiveSb.AppendLine("3. 总结重要里程碑事件和转折点，合并相似经历，突出长期趋势。");
-                archiveSb.AppendLine("4. 只输出更新后的长期记忆内容本身，不要加标题或任何额外说明，字数必须控制在120字以内。");
+                archiveSb.AppendLine("1. 字数必须控制在120字以内。");
+                archiveSb.AppendLine("2. 保留仍会持续影响角色的长期经历、关系与价值观。");
+                archiveSb.AppendLine("3. 将短期记忆中，可能持续影响角色的体验与情绪浓缩进去。");
+                archiveSb.AppendLine("4. 总结重要里程碑事件和转折点，合并相似经历，突出长期趋势。");
+                archiveSb.AppendLine("5. 只输出更新后的长期记忆内容本身，不要加标题或任何额外说明，如果超过120字，请强制删除形容词和次要细节，直到符合要求为止。");
 
                 string archiveSystemInstruction = "你是一个帮忙管理角色记忆档案的助手。根据人格描述、旧的长期记忆和旧的短期记忆，" + "生成一份更新后的长期记忆。";
 
@@ -247,9 +248,10 @@ public static class PersonaService
             shortSb.AppendLine($"以下是 {pawn.LabelShortCap} 最近的一些对话与互动记录。");
             shortSb.AppendLine($"请你将这些内容整理成一段简短的「{pawn.LabelShortCap} 的短期记忆」，用于描述近期发生的重要事件、情绪变化、人际关系与心态。");
             shortSb.AppendLine("要求：");
-            shortSb.AppendLine("1. 提炼地点、人物、事件，将相似事件合并，标注频率。");
-            shortSb.AppendLine("2. 只描述事实与心理，不要加入系统说明或指令。");
-            shortSb.AppendLine("3. 只输出短期记忆内容本身，不要加任何标题或额外说明，字数必须控制在80字以内。");
+            shortSb.AppendLine("1. 字数必须控制在80字以内。");
+            shortSb.AppendLine("2. 提炼地点、人物、事件，将相似事件合并，标注频率。");
+            shortSb.AppendLine("3. 只描述事实与心理，不要加入系统说明或指令。");
+            shortSb.AppendLine("4. 只输出短期记忆内容本身，不要加任何标题或额外说明，如果超过80字，请强制删除形容词和次要细节，直到符合要求为止。");
             shortSb.AppendLine();
             shortSb.AppendLine("最近互动记录：");
 

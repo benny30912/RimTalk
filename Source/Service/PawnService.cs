@@ -1,9 +1,11 @@
-using System.Collections.Generic;
-using System.Linq;
+﻿using NAudio.CoreAudioApi;
 using RimTalk.Data;
 using RimWorld;
+using System.Collections.Generic;
+using System.Linq;
 using Verse;
 using Verse.AI.Group;
+using static Mono.Security.X509.X520;
 using Cache = RimTalk.Data.Cache;
 
 namespace RimTalk.Service;
@@ -86,7 +88,15 @@ public static class PawnService
         if (pawn.IsVisitor())
             return includeFaction && pawn.Faction != null ? $"Visitor Group({pawn.Faction.Name})" : "Visitor";
         if (pawn.IsQuestLodger()) return "Lodger";
-        if (pawn.IsFreeColonist) return pawn.GetMapRole() == MapRole.Invading ? "Invader" : "Colonist";
+        if (pawn.IsFreeColonist)
+        {
+            if (pawn.GetMapRole() == MapRole.Invading)return "Invader";
+            string role = "Colonist";
+            float timeAsColonistTicks = pawn.records?.GetValue(RecordDefOf.TimeAsColonistOrColonyAnimal) ?? 0f;
+            float daysAsColonist = timeAsColonistTicks / 60000f;
+            if (daysAsColonist < 15f)role += "，新成员";
+            return role;
+        }
         return null;
     }
 
@@ -103,6 +113,42 @@ public static class PawnService
     public static bool IsBaby(this Pawn pawn)
     {
         return pawn.ageTracker?.CurLifeStage?.developmentalStage < DevelopmentalStage.Child;
+    }
+
+    /// <summary>
+    /// 統一輸出 Name(Age:{Age}, Sex:{Sex}, Role:{Role}, Race:{Race})
+    /// 如果是動物，Race 用 kindDef（動物類型）
+    /// </summary>
+    public static string FormatPawnBrief(Pawn pawn)
+    {
+        if (pawn == null) return "Unknown";
+
+        var parts = new List<string>();
+
+        // 年齡：生理年齡，拿不到就 unknown
+        int age = pawn.ageTracker?.AgeBiologicalYears ?? -1;
+        if (age >= 0){parts.Add($"Age:{age}");}
+
+        // 性別
+        string sex = pawn.gender.GetLabel();
+        if (!sex.NullOrEmpty()){parts.Add($"Sex:{sex}");}
+
+        // 身分 / 角色：沿用你原本的 GetRole()
+        string role = pawn.GetRole();
+        if (!role.NullOrEmpty()){parts.Add($"Role:{role}");}
+
+        // 種族：
+        // - 若是動物：用 kindDef.LabelCap（例如「母牛」、「馴服野人」）
+        // - 否則用 pawn.def.LabelCap（例如「人類」）
+        string race = null;
+        if (pawn.RaceProps?.Animal == true){race = pawn.kindDef?.LabelCap ?? pawn.def?.LabelCap;}
+        else{race = pawn.def?.LabelCap;}
+        if (!race.NullOrEmpty()){parts.Add($"Race:{race}");}
+
+        // 如果完全沒有任何欄位，就只回名字
+        if (parts.Count == 0){return $"{pawn.LabelShort}";}
+
+        return $"{pawn.LabelShort}({string.Join(", ", parts)})";
     }
 
     public static (string, bool) GetPawnStatusFull(this Pawn pawn, List<Pawn> nearbyPawns)
@@ -128,7 +174,7 @@ public static class PawnService
             var nearbyNotableStatuses = nearbyPawns
                 .Where(nearbyPawn => nearbyPawn.Faction == pawn.Faction && nearbyPawn.IsInDanger(true))
                 .Take(2)
-                .Select(other => $"{other.LabelShort} in {other.GetActivity().Replace("\n", "; ")}")
+                .Select(other => $"{FormatPawnBrief(other)} in {other.GetActivity().Replace("\n", "; ")}")
                 .ToList();
 
             if (nearbyNotableStatuses.Any())
@@ -141,13 +187,13 @@ public static class PawnService
             var nearbyNames = nearbyPawns
                 .Select(nearbyPawn =>
                 {
-                    string name = $"{nearbyPawn.LabelShort}({nearbyPawn.GetRole()})";
+                    string formatted = FormatPawnBrief(nearbyPawn);
                     if (Cache.Get(nearbyPawn) is not null)
                     {
-                        name = $"{name} ({nearbyPawn.GetActivity().StripTags()})";
+                        string activity = nearbyPawn.GetActivity()?.StripTags();
+                        if (!string.IsNullOrEmpty(activity)){formatted = $"{formatted} ({activity})";}
                     }
-
-                    return name;
+                    return formatted;
                 })
                 .ToList();
 
@@ -288,16 +334,12 @@ public static class PawnService
         if (pawn.CurJobDef is null)
             return null;
 
-        var target = pawn.IsAttacking() ? pawn.TargetCurrentlyAimingAt.Thing?.LabelShortCap : null;
-        if (target != null)
-            return $"Attacking {target}";
-
-        var lord = pawn.GetLord()?.LordJob?.GetReport(pawn);
-        var job = pawn.jobs?.curDriver?.GetReport();
+        var lordReport = pawn.GetLord()?.LordJob?.GetReport(pawn);
+        var jobReport = pawn.jobs?.curDriver?.GetReport();
 
         string activity;
-        if (lord == null) activity = job;
-        else activity = job == null ? lord : $"{lord} ({job})";
+        if (lordReport == null) activity = jobReport;
+        else activity = jobReport == null ? lordReport : $"{lordReport} ({jobReport})";
 
         if (ResearchJobDefNames.Contains(pawn.CurJob?.def.defName))
         {
@@ -307,6 +349,54 @@ public static class PawnService
                 float progress = Find.ResearchManager.GetProgress(project);
                 float percentage = (progress / project.baseCost) * 100f;
                 activity += $" (Project: {project.label} - {percentage:F0}%)";
+            }
+        }
+
+        // ========= 一般化：把所有「有對象的動作」中的 Pawn 名字換成詳細格式 =========
+        var job = pawn.CurJob;
+        if (job != null && !string.IsNullOrEmpty(activity))
+        {
+            var targetPawns = new List<Pawn>();
+
+            void AddPawn(LocalTargetInfo t)
+            {
+                if (!t.IsValid) return;
+                if (t.Thing is Pawn p && !targetPawns.Contains(p))
+                    targetPawns.Add(p);
+            }
+
+            // Job 的 A / B / C 目標
+            AddPawn(job.targetA);
+            AddPawn(job.targetB);
+            AddPawn(job.targetC);
+
+            // 另外補上目前瞄準的攻擊目標（有些 attack 報告只寫 "Attacking"）
+            if (pawn.IsAttacking())
+            {
+                var cur = pawn.TargetCurrentlyAimingAt;
+                if (cur.IsValid && cur.Thing is Pawn p && !targetPawns.Contains(p))
+                    targetPawns.Add(p);
+            }
+
+            // 嘗試把報告中的簡短名字換成詳細格式
+            foreach (var targetPawn in targetPawns)
+            {
+                // Job 報告通常會用 LabelShort 或 LabelShortCap
+                var simpleName = targetPawn.LabelShortCap;
+                var detailed = FormatPawnBrief(targetPawn);
+
+                if (string.IsNullOrEmpty(simpleName) || simpleName == detailed)
+                    continue;
+
+                if (activity.Contains(simpleName))
+                {
+                    activity = activity.Replace(simpleName, detailed);
+                }
+                // 如果報告完全沒包含名字，又是純攻擊，可以補一個 fallback
+                else if (pawn.IsAttacking() && activity.StartsWith("Attacking"))
+                {
+                    activity = $"Attacking {detailed}";
+                }
             }
         }
 
