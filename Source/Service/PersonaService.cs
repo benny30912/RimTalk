@@ -204,7 +204,7 @@ public static class PersonaService
             // 拆成：人格主體、長期記憶、短期記憶、尾部
             SplitPersonality(currentPersona, out var corePersonaHead, out var oldLongTerm, out var oldShortTerm, out var corePersonaTail);
 
-            var client = AIClientFactory.GetAIClientForConfig(usedConfig);
+            var client = await AIClientFactory.GetAIClientForConfigAsync(usedConfig);
             if (client == null) return false;
 
             // Step 1：舊長期記憶 + 舊短期記憶 → 新長期記憶
