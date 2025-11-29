@@ -2,6 +2,7 @@ namespace RimTalk.Util;
 
 public static class Describer
 {
+    /*
     public static string Wealth(float wealthTotal)
     {
         return wealthTotal switch
@@ -18,7 +19,8 @@ public static class Describer
             _ => "richest in the galaxy"
         };
     }
-    
+    */
+    /*
     public static string Beauty(float beauty)
     {
         return beauty switch
@@ -33,7 +35,8 @@ public static class Describer
             _ => "disgusting"
         };
     }
-
+    */
+    /*
     public static string Cleanliness(float cleanliness)
     {
         return cleanliness switch
@@ -47,7 +50,7 @@ public static class Describer
             _ => "foul"
         };
     }
-    
+    */
     public static string Resistance(float value)
     {
         if (value <= 0f) return "Completely broken, ready to join";
