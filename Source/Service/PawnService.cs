@@ -1,11 +1,9 @@
-﻿using NAudio.CoreAudioApi;
-using RimTalk.Data;
+﻿using RimTalk.Data;
 using RimWorld;
 using System.Collections.Generic;
 using System.Linq;
 using Verse;
 using Verse.AI.Group;
-using static Mono.Security.X509.X520;
 using Cache = RimTalk.Data.Cache;
 
 namespace RimTalk.Service;
@@ -156,6 +154,10 @@ public static class PawnService
     {
         if (pawn == null) return (null, false);
 
+        // special-case for "player pawn"
+        if (pawn.IsPlayer())
+            return ("Voice from beyond", false);
+
         bool isInDanger = false;
 
         List<string> parts = new List<string>();
@@ -257,7 +259,7 @@ public static class PawnService
         }
 
         if (!isInDanger)
-            parts.Add(Constant.Prompt);
+            parts.Add("Act based on role and context"); // NOTE: literal string instead of Constant.Prompt
 
         return (string.Join("\n", parts), isInDanger);
     }

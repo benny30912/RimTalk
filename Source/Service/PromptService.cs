@@ -1,12 +1,12 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using HarmonyLib;
+﻿using HarmonyLib;
 using RimTalk.Data;
 using RimTalk.Source.Data;
 using RimTalk.Util;
 using RimWorld;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 using Verse;
 using Verse.AI.Group;
 
@@ -323,6 +323,117 @@ public static class PromptService
         // add weather
         sb.Append($"\nWeather: {gameData.WeatherString}");
 
+        // ==== 新增「附近物品」開始 ====
+
+        // 先抓主視角 pawn 和 map
+        Pawn pawn = pawns[0];
+        Map map = pawn.Map;
+
+        List<IntVec3> nearbyCells = new();
+        IntVec3 facing = pawn.Rotation.FacingCell;
+        for (int i = 1; i <= 5; i++)
+        {
+            IntVec3 targetCell = pawn.Position + facing * i;
+            for (int offset = -1; offset <= 1; offset++)
+            {
+                IntVec3 c = new IntVec3(targetCell.x + offset, targetCell.y, targetCell.z);
+                if (c.InBounds(map))
+                    nearbyCells.Add(c);
+            }
+        }
+
+        List<string> items = new();
+        HashSet<Thing> seenThings = new();
+        foreach (IntVec3 c in nearbyCells.OrderBy(_ => Rand.Value).ToList())
+        {
+            if (items.Count >= 3)
+                break;
+
+            List<Thing> thingsHere = c.GetThingList(pawn.Map);
+            if (thingsHere == null || thingsHere.Count == 0)
+                continue;
+
+            bool hasPawnOrAnimal = false;
+            HashSet<ThingDef> thingDefs = new();
+            foreach (Thing thing in thingsHere)
+            {
+                if (thing != null && thing.def != null && thingDefs.Add(thing.def) &&
+                    thing.def.category != ThingCategory.Building && thing.def.category != ThingCategory.Plant &&
+                    thing.def.category != ThingCategory.Item && !thing.def.IsFilth)
+                {
+                    hasPawnOrAnimal = true;
+                    break;
+                }
+            }
+
+            if (hasPawnOrAnimal)
+                continue;
+
+            List<Thing> candidateThings = new();
+            HashSet<ThingCategory> categories = new();
+            foreach (Thing thing in thingsHere)
+            {
+                if (thing == null || thing.def == null)
+                    continue;
+
+                bool isValidCategory = thing.def.category == ThingCategory.Building ||
+                                       thing.def.category == ThingCategory.Plant ||
+                                       thing.def.category == ThingCategory.Item ||
+                                       thing.def.IsFilth;
+
+                if (!isValidCategory)
+                    continue;
+
+                if (thing.def.category == ThingCategory.Building && IsWall(thing))
+                    continue;
+
+                if (categories.Add(thing.def.category))
+                    candidateThings.Add(thing);
+            }
+
+            if (candidateThings.Count == 0)
+                continue;
+
+            Thing picked = candidateThings.RandomElement();
+            if (seenThings.Contains(picked))
+                continue;
+
+            if (picked is Building_Storage storage)
+            {
+                List<Thing> stored = new();
+                foreach (IntVec3 cell in storage.AllSlotCells())
+                {
+                    List<Thing> contents = cell.GetThingList(pawn.Map);
+                    stored.AddRange(contents);
+                }
+
+                List<Thing> distinctStored = stored.Distinct().ToList();
+                if (distinctStored.Count == 0)
+                {
+                    seenThings.Add(storage);
+                }
+                else
+                {
+                    string storedSample = string.Join(", ", distinctStored.OrderBy(_ => Rand.Value)
+                                                                          .Take(3)
+                                                                          .Select(i => i.LabelCap));
+                    string storageLabel = $"{storage.LabelCap} ({storedSample})";
+                    seenThings.Add(storage);
+                    items.Add(storageLabel);
+                }
+            }
+            else
+            {
+                seenThings.Add(picked);
+                items.Add(picked.LabelCap);
+            }
+        }
+
+        if (items.Count > 0)
+            sb.Append("\nitems: " + string.Join(", ", items));
+
+        // ==== 新增「附近物品」結束 ====
+
         // add language assurance
         if (AIService.IsFirstInstruction())
             sb.Append($"\nin {Constant.Lang}");
@@ -339,6 +450,8 @@ public static class PromptService
         if (room == null)
             return null;
 
+        string currentTemperature = pawn.Position.GetTemperature(pawn.Map).ToString("0.0");
+
         // 先決定室內 / 室外
         string baseLocation = room.PsychologicallyOutdoors
             ? "Outdoors".Translate()
@@ -349,10 +462,10 @@ public static class PromptService
         if (role != null && role != RoomRoleDefOf.None)
         {
             // 例如：Hospital / Bedroom
-            return $"{role.LabelCap}";
+            return $"{role.LabelCap}({currentTemperature}°C)";
         }
 
-        return baseLocation;
+        return baseLocation+$"({currentTemperature}°C)";
     }
 
     public static Dictionary<Thought, float> GetThoughts(Pawn pawn)
@@ -363,6 +476,11 @@ public static class PromptService
         return thoughts
             .GroupBy(t => t.def.defName)
             .ToDictionary(g => g.First(), g => g.Sum(t => t.MoodOffset()));
+    }
+    static bool IsWall(Thing thing)
+    {
+        GraphicData data = thing.def.graphicData;
+        return data != null && data.linkFlags.HasFlag(LinkFlags.Wall);
     }
 
     private static string Sanitize(string text, Pawn pawn = null)

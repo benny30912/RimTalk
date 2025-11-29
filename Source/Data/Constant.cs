@@ -43,9 +43,6 @@ Return JSON only, with objects containing ""name"" and ""text"" string keys";
             ? DefaultInstruction
             : Settings.Get().CustomInstruction) + JsonInstruction;
 
-    public const string Prompt =
-        "Act based on role and context";
-
     public static readonly string PersonaGenInstruction =
         $@"Create a funny persona (to be used as conversation style) in {Lang}. Must be short in 1 sentence.
 Include: how they speak, their main attitude, and one weird quirk that makes them memorable.

@@ -150,7 +150,7 @@ public static class TalkService
     {
         if (!responses.Any()) return;
 
-        string cleanedPrompt = prompt.Replace(Constant.Prompt, "");
+        string cleanedPrompt = prompt.Replace("Act based on role and context", "");
         string serializedResponses = JsonUtil.SerializeToJson(responses);
 
         foreach (var pawn in pawns)
