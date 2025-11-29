@@ -1,44 +1,42 @@
-﻿using HarmonyLib;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
+using HarmonyLib;
 using RimTalk.Data;
 using RimTalk.Source.Data;
 using RimTalk.Util;
 using RimWorld;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
+using UnityEngine;
 using Verse;
 using Verse.AI.Group;
+using Cache = RimTalk.Data.Cache;
 
 namespace RimTalk.Service;
 
 public static class PromptService
 {
-    public enum InfoLevel
-    {
-        Short,
-        Normal,
-        Full
-    }
+    private static readonly MethodInfo VisibleHediffsMethod = AccessTools.Method(typeof(HealthCardUtility), "VisibleHediffs");
+    public enum InfoLevel { Short, Normal, Full }
 
     public static string BuildContext(List<Pawn> pawns)
     {
-        StringBuilder context = new StringBuilder();
+        var context = new StringBuilder();
         context.AppendLine(Constant.Instruction).AppendLine();
 
-        int count = 0;
-        foreach (Pawn pawn in pawns)
+        for (int i = 0; i < pawns.Count; i++)
         {
-            // Main pawn gets more detail, others get basic info
-            InfoLevel infoLevel = InfoLevel.Normal;
-            //InfoLevel infoLevel = pawn == pawns[0] ? InfoLevel.Normal : InfoLevel.Short;
-            string pawnContext = CreatePawnContext(pawn, infoLevel);
+            var pawn = pawns[i];
+            var pawnContext = pawn.IsPlayer() 
+                ? $"{pawn.LabelShort}\nRole: {pawn.GetRole()}"
+                : CreatePawnContext(pawn, i == 0 ? InfoLevel.Normal : InfoLevel.Short);
+
             Cache.Get(pawn).Context = pawnContext;
-            count++;
-            context.AppendLine();
-            context.AppendLine($"[Person {count} START]");
-            context.AppendLine(pawnContext);
-            context.AppendLine($"[Person {count} END]");
+            context.AppendLine()
+                   .AppendLine($"[Person {i + 1} START]")
+                   .AppendLine(pawnContext)
+                   .AppendLine($"[Person {i + 1} END]");
         }
 
         return context.ToString();
@@ -46,8 +44,7 @@ public static class PromptService
 
     public static string CreatePawnBackstory(Pawn pawn, InfoLevel infoLevel = InfoLevel.Normal)
     {
-        StringBuilder sb = new StringBuilder();
-
+        var sb = new StringBuilder();
         var name = pawn.LabelShort;
         var title = pawn.story?.title == null ? "" : $"({pawn.story.title})";
         var genderAndAge = Regex.Replace(pawn.MainDesc(false), @"\(\d+\)", "");
@@ -58,138 +55,89 @@ public static class PromptService
             sb.AppendLine($"Role: {role}");
 
         if (ModsConfig.BiotechActive && pawn.genes?.Xenotype != null)
+            sb.AppendLine($"Race: {pawn.genes.Xenotype.LabelCap}");
+
+        // Notable genes (Normal/Full only, not for enemies/visitors)
+        if (infoLevel != InfoLevel.Short && !pawn.IsVisitor() && !pawn.IsEnemy() && 
+            ModsConfig.BiotechActive && pawn.genes?.GenesListForReading != null)
         {
-            var xenotypeInfo = $"Race: {pawn.genes.Xenotype.LabelCap}";
-            // if (!pawn.genes.Xenotype.descriptionShort.NullOrEmpty())
-            // xenotypeInfo += $" - {pawn.genes.Xenotype.descriptionShort}";
-            sb.AppendLine(xenotypeInfo);
+            var notableGenes = pawn.genes.GenesListForReading
+                .Where(g => g.def.biostatMet != 0 || g.def.biostatCpx != 0)
+                .Select(g => g.def.LabelCap);
+
+            if (notableGenes.Any())
+                sb.AppendLine($"Notable Genes: {string.Join(", ", notableGenes)}");
         }
 
-        if (infoLevel != InfoLevel.Short && !pawn.IsVisitor() && !pawn.IsEnemy())
-        {
-            if (ModsConfig.BiotechActive && pawn.genes?.GenesListForReading != null)
-            {
-                var notableGenes = pawn.genes.GenesListForReading
-                    .Where(g => g.def.biostatMet != 0 || g.def.biostatCpx != 0)
-                    .Select(g => g.def.LabelCap);
-
-                if (notableGenes.Any())
-                {
-                    sb.AppendLine($"Notable Genes: {string.Join(", ", notableGenes)}");
-                }
-            }
-        }
-
-        // Add Ideology information
+        // Ideology
         if (ModsConfig.IdeologyActive && pawn.ideo?.Ideo != null)
         {
             var ideo = pawn.ideo.Ideo;
+            sb.AppendLine($"Ideology: {ideo.name}");
 
-            var ideologyInfo = $"Ideology: {ideo.name}";
-            sb.AppendLine(ideologyInfo);
-
-            var memes = ideo?.memes?
+            var memes = ideo.memes?
                 .Where(m => m != null)
                 .Select(m => m.LabelCap.Resolve())
-                .Where(label => !string.IsNullOrEmpty(label))
-                .ToList();
+                .Where(label => !string.IsNullOrEmpty(label));
 
-            if (memes != null && memes.Any())
-            {
+            if (memes?.Any() == true)
                 sb.AppendLine($"Memes: {string.Join(", ", memes)}");
-            }
         }
 
         //// INVADER AND VISITOR STOP
         if (pawn.IsEnemy() || pawn.IsVisitor())
             return sb.ToString();
 
+        // Backstory
         if (pawn.story?.Childhood != null)
-        {
-            var childHood =
-                $"Childhood: {pawn.story.Childhood.title}({pawn.story.Childhood.titleShort})";
-            if (infoLevel == InfoLevel.Full) childHood += $":{Sanitize(pawn.story.Childhood.description, pawn)}";
-            sb.AppendLine(childHood);
-        }
+            sb.AppendLine(ContextHelper.FormatBackstory("Childhood", pawn.story.Childhood, pawn, infoLevel));
 
         if (pawn.story?.Adulthood != null)
-        {
-            var adulthood =
-                $"Adulthood: {pawn.story.Adulthood.title}({pawn.story.Adulthood.titleShort})";
-            if (infoLevel == InfoLevel.Full) adulthood += $":{Sanitize(pawn.story.Adulthood.description, pawn)}";
-            sb.AppendLine(adulthood);
-        }
+            sb.AppendLine(ContextHelper.FormatBackstory("Adulthood", pawn.story.Adulthood, pawn, infoLevel));
 
-        var traits = "";
-        foreach (Trait trait in pawn.story?.traits?.TraitsSorted ?? Enumerable.Empty<Trait>())
+        // Traits
+        var traits = new List<string>();
+        foreach (var trait in pawn.story?.traits?.TraitsSorted ?? Enumerable.Empty<Trait>())
         {
-            foreach (var degreeData in trait.def.degreeDatas.Where(degreeData => degreeData.degree == trait.Degree))
+            var degreeData = trait.def.degreeDatas.FirstOrDefault(d => d.degree == trait.Degree);
+            if (degreeData != null)
             {
-                traits += degreeData.label + (infoLevel == InfoLevel.Full
-                    ? $":{Sanitize(degreeData.description, pawn)}\n"
-                    : ",");
-                break;
+                var traitText = infoLevel == InfoLevel.Full
+                    ? $"{degreeData.label}:{ContextHelper.Sanitize(degreeData.description, pawn)}"
+                    : degreeData.label;
+                traits.Add(traitText);
             }
         }
 
-        if (traits != "")
-            sb.AppendLine($"Traits: {traits}");
+        if (traits.Any())
+        {
+            var separator = infoLevel == InfoLevel.Full ? "\n" : ",";
+            sb.AppendLine($"Traits: {string.Join(separator, traits)}");
+        }
 
+        // Skills
         if (infoLevel != InfoLevel.Short)
         {
-            var skills = "Skills: ";
-            foreach (SkillRecord skillRecord in pawn.skills?.skills ?? Enumerable.Empty<SkillRecord>())
-            {
-                skills += $"{skillRecord.def.label}: {skillRecord.Level}, ";
-            }
-
-            sb.AppendLine(skills);
+            var skills = pawn.skills?.skills?.Select(s => $"{s.def.label}: {s.Level}");
+            if (skills?.Any() == true)
+                sb.AppendLine($"Skills: {string.Join(", ", skills)}");
         }
 
         return sb.ToString();
     }
 
-    public static string CreatePawnContext(Pawn pawn, InfoLevel infoLevel = InfoLevel.Normal)
+    private static string CreatePawnContext(Pawn pawn, InfoLevel infoLevel = InfoLevel.Normal)
     {
-        StringBuilder sb = new StringBuilder();
-        
+        var sb = new StringBuilder();
         sb.Append(CreatePawnBackstory(pawn, infoLevel));
 
-        // add Health
-        var method = AccessTools.Method(typeof(HealthCardUtility), "VisibleHediffs");
-        IEnumerable<Hediff> hediffs = (IEnumerable<Hediff>)method.Invoke(null, [pawn, false]);
+        // Health
+        var hediffs = (IEnumerable<Hediff>)VisibleHediffsMethod.Invoke(null, [pawn, false]);
+        var healthInfo = string.Join(",", hediffs
+            .GroupBy(h => h.def)
+            .Select(g => $"{g.Key.label}({string.Join(",", g.Select(h => h.Part?.Label ?? ""))})"));
 
-        var hediffGroups = hediffs
-            .GroupBy(h => new
-            {
-                h.def,
-                IsPermanent = h is Hediff_Injury inj && inj.IsPermanent()
-            })
-            .Select(g =>
-            {
-                var sample = g.First();
-                string label = sample.LabelCap; // 會有 old injury / scar 等資訊
-
-                // 收集有名字的部位，去掉 null/空字串，順便 Distinct
-                var partsList = g
-                    .Select(h => h.Part?.Label)
-                    .Where(p => !string.IsNullOrEmpty(p))
-                    .Distinct()
-                    .ToList();
-
-                if (partsList.Count == 0)
-                {
-                    // 全身 hediff 或沒有具體部位 → 只顯示 label，不加 ()
-                    return label;
-                }
-
-                string parts = string.Join(",", partsList);
-                return $"{label}({parts})";
-            });
-
-        var healthInfo = string.Join(", ", hediffGroups);
-
-        if (!healthInfo.NullOrEmpty())
+        if (!string.IsNullOrEmpty(healthInfo))
             sb.AppendLine($"Health: {healthInfo}");
 
         var personality = Cache.Get(pawn).Personality;
@@ -200,10 +148,11 @@ public static class PromptService
         if (pawn.IsEnemy())
             return sb.ToString();
 
+        // Mood
         var m = pawn.needs?.mood;
         if (m?.MoodString != null)
         {
-            var mood = pawn.Downed && !pawn.IsBaby()
+            string mood = pawn.Downed && !pawn.IsBaby()
                 ? "Critical: Downed (in pain/distress)"
                 : pawn.InMentalState
                     ? $"Mood: {pawn.MentalState?.InspectLine} (in mental break)"
@@ -211,49 +160,40 @@ public static class PromptService
             sb.AppendLine(mood);
         }
 
-        var thoughts = "";
-        foreach (Thought thought in GetThoughts(pawn).Keys)
-        {
-            thoughts += $"{Sanitize(thought.LabelCap)}, ";
-        }
-
-        if (thoughts != "")
-            sb.AppendLine($"Thoughts: {thoughts}");
+        // Thoughts
+        var thoughts = ContextHelper.GetThoughts(pawn).Keys.Select(t => ContextHelper.Sanitize(t.LabelCap));
+        if (thoughts.Any())
+            sb.AppendLine($"Memory: {string.Join(", ", thoughts)}");
 
         if (pawn.IsSlave || pawn.IsPrisoner)
             sb.AppendLine(pawn.GetPrisonerSlaveStatus());
 
-        //// VISITOR STOP
+        // Visitor activity
         if (pawn.IsVisitor())
         {
-            Lord lord = pawn.GetLord() ?? pawn.CurJob?.lord;
+            var lord = pawn.GetLord() ?? pawn.CurJob?.lord;
             if (lord?.LordJob != null)
             {
-                string fullTypeName = lord.LordJob.GetType().Name;
-                string cleanName = fullTypeName.Replace("LordJob_", "");
+                var cleanName = lord.LordJob.GetType().Name.Replace("LordJob_", "");
                 sb.AppendLine($"Activity: {cleanName}");
             }
         }
 
         sb.AppendLine(RelationsService.GetRelationsString(pawn));
 
+        // Equipment
         if (infoLevel != InfoLevel.Short)
         {
-            var equipments = "";
+            var equipments = new List<string>();
             if (pawn.equipment?.Primary != null)
-                equipments += $"Weapon: {pawn.equipment.Primary.LabelCap}, ";
+                equipments.Add($"Weapon: {pawn.equipment.Primary.LabelCap}");
 
-            var wornApparel = pawn.apparel?.WornApparel;
-            var apparelLabels =
-                wornApparel != null ? wornApparel.Select(a => a.LabelCap) : [];
+            var apparelLabels = pawn.apparel?.WornApparel?.Select(a => a.LabelCap);
+            if (apparelLabels?.Any() == true)
+                equipments.Add($"Apparel: {string.Join(", ", apparelLabels)}");
 
-            if (apparelLabels.Any())
-            {
-                equipments += $"Apparel: {string.Join(", ", apparelLabels)}";
-            }
-
-            if (equipments != "")
-                sb.AppendLine($"Equipments: {equipments}");
+            if (equipments.Any())
+                sb.AppendLine($"Equipments: {string.Join(", ", equipments)}");
         }
 
         return sb.ToString();
@@ -262,332 +202,99 @@ public static class PromptService
     public static void DecoratePrompt(TalkRequest talkRequest, List<Pawn> pawns, string status)
     {
         var sb = new StringBuilder();
-        CommonUtil.InGameData gameData = CommonUtil.GetInGameData();
+        var gameData = CommonUtil.GetInGameData();
+        var mainPawn = pawns[0];
+        var shortName = $"{mainPawn.LabelShort}";
 
-        string shortName = $"{pawns[0].LabelShort}({pawns[0].GetRole()})";
-
-        // Add the conversation part
+        // Dialogue type
         if (talkRequest.TalkType == TalkType.User)
         {
-            sb.Append($"{pawns[1].LabelShort}({pawns[1].GetRole()}) said to '{pawns[0].LabelShort}({pawns[0].GetRole()}): {talkRequest.Prompt}'.");
-            sb.Append($"Generate multi turn dialogues starting after this (do not repeat initial dialogue), beginning with {pawns[0].LabelShort}");
+            sb.Append($"{pawns[1].LabelShort}({pawns[1].GetRole()}) said to '{shortName}: {talkRequest.Prompt}'.");
+            sb.Append($"Generate multi turn dialogues starting after this (do not repeat initial dialogue), beginning with {mainPawn.LabelShort}");
         }
         else
         {
             if (pawns.Count == 1)
-                sb.Append($"{shortName} short monologue");
-            else if (pawns[0].IsInCombat() || pawns[0].GetMapRole() == MapRole.Invading)
             {
-                if (talkRequest.TalkType != TalkType.Urgent && !pawns[0].InMentalState)
-                {
+                sb.Append($"{shortName} short monologue");
+            }
+            else if (mainPawn.IsInCombat() || mainPawn.GetMapRole() == MapRole.Invading)
+            {
+                if (talkRequest.TalkType != TalkType.Urgent && !mainPawn.InMentalState)
                     talkRequest.Prompt = null;
-                }
 
                 talkRequest.TalkType = TalkType.Urgent;
-                if (pawns[0].IsSlave || pawns[0].IsPrisoner)
-                    sb.Append($"{shortName} dialogue short (worry)");
-                else
-                    sb.Append(
-                        $"{shortName} dialogue short, urgent tone ({pawns[0].GetMapRole().ToString().ToLower()}/command)");
+                sb.Append(mainPawn.IsSlave || mainPawn.IsPrisoner
+                    ? $"{shortName} dialogue short (worry)"
+                    : $"{shortName} dialogue short, urgent tone ({mainPawn.GetMapRole().ToString().ToLower()}/command)");
             }
             else
             {
                 sb.Append($"{shortName} starts conversation, taking turns");
             }
 
-            if (pawns[0].InMentalState)
-                sb.Append($"\nbe dramatic (mental break)");
-            else if (pawns[0].Downed && !pawns[0].IsBaby())
-                sb.Append($"\n(downed in pain. Short, strained dialogue)");
+            // Modifiers
+            if (mainPawn.InMentalState)
+                sb.Append("\nbe dramatic (mental break)");
+            else if (mainPawn.Downed && !mainPawn.IsBaby())
+                sb.Append("\n(downed in pain. Short, strained dialogue)");
             else
                 sb.Append($"\n{talkRequest.Prompt}");
         }
 
-
-        // add pawn status
+        // Time and weather
         sb.Append($"\n{status}");
-
-        string locationStatus = GetPawnLocationStatus(pawns[0]);
-        if (!string.IsNullOrEmpty(locationStatus))
-            sb.Append($"\nLocation: {locationStatus}");
-
-        // add time
         sb.Append($"\nTime: {gameData.Hour12HString}");
-
-        // add date
         sb.Append($"\nToday: {gameData.DateString}");
-
-        // add season
         sb.Append($"\nSeason: {gameData.SeasonString}");
-
-        // add weather
         sb.Append($"\nWeather: {gameData.WeatherString}");
 
-        // ==== 新增「附近物品」開始 ====
-
-        // 先抓主視角 pawn 和 map
-        Pawn pawn = pawns[0];
-        Map map = pawn.Map;
-
-        List<IntVec3> nearbyCells = new();
-        IntVec3 facing = pawn.Rotation.FacingCell;
-        for (int i = 1; i <= 5; i++)
+        // Location
+        var locationStatus = ContextHelper.GetPawnLocationStatus(mainPawn);
+        if (!string.IsNullOrEmpty(locationStatus))
         {
-            IntVec3 targetCell = pawn.Position + facing * i;
-            for (int offset = -1; offset <= 1; offset++)
-            {
-                IntVec3 c = new IntVec3(targetCell.x + offset, targetCell.y, targetCell.z);
-                if (c.InBounds(map))
-                    nearbyCells.Add(c);
-            }
+            var temperature = Mathf.RoundToInt(mainPawn.Position.GetTemperature(mainPawn.Map));
+            var room = mainPawn.GetRoom();
+            var roomRole = room is { PsychologicallyOutdoors: false } ? room.Role?.label ?? "Room" : "";
+
+            sb.Append(string.IsNullOrEmpty(roomRole)
+                ? $"\nLocation: {locationStatus};{temperature}C"
+                : $"\nLocation: {locationStatus};{temperature}C;{roomRole}");
         }
 
-        List<string> items = new();
-        HashSet<Thing> seenThings = new();
-        foreach (IntVec3 c in nearbyCells.OrderBy(_ => Rand.Value).ToList())
+        // Environment
+        var terrain = mainPawn.Position.GetTerrain(mainPawn.Map);
+        if (terrain != null)
+            sb.Append($"\nTerrain: {terrain.LabelCap}");
+
+        var wall = ContextHelper.FindWallInFrontAndBack(mainPawn, 8);
+        if (wall != null)
+            sb.Append($"\nWall: {wall.LabelCap}");
+
+        var nearbyCells = ContextHelper.GetNearbyCells(mainPawn);
+        if (nearbyCells.Count > 0)
         {
-            if (items.Count >= 3)
-                break;
-
-            List<Thing> thingsHere = c.GetThingList(pawn.Map);
-            if (thingsHere == null || thingsHere.Count == 0)
-                continue;
-
-            bool hasPawnOrAnimal = false;
-            HashSet<ThingDef> thingDefs = new();
-            foreach (Thing thing in thingsHere)
-            {
-                if (thing != null && thing.def != null && thingDefs.Add(thing.def) &&
-                    thing.def.category != ThingCategory.Building && thing.def.category != ThingCategory.Plant &&
-                    thing.def.category != ThingCategory.Item && !thing.def.IsFilth)
-                {
-                    hasPawnOrAnimal = true;
-                    break;
-                }
-            }
-
-            if (hasPawnOrAnimal)
-                continue;
-
-            List<Thing> candidateThings = new();
-            HashSet<ThingCategory> categories = new();
-            foreach (Thing thing in thingsHere)
-            {
-                if (thing == null || thing.def == null)
-                    continue;
-
-                bool isValidCategory = thing.def.category == ThingCategory.Building ||
-                                       thing.def.category == ThingCategory.Plant ||
-                                       thing.def.category == ThingCategory.Item ||
-                                       thing.def.IsFilth;
-
-                if (!isValidCategory)
-                    continue;
-
-                if (thing.def.category == ThingCategory.Building && IsWall(thing))
-                    continue;
-
-                if (categories.Add(thing.def.category))
-                    candidateThings.Add(thing);
-            }
-
-            if (candidateThings.Count == 0)
-                continue;
-
-            Thing picked = candidateThings.RandomElement();
-            if (seenThings.Contains(picked))
-                continue;
-
-            if (picked is Building_Storage storage)
-            {
-                List<Thing> stored = new();
-                foreach (IntVec3 cell in storage.AllSlotCells())
-                {
-                    List<Thing> contents = cell.GetThingList(pawn.Map);
-                    stored.AddRange(contents);
-                }
-
-                List<Thing> distinctStored = stored.Distinct().ToList();
-                if (distinctStored.Count == 0)
-                {
-                    seenThings.Add(storage);
-                }
-                else
-                {
-                    string storedSample = string.Join(", ", distinctStored.OrderBy(_ => Rand.Value)
-                                                                          .Take(3)
-                                                                          .Select(i => i.LabelCap));
-                    string storageLabel = $"{storage.LabelCap} ({storedSample})";
-                    seenThings.Add(storage);
-                    items.Add(storageLabel);
-                }
-            }
-            else
-            {
-                seenThings.Add(picked);
-                items.Add(picked.LabelCap);
-            }
+            var beautySum = nearbyCells.Sum(c => BeautyUtility.CellBeauty(c, mainPawn.Map));
+            sb.Append($"\nCellBeauty: {Describer.Beauty(beautySum / nearbyCells.Count)}");
         }
 
-        if (items.Count > 0)
-            sb.Append("\nitems: " + string.Join(", ", items));
+        var pawnRoom = mainPawn.GetRoom();
+        if (pawnRoom is { PsychologicallyOutdoors: false })
+            sb.Append($"\nCleanliness: {Describer.Cleanliness(pawnRoom.GetStat(RoomStatDefOf.Cleanliness))}");
 
-        // ==== 新增「附近物品」結束 ====
+        // Surroundings
+        var items = ContextHelper.CollectNearbyItems(mainPawn, 3);
+        if (items.Any())
+        {
+            var grouped = items.GroupBy(i => i).Select(g => g.Count() > 1 ? $"{g.Key} x {g.Count()}" : g.Key);
+            sb.Append($"\nSurroundings: {string.Join(", ", grouped)}");
+        }
 
-        // add language assurance
+        sb.Append($"\nWealth: {Describer.Wealth(mainPawn.Map.wealthWatcher.WealthTotal)}");
+
         if (AIService.IsFirstInstruction())
             sb.Append($"\nin {Constant.Lang}");
 
         talkRequest.Prompt = sb.ToString();
-    }
-
-    public static string GetPawnLocationStatus(Pawn pawn)
-    {
-        if (pawn == null || pawn.Map == null || pawn.Position == IntVec3.Invalid)
-            return null;
-
-        Room room = pawn.GetRoom();
-        if (room == null)
-            return null;
-
-        string currentTemperature = pawn.Position.GetTemperature(pawn.Map).ToString("0.0");
-
-        // 先決定室內 / 室外
-        string baseLocation = room.PsychologicallyOutdoors
-            ? "Outdoors".Translate()
-            : "Indoors".Translate();
-
-        // 嘗試讀房間角色
-        var role = room.Role;
-        if (role != null && role != RoomRoleDefOf.None)
-        {
-            // 例如：Hospital / Bedroom
-            return $"{role.LabelCap}({currentTemperature}°C)";
-        }
-
-        return baseLocation+$"({currentTemperature}°C)";
-    }
-
-    public static Dictionary<Thought, float> GetThoughts(Pawn pawn)
-    {
-        var thoughts = new List<Thought>();
-        pawn?.needs?.mood?.thoughts?.GetAllMoodThoughts(thoughts);
-
-        return thoughts
-            .GroupBy(t => t.def.defName)
-            .ToDictionary(g => g.First(), g => g.Sum(t => t.MoodOffset()));
-    }
-    static bool IsWall(Thing thing)
-    {
-        GraphicData data = thing.def.graphicData;
-        return data != null && data.linkFlags.HasFlag(LinkFlags.Wall);
-    }
-
-    private static string Sanitize(string text, Pawn pawn = null)
-    {
-        if (pawn != null)
-            text = text.Formatted(pawn.Named("PAWN")).AdjustedFor(pawn, "PAWN", true).Resolve();
-        return text.StripTags().RemoveLineBreaks();
-    }
-
-    public static string ExtractContextFromPrompt(string prompt)
-    {
-        if (string.IsNullOrWhiteSpace(prompt))
-            return null;
-
-        // 正規化換行
-        var text = prompt.Replace("\r\n", "\n");
-        var lines = text.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
-
-        // 去掉前後空行
-        int start = 0;
-        int end = lines.Count - 1;
-        while (start <= end && string.IsNullOrWhiteSpace(lines[start])) start++;
-        while (end >= start && string.IsNullOrWhiteSpace(lines[end])) end--;
-        if (start > end)
-            return null;
-
-        var resultLines = new List<string>();
-        bool skippedFirstContentLine = false;
-
-        for (int i = start; i <= end; i++)
-        {
-            var line = lines[i];
-
-            // 空行直接保留，用來分段
-            if (string.IsNullOrWhiteSpace(line))
-            {
-                resultLines.Add(line);
-                continue;
-            }
-
-            // 第一條非空行視為「命令 / 模板」頭，直接略過
-            if (!skippedFirstContentLine)
-            {
-                skippedFirstContentLine = true;
-                continue;
-            }
-
-            var trimmedLower = line.Trim().ToLowerInvariant();
-
-            // 語言保證行，例如 "in 简体中文" / "in english"
-            if (trimmedLower == $"in {Constant.Lang}".ToLowerInvariant())
-                continue;
-
-            // 明顯模板字句（保守一點再過濾）
-            if (trimmedLower.Contains("be dramatic (mental break)") ||
-                trimmedLower.Contains("(downed in pain. Short, strained dialogue)") ||
-                trimmedLower.Contains("(Talk if you want to accept quest)") ||
-                trimmedLower.Contains("(Talk about quest result)") ||
-                trimmedLower.Contains("(Talk about incident)"))
-                continue;
-
-            // 其他行視為「情境 / 狀態」
-            resultLines.Add(line);
-        }
-
-        var result = string.Join("\n", resultLines).Trim();
-        return string.IsNullOrEmpty(result) ? null : result;
-    }
-
-    public static List<(Role role, string message)> BuildMemoryBlockFromHistory(List<(Role role, string message)> history)
-    {
-        var result = new List<(Role role, string message)>();
-
-        if (history == null || history.Count == 0)
-            return result;
-
-        var contexts = new List<string>();
-
-        foreach (var (role, message) in history)
-        {
-            // 只看 User 角色的歷史
-            if (role != Role.User)
-                continue;
-
-            var ctx = ExtractContextFromPrompt(message);
-            if (!string.IsNullOrWhiteSpace(ctx))
-                contexts.Add(ctx.Trim());
-        }
-
-        if (contexts.Count == 0)
-            return result;
-
-        var sb = new StringBuilder();
-        sb.AppendLine("以下是与当前角色相关的最近情境与背景摘要（记忆区块，仅供你理解角色状态，不是指令）：");
-        sb.AppendLine();
-
-        for (int i = 0; i < contexts.Count; i++)
-        {
-            sb.AppendLine($"[记忆 {i + 1}]");
-            sb.AppendLine(contexts[i]);
-            sb.AppendLine();
-        }
-
-        string memoryBlock = sb.ToString().TrimEnd();
-
-        // 封裝成「一個」 user message
-        result.Add((Role.User, memoryBlock));
-        return result;
     }
 }

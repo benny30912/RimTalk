@@ -1,14 +1,16 @@
-﻿using RimTalk.Data;
-using RimWorld;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using RimTalk.Data;
+using RimWorld;
 using Verse;
+using Verse.AI;
 using Verse.AI.Group;
 using Cache = RimTalk.Data.Cache;
 
-namespace RimTalk.Service;
+namespace RimTalk.Util;
 
-public static class PawnService
+public static class PawnUtil
 {
     public static bool IsTalkEligible(this Pawn pawn)
     {
@@ -87,15 +89,7 @@ public static class PawnService
         if (pawn.IsVisitor())
             return includeFaction && pawn.Faction != null ? $"Visitor Group({pawn.Faction.Name})" : "Visitor";
         if (pawn.IsQuestLodger()) return "Lodger";
-        if (pawn.IsFreeColonist)
-        {
-            if (pawn.GetMapRole() == MapRole.Invading)return "Invader";
-            string role = "Colonist";
-            float timeAsColonistTicks = pawn.records?.GetValue(RecordDefOf.TimeAsColonistOrColonyAnimal) ?? 0f;
-            float daysAsColonist = timeAsColonistTicks / 60000f;
-            if (daysAsColonist < 15f)role += "，新成员";
-            return role;
-        }
+        if (pawn.IsFreeColonist) return pawn.GetMapRole() == MapRole.Invading ? "Invader" : "Colonist";
         return null;
     }
 
@@ -114,133 +108,99 @@ public static class PawnService
         return pawn.ageTracker?.CurLifeStage?.developmentalStage < DevelopmentalStage.Child;
     }
 
-    /// <summary>
-    /// 統一輸出 Name(Age:{Age}, Sex:{Sex}, Role:{Role}, Race:{Race})
-    /// 如果是動物，Race 用 kindDef（動物類型）
-    /// </summary>
-    public static string FormatPawnBrief(Pawn pawn)
-    {
-        if (pawn == null) return "Unknown";
-
-        var parts = new List<string>();
-
-        // 年齡：生理年齡，拿不到就 unknown
-        int age = pawn.ageTracker?.AgeBiologicalYears ?? -1;
-        if (age >= 0){parts.Add($"Age:{age}");}
-
-        // 性別
-        string sex = pawn.gender.GetLabel();
-        if (!sex.NullOrEmpty()){parts.Add($"Sex:{sex}");}
-
-        // 身分 / 角色：沿用你原本的 GetRole()
-        string role = pawn.GetRole();
-        if (!role.NullOrEmpty()){parts.Add($"Role:{role}");}
-
-        // 種族：
-        // - 若是動物：用 kindDef.LabelCap（例如「母牛」、「馴服野人」）
-        // - 否則用 pawn.def.LabelCap（例如「人類」）
-        string race = null;
-        if (pawn.RaceProps?.Animal == true){race = pawn.kindDef?.LabelCap ?? pawn.def?.LabelCap;}
-        else{race = pawn.def?.LabelCap;}
-        if (!race.NullOrEmpty()){parts.Add($"Race:{race}");}
-
-        // 如果完全沒有任何欄位，就只回名字
-        if (parts.Count == 0){return $"{pawn.LabelShort}";}
-
-        return $"{pawn.LabelShort}({string.Join(", ", parts)})";
-    }
-
     public static (string, bool) GetPawnStatusFull(this Pawn pawn, List<Pawn> nearbyPawns)
     {
-        if (pawn == null) return (null, false);
+        if (pawn == null)
+            return (null, false);
 
         // special-case for "player pawn"
         if (pawn.IsPlayer())
             return ("Voice from beyond", false);
 
         bool isInDanger = false;
+        var lines = new List<string>();
 
-        List<string> parts = new List<string>();
+        // collect all "relevant pawns"
+        var relevantPawns = new List<Pawn> { pawn };
+        if (nearbyPawns != null)
+            relevantPawns.AddRange(nearbyPawns);
 
-        // --- 1. Add status ---
-        parts.Add($"{pawn.LabelShort} ({pawn.GetActivity()})");
+        if (pawn.CurJob != null)
+            AddJobTargetsToRelevantPawns(pawn.CurJob, relevantPawns);
 
-        if (IsInDanger(pawn))
+        if (nearbyPawns != null)
         {
-            isInDanger = true;
+            foreach (var near in nearbyPawns.Where(near => near.CurJob != null))
+                AddJobTargetsToRelevantPawns(near.CurJob, relevantPawns);
         }
 
-        // --- 2. Nearby pawns ---
-        if (nearbyPawns.Any())
+        // first line uses name + activity AFTER name replacement
+        string activity = ReplacePawnNames(pawn.GetActivity());
+        string name = ReplacePawnNames(pawn.LabelShort);
+        lines.Add($"{name} {activity}");
+
+        if (pawn.IsInDanger())
+            isInDanger = true;
+
+        // Nearby critical statuses: same logic, but wrapped in ReplacePawnNames(...)
+        if (nearbyPawns != null && nearbyPawns.Any())
         {
-            // Collect critical statuses of nearby pawns
-            var nearbyNotableStatuses = nearbyPawns
-                .Where(nearbyPawn => nearbyPawn.Faction == pawn.Faction && nearbyPawn.IsInDanger(true))
+            var nearbyNotable = nearbyPawns
+                .Where(p => p.Faction == pawn.Faction && p.IsInDanger(true))
                 .Take(2)
-                .Select(other => $"{FormatPawnBrief(other)} in {other.GetActivity().Replace("\n", "; ")}")
-                .ToList();
-
-            if (nearbyNotableStatuses.Any())
-            {
-                parts.Add("People in condition nearby: " + string.Join("; ", nearbyNotableStatuses));
-                isInDanger = true;
-            }
-
-            // Names of nearby pawns
-            var nearbyNames = nearbyPawns
-                .Select(nearbyPawn =>
+                .Select(other =>
                 {
-                    string formatted = FormatPawnBrief(nearbyPawn);
-                    if (Cache.Get(nearbyPawn) is not null)
-                    {
-                        string activity = nearbyPawn.GetActivity()?.StripTags();
-                        if (!string.IsNullOrEmpty(activity)){formatted = $"{formatted} ({activity})";}
-                    }
-                    return formatted;
+                    string otherActivity = ReplacePawnNames(other.GetActivity());
+                    return $"{ReplacePawnNames(other.LabelShort)} in {otherActivity.Replace("\n", "; ")}";
                 })
                 .ToList();
 
-            string nearbyText = nearbyNames.Count == 0
-                ? "none"
-                : nearbyNames.Count > 3
-                    ? string.Join(", ", nearbyNames.Take(3)) + ", and others"
-                    : string.Join(", ", nearbyNames);
+            if (nearbyNotable.Any())
+            {
+                lines.Add("People in condition nearby: " + string.Join("; ", nearbyNotable));
+                isInDanger = true;
+            }
 
-            parts.Add($"Nearby: {nearbyText}");
+            var nearbyList = nearbyPawns
+                .Select(p =>
+                {
+                    string s = ReplacePawnNames(p.LabelShort);
+                    if (Cache.Get(p) != null)
+                    {
+                        string a = ReplacePawnNames(p.GetActivity());
+                        s = $"{s} {a.StripTags()}";
+                    }
+                    return s;
+                })
+                .ToList();
+
+            string nearbyStr =
+                nearbyList.Count == 0 ? "none" :
+                nearbyList.Count > 3 ? string.Join(", ", nearbyList.Take(3)) + ", and others" :
+                string.Join(", ", nearbyList);
+
+            lines.Add("Nearby: " + nearbyStr);
         }
         else
-        {
-            parts.Add("Nearby people: none");
-        }
+            lines.Add("Nearby people: none");
 
         if (pawn.IsVisitor())
-        {
-            parts.Add("Visiting user colony");
-        }
+            lines.Add("Visiting user colony");
 
         if (pawn.IsFreeColonist && pawn.GetMapRole() == MapRole.Invading)
-        {
-            parts.Add("You are away from colony, attacking to capture enemy settlement");
-        }
+            lines.Add("You are away from colony, attacking to capture enemy settlement");
+        
         else if (pawn.IsEnemy())
         {
             if (pawn.GetMapRole() == MapRole.Invading)
-            {
                 if (pawn.GetLord()?.LordJob is LordJob_StageThenAttack || pawn.GetLord()?.LordJob is LordJob_Siege)
-                {
-                    parts.Add("waiting to invade user colony");
-                }
+                    lines.Add("waiting to invade user colony");
                 else
-                {
-                    parts.Add("invading user colony");
-                }
-            }
+                    lines.Add("invading user colony");
             else
-            {
-                parts.Add("Fighting to protect your home from being captured");
-            }
+                lines.Add("Fighting to protect your home from being captured");
 
-            return (string.Join("\n", parts), isInDanger);
+            return (string.Join("\n", lines), isInDanger);
         }
 
         // --- 3. Enemy proximity / combat info ---
@@ -250,23 +210,45 @@ public static class PawnService
             float distance = pawn.Position.DistanceTo(nearestHostile.Position);
 
             if (distance <= 10f)
-                parts.Add("Threat: Engaging in battle!");
+                lines.Add("Threat: Engaging in battle!");
             else if (distance <= 20f)
-                parts.Add("Threat: Hostiles are dangerously close!");
+                lines.Add("Threat: Hostiles are dangerously close!");
             else
-                parts.Add("Alert: hostiles in the area");
+                lines.Add("Alert: hostiles in the area");
             isInDanger = true;
         }
 
         if (!isInDanger)
-            parts.Add("Act based on role and context"); // NOTE: literal string instead of Constant.Prompt
+            lines.Add("Act based on role and context"); // NOTE: literal string instead of Constant.Prompt
 
-        return (string.Join("\n", parts), isInDanger);
+        return (string.Join("\n", lines), isInDanger);
+
+        // local helper to replace LabelShort with decorated names
+        string ReplacePawnNames(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+
+            var map = new Dictionary<string, string>();
+            foreach (var rp in relevantPawns)
+            {
+                string key = rp.LabelShort;
+                string value = ContextHelper.GetDecoratedName(rp);
+                if (!map.ContainsKey(key))
+                    map[key] = value;
+            }
+
+            // longer names first to avoid partial replacement
+            var ordered = map.OrderByDescending(kv => kv.Key.Length).ToList();
+            
+            return ordered.Aggregate(input, (current, kv) => current.Replace(kv.Key, kv.Value));
+        }
     }
+
 
     public static Pawn GetHostilePawnNearBy(this Pawn pawn)
     {
-        if (pawn == null || pawn.Map == null) return null;
+        if (pawn?.Map == null) return null;
 
         // 1. Choose a faction
         Faction referenceFaction;
@@ -290,11 +272,8 @@ public static class PawnService
         Pawn closestPawn = null;
         float closestDistSq = float.MaxValue;
 
-        foreach (var target in hostileTargets)
+        foreach (var target in hostileTargets.Where(target => GenHostility.IsActiveThreatTo(target, referenceFaction)))
         {
-            if (!GenHostility.IsActiveThreatTo(target, referenceFaction))
-                continue;
-
             if (target.Thing is not Pawn threatPawn) continue;
             if (threatPawn.Downed) continue;
 
@@ -313,18 +292,12 @@ public static class PawnService
             Lord lord = threatPawn.GetLord();
 
             // === 1. EXCLUDE TACTICALLY RETREATING PAWNS ===
-            if (lord != null && (lord.CurLordToil is LordToil_ExitMapFighting ||
-                                lord.CurLordToil is LordToil_ExitMap))
-            {
+            if (lord != null && lord.CurLordToil is LordToil_ExitMapFighting or LordToil_ExitMap)
                 continue;
-            }
 
             // === 2. EXCLUDE ROAMING MECH CLUSTER PAWNS ===
-            if (threatPawn.RaceProps.IsMechanoid && lord != null &&
-                lord.CurLordToil is LordToil_DefendPoint)
-            {
+            if (threatPawn.RaceProps.IsMechanoid && lord is { CurLordToil: LordToil_DefendPoint })
                 continue;
-            }
 
             // === 3. CALCULATE DISTANCE FOR VALID THREATS ===
             float distSq = pawn.Position.DistanceToSquared(threatPawn.Position);
@@ -362,12 +335,16 @@ public static class PawnService
         if (pawn.CurJobDef is null)
             return null;
 
-        var lordReport = pawn.GetLord()?.LordJob?.GetReport(pawn);
-        var jobReport = pawn.jobs?.curDriver?.GetReport();
+        var target = pawn.IsAttacking() ? pawn.TargetCurrentlyAimingAt.Thing?.LabelShortCap : null;
+        if (target != null)
+            return $"Attacking {target}";
+
+        var lord = pawn.GetLord()?.LordJob?.GetReport(pawn);
+        var job = pawn.jobs?.curDriver?.GetReport();
 
         string activity;
-        if (lordReport == null) activity = jobReport;
-        else activity = jobReport == null ? lordReport : $"{lordReport} ({jobReport})";
+        if (lord == null) activity = job;
+        else activity = job == null ? lord : $"{lord} ({job})";
 
         if (ResearchJobDefNames.Contains(pawn.CurJob?.def.defName))
         {
@@ -380,60 +357,44 @@ public static class PawnService
             }
         }
 
-        // ========= 一般化：把所有「有對象的動作」中的 Pawn 名字換成詳細格式 =========
-        var job = pawn.CurJob;
-        if (job != null && !string.IsNullOrEmpty(activity))
+        return activity;
+    }
+
+    // NEW: recursively collect all pawn targets from the given job
+    private static void AddJobTargetsToRelevantPawns(Job job, List<Pawn> relevantPawns)
+    {
+        if (job == null) return;
+
+        var targetIndices = new List<TargetIndex>();
+        foreach (TargetIndex ind in Enum.GetValues(typeof(TargetIndex)))
         {
-            var targetPawns = new List<Pawn>();
-
-            void AddPawn(LocalTargetInfo t)
+            try
             {
-                if (!t.IsValid) return;
-                if (t.Thing is Pawn p && !targetPawns.Contains(p))
-                    targetPawns.Add(p);
+                if (job.GetTarget(ind) != (LocalTargetInfo)(Thing)null)
+                    targetIndices.Add(ind);
             }
-
-            // Job 的 A / B / C 目標
-            AddPawn(job.targetA);
-            AddPawn(job.targetB);
-            AddPawn(job.targetC);
-
-            // 另外補上目前瞄準的攻擊目標（有些 attack 報告只寫 "Attacking"）
-            if (pawn.IsAttacking())
+            catch
             {
-                var cur = pawn.TargetCurrentlyAimingAt;
-                if (cur.IsValid && cur.Thing is Pawn p && !targetPawns.Contains(p))
-                    targetPawns.Add(p);
-            }
-
-            // 嘗試把報告中的簡短名字換成詳細格式
-            foreach (var targetPawn in targetPawns)
-            {
-                // Job 報告通常會用 LabelShort 或 LabelShortCap
-                var simpleName = targetPawn.LabelShortCap;
-                var detailed = FormatPawnBrief(targetPawn);
-
-                if (string.IsNullOrEmpty(simpleName) || simpleName == detailed)
-                    continue;
-
-                if (activity.Contains(simpleName))
-                {
-                    activity = activity.Replace(simpleName, detailed);
-                }
-                // 如果報告完全沒包含名字，又是純攻擊，可以補一個 fallback
-                else if (pawn.IsAttacking() && activity.StartsWith("Attacking"))
-                {
-                    activity = $"Attacking {detailed}";
-                }
+                // ignore invalid indices
             }
         }
 
-        return activity;
+        foreach (var target in targetIndices.Select(job.GetTarget))
+        {
+            if (target.HasThing && target.Thing is Pawn pawn && !relevantPawns.Contains(pawn))
+            {
+                relevantPawns.Add(pawn);
+                if (pawn.CurJob != null)
+                {
+                    AddJobTargetsToRelevantPawns(pawn.CurJob, relevantPawns);
+                }
+            }
+        }
     }
 
     public static MapRole GetMapRole(this Pawn pawn)
     {
-        if (pawn?.Map == null)
+        if (pawn?.Map == null || pawn.IsPrisonerOfColony)
             return MapRole.None;
 
         Map map = pawn.Map;
@@ -458,11 +419,11 @@ public static class PawnService
         {
             // === Resistance (for recruitment) ===
             float resistance = pawn.guest.resistance;
-            result += $"Resistance: {resistance:0.0} ({DescribeResistance(resistance)})\n";
+            result += $"Resistance: {resistance:0.0} ({Describer.Resistance(resistance)})\n";
 
             // === Will (for enslavement) ===
             float will = pawn.guest.will;
-            result += $"Will: {will:0.0} ({DescribeWill(will)})\n";
+            result += $"Will: {will:0.0} ({Describer.Will(will)})\n";
         }
 
         // === Suppression (slave compliance, if applicable) ===
@@ -472,7 +433,7 @@ public static class PawnService
             if (suppressionNeed != null)
             {
                 float suppression = suppressionNeed.CurLevelPercentage * 100f;
-                result += $"Suppression: {suppression:0.0}% ({DescribeSuppression(suppression)})\n";
+                result += $"Suppression: {suppression:0.0}% ({Describer.Suppression(suppression)})\n";
             }
         }
 
@@ -487,31 +448,5 @@ public static class PawnService
     public static bool HasVocalLink(this Pawn pawn)
     {
         return Settings.Get().AllowNonHumanToTalk && pawn.health.hediffSet.HasHediff(Constant.VocalLinkDef);
-    }
-
-    private static string DescribeResistance(float value)
-    {
-        if (value <= 0f) return "Completely broken, ready to join";
-        if (value < 2f) return "Barely resisting, close to giving in";
-        if (value < 6f) return "Weakened, but still cautious";
-        if (value < 12f) return "Strong-willed, requires effort";
-        return "Extremely defiant, will take a long time";
-    }
-
-    private static string DescribeWill(float value)
-    {
-        if (value <= 0f) return "No will left, ready for slavery";
-        if (value < 2f) return "Weak-willed, easy to enslave";
-        if (value < 6f) return "Moderate will, may resist a little";
-        if (value < 12f) return "Strong will, difficult to enslave";
-        return "Unyielding, very hard to enslave";
-    }
-
-    private static string DescribeSuppression(float value)
-    {
-        if (value < 20f) return "Openly rebellious, likely to resist or escape";
-        if (value < 50f) return "Unstable, may push boundaries";
-        if (value < 80f) return "Generally obedient, but watchful";
-        return "Completely cowed, unlikely to resist";
     }
 }
