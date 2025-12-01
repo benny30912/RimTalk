@@ -87,7 +87,7 @@ public partial class Settings
         leftListing.CheckboxLabeled("RimTalk.Settings.ApplyMoodAndSocialEffects".Translate().ToString(),
             ref settings.ApplyMoodAndSocialEffects,
             "RimTalk.Settings.ApplyMoodAndSocialEffectsTooltip".Translate().ToString());
-        leftListing.Gap(); // ← 新增間距
+        leftListing.Gap(6f); // ← 新增間距
         leftListing.CheckboxLabeled("RimTalk.Settings.EnableAutoPersonalityUpdate".Translate().ToString(),
             ref settings.EnableAutoPersonalityUpdate,
             "RimTalk.Settings.EnableAutoPersonalityUpdateTooltip".Translate().ToString()); // ← 新增 checkbox
