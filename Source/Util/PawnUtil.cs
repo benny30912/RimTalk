@@ -97,14 +97,14 @@ public static class PawnUtil
         bool isInDanger = false;
         var lines = new List<string>();
         // collect all "relevant pawns"
-        var relevantPawns = new List<Pawn> { pawn };
+        var relevantPawns = new List<Pawn> {}; //發話人自己不需要當作相關Pawn(被修飾名字)
         if (nearbyPawns != null) relevantPawns.AddRange(nearbyPawns);
         if (pawn.CurJob != null) AddJobTargetsToRelevantPawns(pawn.CurJob, relevantPawns);
         if (nearbyPawns != null) foreach (var near in nearbyPawns.Where(near => near.CurJob != null)) AddJobTargetsToRelevantPawns(near.CurJob, relevantPawns);
         // first line uses name + activity AFTER name replacement
         string activity = ReplacePawnNames(pawn.GetActivity());
         string name = ReplacePawnNames(pawn.LabelShort);
-        lines.Add($"{name}({activity})");
+        lines.Add($"{name}{activity}");
         if (pawn.IsInDanger()) isInDanger = true;
         // Nearby critical statuses: same logic, but wrapped in ReplacePawnNames(...)
         if (nearbyPawns != null && nearbyPawns.Any())
@@ -162,6 +162,7 @@ public static class PawnUtil
             var map = new Dictionary<string, string>();
             foreach (var rp in relevantPawns)
             {
+                if (rp == pawn) continue; //就算被別人作為動作對象，發話人自己也不需要當作相關Pawn(被修飾名字)
                 string key = rp.LabelShort;
                 string value = ContextHelper.GetDecoratedName(rp);
                 if (!map.ContainsKey(key)) map[key] = value;
@@ -260,14 +261,7 @@ public static class PawnUtil
                 // ignore invalid indices
             }
         }
-        foreach (var target in targetIndices.Select(job.GetTarget))
-        {
-            if (target.HasThing && target.Thing is Pawn pawn && !relevantPawns.Contains(pawn))
-            {
-                relevantPawns.Add(pawn);
-                if (pawn.CurJob != null) AddJobTargetsToRelevantPawns(pawn.CurJob, relevantPawns);
-            }
-        }
+        foreach (var target in targetIndices.Select(job.GetTarget)) if (target.HasThing && target.Thing is Pawn pawn && !relevantPawns.Contains(pawn)) relevantPawns.Add(pawn); //刪除遞迴，對象的對象不需要當作相關Pawn(被修飾名字)
     }
     public static MapRole GetMapRole(this Pawn pawn)
     {
