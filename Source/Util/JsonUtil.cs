@@ -69,6 +69,12 @@ namespace RimTalk.Util
             @"""$1"":null$2"
         );
 
+        sanitized = Regex.Replace(
+            sanitized, 
+            @"""([^""]+)""\s*:\s*([,}])", 
+            @"""$1"":null$2"
+        );
+
         if (sanitized.Contains("]["))
         {
             sanitized = sanitized.Replace("][", ",");
