@@ -32,7 +32,7 @@ public static class Constant
          """;
 
     private const string JsonInstruction = """
-                                           Output JSONL.
+                                           Output JSON.
                                            Required keys: "name", "text".
                                            """;
     

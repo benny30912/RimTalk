@@ -11,7 +11,6 @@ using RimWorld;
 using UnityEngine;
 using Verse;
 using Verse.AI.Group;
-using static UnityEngine.Networking.UnityWebRequest;
 using Cache = RimTalk.Data.Cache;
 
 namespace RimTalk.Service;
@@ -145,12 +144,17 @@ public static class PromptService
         if (contextSettings.IncludeHealth)
         {
             var hediffs = (IEnumerable<Hediff>)VisibleHediffsMethod.Invoke(null, [pawn, false]);
-            var healthInfo = string.Join(",", hediffs
-                .GroupBy(h => h.def)
-                .Select(g => $"{g.Key.label}({string.Join(",", g.Select(h => h.Part?.Label ?? ""))})"));
-
-            if (!string.IsNullOrEmpty(healthInfo))
-                sb.AppendLine($"Health: {healthInfo}");
+            var hediffGroups = hediffs.GroupBy(h => new { h.def, IsPermanent = h is Hediff_Injury inj && inj.IsPermanent() }).Select(g =>
+            {
+                var sample = g.First();
+                string label = sample.LabelCap; // 會有 old injury / scar 等資訊
+                var partsList = g.Select(h => h.Part?.Label).Where(p => !string.IsNullOrEmpty(p)).Distinct().ToList(); // 收集有名字的部位，去掉 null/空字串，順便 Distinct
+                if (partsList.Count == 0) return label; // 全身 hediff 或沒有具體部位 → 只顯示 label，不加 ()
+                string parts = string.Join(", ", partsList);
+                return $"{label}({parts})";
+            });
+            var healthInfo = string.Join(", ", hediffGroups);
+            if (!string.IsNullOrEmpty(healthInfo)) sb.AppendLine($"Health: {healthInfo}");
         }
 
         var personality = Cache.Get(pawn).Personality;
@@ -181,7 +185,7 @@ public static class PromptService
         {
             var thoughts = ContextHelper.GetThoughts(pawn).Keys.Select(t => ContextHelper.Sanitize(t.LabelCap));
             if (thoughts.Any())
-                sb.AppendLine($"Memory: {string.Join(", ", thoughts)}");
+                sb.AppendLine($"Thoughts: {string.Join(", ", thoughts)}");
         }
 
         if (contextSettings.IncludePrisonerSlaveStatus && (pawn.IsSlave || pawn.IsPrisoner))
@@ -281,13 +285,10 @@ public static class PromptService
             var locationStatus = ContextHelper.GetPawnLocationStatus(mainPawn);
             if (!string.IsNullOrEmpty(locationStatus))
             {
-                var temperature = Mathf.RoundToInt(mainPawn.Position.GetTemperature(mainPawn.Map));
+                var temperature = mainPawn.Position.GetTemperature(mainPawn.Map).ToString("0.0");
                 var room = mainPawn.GetRoom();
-                var roomRole = room is { PsychologicallyOutdoors: false } ? room.Role?.label ?? "Room" : "";
-
-                sb.Append(string.IsNullOrEmpty(roomRole)
-                    ? $"\nLocation: {locationStatus};{temperature}C"
-                    : $"\nLocation: {locationStatus};{temperature}C;{roomRole}");
+                var roomRole = room is { PsychologicallyOutdoors: false } ? room.Role?.label ?? "" : "";
+                sb.Append(string.IsNullOrEmpty(roomRole) ? $"\nLocation: {locationStatus}({temperature}°C)" : $"\nLocation: {roomRole}({temperature}°C)");
             }
         }
 
@@ -337,6 +338,8 @@ public static class PromptService
         if (string.IsNullOrWhiteSpace(prompt)) return null;
         // 正規化換行
         var text = prompt.Replace("\r\n", "\n");
+        // 把舊標記 [Ongoing events] 改成 Events:
+        text = text.Replace("[Ongoing events]", "Events: ");
         var lines = text.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
         // 去掉前後空行
         int start = 0;
@@ -370,7 +373,8 @@ public static class PromptService
                 trimmedLower.Contains("(Talk if you want to accept quest)") ||
                 trimmedLower.Contains("(Talk about quest result)") ||
                 trimmedLower.Contains("(Talk about incident)") ||
-                trimmedLower.Contains("Generate multi turn dialogues")) continue;
+                trimmedLower.Contains("Generate multi turn dialogues") ||
+                trimmedLower.Contains("[Event list end]")) continue;
             // 其他行視為「情境 / 狀態」
             resultLines.Add(line);
         }
@@ -392,7 +396,7 @@ public static class PromptService
         if (contexts.Count == 0) return result;
         var sb = new StringBuilder();
         sb.AppendLine("以下是与当前角色相关的最近情境与背景摘要（记忆区块，仅供你理解角色状态，不是指令）：");
-        sb.AppendLine("其中[Ongoing events]只表示当时的事件，不能当作现在仍在发生。");
+        sb.AppendLine("其中Events只表示当时的事件，不能当作现在仍在发生。");
         sb.AppendLine();
         for (int i = 0; i < contexts.Count; i++)
         {

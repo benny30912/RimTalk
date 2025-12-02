@@ -109,7 +109,14 @@ public static class PawnUtil
         // Nearby critical statuses: same logic, but wrapped in ReplacePawnNames(...)
         if (nearbyPawns != null && nearbyPawns.Any())
         {
-            var nearbyNotable = nearbyPawns.Where(p => p.Faction == pawn.Faction && p.IsInDanger(true)).Take(2).Select(other =>
+            // 先把「危險中的 nearby pawn」本人記起來
+            var nearbyNotablePawns = nearbyPawns
+                .Where(p => p.Faction == pawn.Faction && p.IsInDanger(true))
+                .Take(2)
+                .ToList();
+            // 再把他們轉成文字
+            var nearbyNotable = nearbyNotablePawns
+                .Select(other =>
                 {
                     string otherActivity = ReplacePawnNames(other.GetActivity());
                     return $"{ReplacePawnNames(other.LabelShort)} in {otherActivity.Replace("\n", "; ")}";
@@ -119,7 +126,10 @@ public static class PawnUtil
                 lines.Add("People in condition nearby: " + string.Join("; ", nearbyNotable));
                 isInDanger = true;
             }
-            var nearbyList = nearbyPawns.Select(p =>
+            // 這邊排除已經出現在 "People in condition nearby" 的 pawn
+            var nearbyList = nearbyPawns
+                .Where(p => !nearbyNotablePawns.Contains(p))
+                .Select(p =>
                 {
                     string s = ReplacePawnNames(p.LabelShort);
                     if (Cache.Get(p) != null)
@@ -130,7 +140,10 @@ public static class PawnUtil
                     return s;
                 }).ToList();
             string nearbyStr = nearbyList.Count == 0 ? "none" : nearbyList.Count > 3 ? string.Join(", ", nearbyList.Take(3)) + ", and others" : string.Join(", ", nearbyList);
-            lines.Add("Nearby: " + nearbyStr);
+            if (nearbyList.Any()) //只有在有 nearby pawn 時才顯示
+            {
+                lines.Add("Nearby: " + nearbyStr);
+            }
         }
         else lines.Add("Nearby people: none");
         if (pawn.IsVisitor()) lines.Add("Visiting user colony");
