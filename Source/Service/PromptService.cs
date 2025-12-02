@@ -235,7 +235,7 @@ public static class PromptService
         if (talkRequest.TalkType == TalkType.User)
         {
             sb.Append($"{pawns[1].LabelShort}({pawns[1].GetRole()}) said to '{shortName}: {talkRequest.Prompt}'.");
-            sb.Append($"Generate conversation starting after this (do not repeat initial dialogue), beginning with {mainPawn.LabelShort}");
+            sb.Append($"Generate multi turn dialogues starting after this (do not repeat initial dialogue), beginning with {mainPawn.LabelShort}");
         }
         else
         {
@@ -373,7 +373,7 @@ public static class PromptService
                 trimmedLower.Contains("(Talk if you want to accept quest)") ||
                 trimmedLower.Contains("(Talk about quest result)") ||
                 trimmedLower.Contains("(Talk about incident)") ||
-                trimmedLower.Contains("Generate multi turn dialogues") ||
+                trimmedLower.Contains("Generate ") ||
                 trimmedLower.Contains("[Event list end]")) continue;
             // 其他行視為「情境 / 狀態」
             resultLines.Add(line);

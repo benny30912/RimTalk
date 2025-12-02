@@ -3,6 +3,7 @@ using System.Collections;
 using System.IO;
 using System.Runtime.Serialization.Json;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace RimTalk.Util
 {
@@ -62,25 +63,29 @@ namespace RimTalk.Util
                 return string.Empty;
             }
 
-            // 修正 ][ 或 }{ 之類黏在一起的情況
-            if (sanitized.Contains("]["))
-            {
-                sanitized = sanitized.Replace("][", ",");
-            }
-            if (sanitized.Contains("}{"))
-            {
-                sanitized = sanitized.Replace("}{", "},{");
-            }
+        sanitized = Regex.Replace(
+            sanitized, 
+            @"""([^""]+)""\s*:\s*([,}])", 
+            @"""$1"":null$2"
+        );
 
-            // 處理多包一層 { [ ... ] } 的情況
-            if (sanitized.StartsWith("{") && sanitized.EndsWith("}"))
+        if (sanitized.Contains("]["))
+        {
+            sanitized = sanitized.Replace("][", ",");
+        }
+        if (sanitized.Contains("}{"))
+        {
+            sanitized = sanitized.Replace("}{", "},{");
+        }
+    
+        if (sanitized.StartsWith("{") && sanitized.EndsWith("}"))
+        {
+            string innerContent = sanitized.Substring(1, sanitized.Length - 2).Trim();
+            if (innerContent.StartsWith("[") && innerContent.EndsWith("]"))
             {
-                string innerContent = sanitized.Substring(1, sanitized.Length - 2).Trim();
-                if (innerContent.StartsWith("[") && innerContent.EndsWith("]"))
-                {
-                    sanitized = innerContent;
-                }
+                sanitized = innerContent;
             }
+        }
 
             bool isEnumerable = typeof(IEnumerable).IsAssignableFrom(targetType) && targetType != typeof(string);
 
