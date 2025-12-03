@@ -373,7 +373,7 @@ public static class PromptService
                 trimmedLower.Contains("(Talk if you want to accept quest)") ||
                 trimmedLower.Contains("(Talk about quest result)") ||
                 trimmedLower.Contains("(Talk about incident)") ||
-                trimmedLower.Contains("Generate ") ||
+                trimmedLower.Contains("Generate multi turn dialogues") ||
                 trimmedLower.Contains("[Event list end]")) continue;
             // 其他行視為「情境 / 狀態」
             resultLines.Add(line);
