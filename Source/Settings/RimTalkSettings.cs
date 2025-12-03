@@ -7,8 +7,6 @@ namespace RimTalk;
 
 public class RimTalkSettings : ModSettings
 {
-    public static RimTalkSettings Instance;
-    
     public List<ApiConfig> CloudConfigs = [];
     public int CurrentCloudConfigIndex = 0;
     public ApiConfig LocalConfig = new() { Provider = AIProvider.Local };
@@ -29,13 +27,14 @@ public class RimTalkSettings : ModSettings
     public bool AllowOtherFactionsToTalk = false;
     public bool AllowEnemiesToTalk = false;
     public bool AllowCustomConversation = true;
+    public Settings.PlayerDialogueMode PlayerDialogueMode = Settings.PlayerDialogueMode.Manual;
+    public string PlayerName = "Player";
     public bool ContinueDialogueWhileSleeping = false;
     public bool AllowBabiesToTalk = true;
     public bool AllowNonHumanToTalk = true;
     public bool ApplyMoodAndSocialEffects = false;
     public bool EnableAutoPersonalityUpdate = false;
     public int DisableAiAtSpeed = 0;
-    public string PlayerPrompt = "Voice from beyond";
     public Settings.ButtonDisplayMode ButtonDisplay = Settings.ButtonDisplayMode.Tab;
 
     public ContextSettings Context = new();
@@ -53,11 +52,6 @@ public class RimTalkSettings : ModSettings
     public bool OverlayDrawAboveUI = true;
     public Rect OverlayRectDebug = new(200f, 200f, 600f, 450f);
     public Rect OverlayRectNonDebug = new(200f, 200f, 400f, 250f);
-    
-    public RimTalkSettings()
-    {
-        Instance = this;
-    }
 
     /// <summary>
     /// Gets the first active and valid API configuration.
@@ -171,6 +165,9 @@ public class RimTalkSettings : ModSettings
         Scribe_Values.Look(ref AllowOtherFactionsToTalk, "allowOtherFactionsToTalk", false);
         Scribe_Values.Look(ref AllowEnemiesToTalk, "allowEnemiesToTalk", false);
         Scribe_Values.Look(ref AllowCustomConversation, "allowCustomConversation", true);
+        Scribe_Values.Look(ref PlayerDialogueMode, "playerDialogueMode", Settings.PlayerDialogueMode.Manual);
+        Scribe_Values.Look(ref PlayerName, "playerName", "Player");
+        
         Scribe_Values.Look(ref ContinueDialogueWhileSleeping, "continueDialogueWhileSleeping", false);
         Scribe_Values.Look(ref EnableAutoPersonalityUpdate, "EnableAutoPersonalityUpdate", false);
         Scribe_Values.Look(ref DisableAiAtSpeed, "DisableAiAtSpeed", 0);
@@ -178,8 +175,7 @@ public class RimTalkSettings : ModSettings
         Scribe_Values.Look(ref AllowBabiesToTalk, "allowBabiesToTalk", true);
         Scribe_Values.Look(ref AllowNonHumanToTalk, "allowNonHumanToTalk", true);
         Scribe_Values.Look(ref ApplyMoodAndSocialEffects, "applyMoodAndSocialEffects", false);
-        Scribe_Values.Look(ref PlayerPrompt, "playerPrompt", "Voice from beyond");
-
+        
         Scribe_Deep.Look(ref Context, "context");
 
         // Debug window settings

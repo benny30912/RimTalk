@@ -45,6 +45,7 @@ public class RimTalk : GameComponent
 
         // 讓現有 pawn 把排隊回應全部丟棄
         Cache.GetAll().ToList().ForEach(pawnState => pawnState.IgnoreAllTalkResponses());
+        Cache.InitializePlayerPawn();
 
         Cache.Clear();           // PawnState 快取，裡面直指 Pawn，世界換了就全是舊人
         ApiHistory.Clear();      //都清掉上一輪的 API 紀錄
