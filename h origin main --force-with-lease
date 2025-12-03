@@ -1,0 +1,137 @@
+[33m692051d[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31mjlibrary/main[m[33m)[m feat: Add player dialoge customization options
+[33m2222631[m fix: Refine pawn exclusion logic and adjust DebugWindow UI styling
+[33m5b3bca5[m Merge pull request #30 from Alchuang22-dev/dev-5
+[33m42cfc1c[m Fix: Fix Input bug
+[33m468e661[m Fix: Add settings to change "User Prompt"
+[33m45f256e[m Fix: Improve JSON sanitization and simplify overlay depth handling.
+[33m2f4d5ec[m Merge pull request #29 from craftingmod/fix-zindex
+[33maac303f[m Fix: z-index issues (restore depth after draw)
+[33mdf9f4ef[m add support to reposition overlay above UI
+[33m3d2809b[m Merge pull request #27 from fourging/fix/chinese-text-display-comments
+[33m1ec9b81[m Translate Chinese comments to English for Chinese text display fix
+[33m82226f4[m feat: Add context filter customization for dialogue generation
+[33me548ad7[m feat: Implement mood and social effects based on dialogue
+[33mc7e70cb[m feat: Add export and reset functionality to Debug Window
+[33m7a27717[m fix: Code refactoring
+[33m081bef9[m feat: Add support for Grok and gemini-3-pro-preview
+[33m9844b95[m Merge pull request #24 from Alchuang22-dev/dev-3
+[33md242d68[m fix: Refact Hostile logic
+[33mfe9e725[m Merge pull request #23 from Alchuang22-dev/dev-3
+[33m57b5264[m fix: Baby talk eligibility
+[33m15b6147[m  feat: Environment  perception
+[33m1b1b829[m Merge pull request #22 from Alchuang22-dev/dev-3
+[33m278dd87[m fix: Fix healthcard of vocal link
+[33m3efce3b[m Merge pull request #21 from CarlosNahuelcoy/feature/player2-local-app-detection
+[33m384f0e9[m feat: Add Player2 local app auto-detection with manual API key fallback
+[33m985bd7e[m fix: Vocal Link can be implanted to Ghouls
+[33mf7aa62c[m fix: Allow Prisoner persona to be edited
+[33mf1e53cd[m feat: Add vocal link catalyst, giving ability for non-human creatures to talk
+[33mb4d8d96[m Fix: Player-initiated dialogue not working after loading a save.
+[33m73b38cc[m fix: Fixed babies being falsely treated as downed/critical due to non-movable state.
+[33md8f02e1[m Merge pull request #19 from Alchuang22-dev/dev-3
+[33m256d1fc[m fix: Add "Allow Babies To Talk" setting
+[33m189b8e4[m feat: Add "Continue Dialogue While Sleeping" setting
+[33m77287f6[m fix: Add check to prevent newborns and babies from talking
+[33m59c6e2c[m feat: Enable multi-turn dialogue for player
+[33mb183c61[m fix: allow resting and sleeping pawns to display talk
+[33md988668[m fix: LLM response format change from JSON array to JSONL
+[33m0aac40f[m fix: refine prisoner threat bug where they recognize other inmates as threat
+[33m498a436[m fix: add exception handling for saving/loading interaction texts and sanitize XML strings fix: Minor bug fix in `ConsumeTalk` with failsafe check for empty responses.
+[33m31af9d7[m fix: Correct MapRole assignment for player home pawns
+[33m27083e7[m Revert merge causing dialogue/status issues reported by users
+[33m1190137[m Merge pull request #17 from CarlosNahuelcoy/feature/player2-integration
+[33md67bdfc[m Merge pull request #15 from Alchuang22-dev/dev-2
+[33mcd0b79b[m Add Player2 AI provider integration
+[33mba80395[m fix: Fix bugs of Baby Enemy
+[33m5d2f18d[m fix: Add `fetch Bubbles` for windows
+[33m84ab1e3[m fix: Refactor `GetMapRole()` logic and add message state to debug window
+[33m5d8e49a[m fix: logic for colonist and invader role assignments.
+[33m472b20a[m feat: Introduce MapRole system to classify pawn activities and improve role-based behaviors
+[33mdb6f1be[m fix: Add Player dialogue to overlay, and minor bug fixes
+[33m823652f[m feat: Adds setting for simultaneous conversations.
+[33m03cf606[m fix: replace hostile pawn check with combat status check in PromptService
+[33ma991f7c[m fix: bug where a slave could be incorrectly marked as a master
+[33mbdc83ee[m feat: Implement player-initiated dialogue system
+[33mcad85d8[m Merge pull request #12 from lzw-723/main
+[33m09b0dda[m fix: ChineseSimplified
+[33m08bc7e9[m fix: Fixed stream handlers to log deserialization error properly
+[33m5171b74[m fix: Enforce group behavior, avoid name-calling, add lodger check. Replace static PawnService calls with extension methods
+[33mb5e8204[m fix: Balance pawn talk selection to prioritize colonists
+[33m89226e9[m feat: Add GameVersion property, implement RimTalk text persistence, and enhance ThoughtPatch with program state checks.
+[33m69b9b35[m fix: Refactor ArchivePatch and remove padding in Persona Editor Window
+[33m606a569[m Merge pull request #11 from Alchuang22-dev/dev
+[33ma65eba4[m fix: Improve script path resolution for enhanced portability
+[33m8370e16[m Merge pull request #10 from craftingmod/crossplatform
+[33mb27c42a[m fix: Fix Quest “Offer” vs “End” classification
+[33m06a49c7[m Merge branch 'dev' of https://github.com/Alchuang22-dev/RimTalk into dev
+[33m12ac171[m fix: update persona editor window
+[33m5bc9606[m feat: Cross-Platform csharp project support
+[33m287745b[m fix: Integrates persona element into character card UI stack via transpiler
+[33m992cd08[m fix: Hediff persona not generating initial personality on creation.
+[33m01abd2c[m fix: bubble NPE and enables urgent talks for downed pawns.
+[33m2a50327[m Merge pull request #9 from Alchuang22-dev/dev
+[33m101671e[m fix: Fix NullReferenceException on pawns, including toddlers
+[33mcf503f7[m fix: Add thought tracking and prioritizes urgent talks.
+[33m070ee40[m fix: Adjust research activity display, optimize relationship labels, and resolve null references in spoken thoughts
+[33m90b0c11[m chore: Add MIT License file to the repository
+[33m266bbe6[m fix: Update multiline editing tips across translations and handle `\n` input in text areas
+[33m4166d40[m feat: Introduce streaming AI responses and real-time updates
+[33m814dfb1[m fix: Overlay performance enhancement and bug fix
+[33m3e4c177[m fix: Reposition Persona button on Biotab
+[33mf4b3e5b[m fix: Prevent null reference in TalkService when API log is missing
+[33m85d34c1[m fix: Updates Chinese tooltip for toggle from 'floating' to 'overlay'.
+[33m1861b56[m fix: Prevents null reference when research project is missing.
+[33m7d31e37[m Merge branch 'feature'
+[33mf02ee47[m feat: Add overlay
+[33m3b95c1f[m fix: Relations of nearby pawns
+[33m85d47fa[m feat: Add translations
+[33m55725fc[m fix: Language version update
+[33m64ba454[m fix: Enhance JSON handling with 3rd party libs
+[33m9fa89b0[m fix: Remove redundant reply check in TalkService logic
+[33m2e674e1[m Merge pull request #7 from winteryu21/feat/add-prompt-w-s
+[33m814d615[m feat: Adds weather/season context to the prompt and optimizes data lookup
+[33me9f7f8e[m fix: Refine logic for identifying hostile pawns nearby and event talk distribution.
+[33md3391b3[m Merge pull request #6 from winteryu21/feat/change-date-to-today
+[33m6847c2f[m feat: Change 'Date' prompt to 'Today'
+[33m461d03b[m Merge pull request #5
+[33mcf91e7e[m Merge pull request #4
+[33mde265af[m fix: Adds configurable button display mode and expands toggle hotkeys.
+[33m1377456[m fix: Balances non-colonist pawn talk initiation weights dynamically.
+[33mb9dc1df[m feat: Include the date when composing the prompt.
+[33m5f5f71e[m feat: Improve research job detection for mod compatibility(Research Reinvented)
+[33mcb7d0d4[m fix: Recalibrates tick rates and alternates talk generation priority.
+[33m1c8e65f[m fix: Improves hostile pawn search, talk expiry, and pawn eligibility logic.
+[33m02a2104[m fix: Update pawn relations to show only nearby pawns.
+[33mab2b512[m fix: Separates AI persona instruction from dynamic context.
+[33m9e065a1[m fix: Refactors interaction logging to use a dedicated log entry type.
+[33mbbc71f0[m fix: Propagates web request error message in thrown exceptions.
+[33m5856b64[m fix: Adds research in the context
+[33m185a1fe[m fix: Ensures correct AI client API endpoint construction.
+[33md8073a6[m fix: Clarifies JSON return instructions for better model adherence.
+[33m567628d[m fix: Enhance battle prompts for better performance.
+[33md6bda69[m fix: Adds boilerplate for many languages and fixes the turret bug.
+[33m9561cc0[m feat: Adds AI speed pause, custom API path support, and improves logging.
+[33m50f7ee9[m fix: v1.5 and CE compatibility.
+[33m9ca38ab[m fix: Provides better context for AI prompts and game interactions.
+[33m858badc[m feat: Support for per-pawn conversation history
+[33meda3d4b[m fix: Queues battle log talk requests
+[33m3785c05[m fix: Save compatibility and migration logic.
+[33mf53c879[m feat: Add Debug UI & Fixed pawn selection logic.
+[33m5f529d2[m fix: Ai instruction text area fix 2.
+[33m4b3e939[m fix: Ai instruction text area fix.
+[33mfb746aa[m fix: Makes AI instruction text area height calculation more robust.
+[33md4e5b34[m fix: Restricts chitchat danger check to PlayLogEntry_Interaction entries.
+[33m4b86efd[m fix: Pawns that are no longer is the map should be excluded.
+[33md97273d[m feat: Generalizes AI client handling and adds a custom provider option.
+[33mcce3cf9[m fix: Refactor settings UI, update services, and clean up old code.
+[33m80af079[m fix: Refines persona editor character guidance and token count estimation.
+[33m9fdb692[m feat: Migrates to PersonaManager, adds talk request pool, and refactors AI prompts.
+[33ma36cf6e[m feat: Enhances AI context, improves talk eligibility, and optimizes pawn cache.
+[33m6553e1f[m feat: Adds dedicated AI error handling and fallback model support.
+[33m7e177bd[m fix: Structures colonist context with explicit start and end markers.
+[33m31fb903[m feat: Adds global enable toggle
+[33maccfa8b[m feat: Integrate multiple AI providers with dynamic model fetching and reordering.
+[33mb08c0db[m fix: Restricts talk generation to pawns near battle log events.
+[33m90b9360[m fix: Adds AI-generated pawn personas and localizes settings UI.
+[33m88decf8[m fix: Simplifies settings UI scrolling and adds bubble fade tip.
+[33m636e2f5[m Initial commit
