@@ -29,7 +29,7 @@ public static class PromptService
         {
             var pawn = pawns[i];
             if (pawn.IsPlayer()) continue;
-            var pawnContext = CreatePawnContext(pawn, i == 0 ? InfoLevel.Normal : InfoLevel.Short);
+            var pawnContext = CreatePawnContext(pawn, InfoLevel.Normal); //讓所有 Pawn 都使用 Normal 級別的上下文
 
             Cache.Get(pawn).Context = pawnContext;
             context.AppendLine()

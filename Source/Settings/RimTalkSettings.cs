@@ -16,7 +16,7 @@ public class RimTalkSettings : ModSettings
     public bool IsUsingFallbackModel = false;
     public bool IsEnabled = true;
     public int TalkInterval = 7;
-    public const int ReplyInterval = 4;
+    public const int ReplyInterval = 2; //從 4 減少到 2，以加快回應速度
     public bool ProcessNonRimTalkInteractions;
     public bool AllowSimultaneousConversations;
     public string CustomInstruction = "";
