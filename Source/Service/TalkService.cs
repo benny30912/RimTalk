@@ -102,10 +102,19 @@ public static class TalkService
             var playerDict = allInvolvedPawns.ToDictionary(p => p.LabelShort, p => p);
             var receivedResponses = new List<TalkResponse>();
 
+            // --- 修改開始 ---
+
+            // 1. 先抓這個 pawn 的完整歷史（User + AI 原始 JSON）
+            var fullHistory = TalkHistory.GetMessageHistory(initiator);
+
+            // 2. 把歷史轉成「只保留情境的 Memory Block」
+            // 這樣 LLM 只會看到整理過的 [記憶 1]... [記憶 N]，而不會看到之前的 JSON 輸出或重複的指令
+            var memoryBlockHistory = PromptService.BuildMemoryBlockFromHistory(fullHistory);
+
             // Call the streaming chat service. The callback is executed as each piece of dialogue is parsed.
             await AIService.ChatStreaming(
                 talkRequest,
-                TalkHistory.GetMessageHistory(initiator),
+                memoryBlockHistory,  // 3. 這裡傳入處理過的 memoryBlock，而不是 fullHistory
                 playerDict,
                 (pawn, talkResponse) =>
                 {
