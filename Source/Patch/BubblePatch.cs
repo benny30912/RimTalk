@@ -65,7 +65,7 @@ public static class Bubbler_Add
         PawnState pawnState = Cache.Get(initiator);
 
         // chitchat is ignored if talkRequest exists
-        if (pawnState == null || (isChitchat && pawnState.TalkRequests.Count > 0))
+        if (pawnState == null) //不再因為 TalkRequests 隊列中存在請求就阻擋 Chitchat 發起
             return false;
 
         // Otherwise, block normal bubble and generate talk
