@@ -139,14 +139,33 @@ public static class PromptService
         var sb = new StringBuilder();
         sb.Append(CreatePawnBackstory(pawn, infoLevel));
 
-        // Health
+        // Health - 改進顯示邏輯
         if (contextSettings.IncludeHealth)
         {
             var hediffs = (IEnumerable<Hediff>)VisibleHediffsMethod.Invoke(null, [pawn, false]);
-            var healthInfo = string.Join(",", hediffs
-                .GroupBy(h => h.def)
-                .Select(g => $"{g.Key.label}({string.Join(",", g.Select(h => h.Part?.Label ?? ""))})"));
 
+            // 依據 def 和是否為永久性傷口分組
+            var hediffGroups = hediffs
+                .GroupBy(h => new { h.def, IsPermanent = h is Hediff_Injury inj && inj.IsPermanent() })
+                .Select(g =>
+                {
+                    var sample = g.First();
+                    string label = sample.LabelCap; // 使用 LabelCap 獲取完整名稱（包含階段）
+
+                    // 收集部位名稱，過濾掉空的
+                    var partsList = g.Select(h => h.Part?.Label)
+                                     .Where(p => !string.IsNullOrEmpty(p))
+                                     .Distinct()
+                                     .ToList();
+
+                    if (partsList.Count == 0)
+                        return label; // 全身性或無部位的 Hediff
+
+                    string parts = string.Join(", ", partsList);
+                    return $"{label}({parts})";
+                });
+
+            var healthInfo = string.Join(", ", hediffGroups);
             if (!string.IsNullOrEmpty(healthInfo))
                 sb.AppendLine($"Health: {healthInfo}");
         }
@@ -174,12 +193,12 @@ public static class PromptService
             }
         }
 
-        // Thoughts
+        // Thoughts - 標籤更改
         if (contextSettings.IncludeThoughts)
         {
             var thoughts = ContextHelper.GetThoughts(pawn).Keys.Select(t => ContextHelper.Sanitize(t.LabelCap));
             if (thoughts.Any())
-                sb.AppendLine($"Memory: {string.Join(", ", thoughts)}");
+                sb.AppendLine($"Thoughts: {string.Join(", ", thoughts)}"); // Memory 改為 Thoughts
         }
 
         if (contextSettings.IncludePrisonerSlaveStatus && (pawn.IsSlave || pawn.IsPrisoner))
@@ -284,11 +303,11 @@ public static class PromptService
             {
                 var temperature = Mathf.RoundToInt(mainPawn.Position.GetTemperature(mainPawn.Map));
                 var room = mainPawn.GetRoom();
-                var roomRole = room is { PsychologicallyOutdoors: false } ? room.Role?.label ?? "Room" : "";
+                var roomRole = room is { PsychologicallyOutdoors: false } ? room.Role?.label ?? "" : ""; //若沒有roomRole就留空
 
                 sb.Append(string.IsNullOrEmpty(roomRole)
-                    ? $"\nLocation: {locationStatus};{temperature}C"
-                    : $"\nLocation: {locationStatus};{temperature}C;{roomRole}");
+                    ? $"\nLocation: {locationStatus}({temperature}°C)" //若roomRole為空就顯示locationStatus(室內/室外)
+                    : $"\nLocation: {roomRole}({temperature}°C)"); //若roomRole不為空就顯示roomRole(房間名稱)
             }
         }
 

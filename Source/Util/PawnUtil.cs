@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using RimTalk.Data;
@@ -88,7 +88,21 @@ public static class PawnUtil
         if (pawn.IsVisitor())
             return includeFaction && pawn.Faction != null ? $"Visitor Group({pawn.Faction.Name})" : "Visitor";
         if (pawn.IsQuestLodger()) return "Lodger";
-        if (pawn.IsFreeColonist) return pawn.GetMapRole() == MapRole.Invading ? "Invader" : "Colonist";
+        if (pawn.IsFreeColonist)
+        {
+            if (pawn.GetMapRole() == MapRole.Invading) return "Invader";
+
+            // --- 新增：新加入殖民者判斷 ---
+            string role = "Colonist";
+            float timeAsColonistTicks = pawn.records?.GetValue(RecordDefOf.TimeAsColonistOrColonyAnimal) ?? 0f;
+            float daysAsColonist = timeAsColonistTicks / 60000f; // 60000 ticks = 1 day
+            if (daysAsColonist < 15f)
+            {
+                role += "，新成员";
+            }
+            return role;
+            // -----------------------------
+        }
         return null;
     }
 
