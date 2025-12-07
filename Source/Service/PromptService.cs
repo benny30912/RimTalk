@@ -196,7 +196,8 @@ public static class PromptService
         // Thoughts - 標籤更改
         if (contextSettings.IncludeThoughts)
         {
-            var thoughts = ContextHelper.GetThoughts(pawn).Keys.Select(t => ContextHelper.Sanitize(t.LabelCap));
+            var thoughts = ContextHelper.GetThoughts(pawn).Keys
+                .Select(t => $"{ContextHelper.Sanitize(t.LabelCap)}: {ContextHelper.Sanitize(t.Description)} (mood {t.MoodOffset():+0;-0;0})");
             if (thoughts.Any())
                 sb.AppendLine($"Thoughts: {string.Join(", ", thoughts)}"); // Memory 改為 Thoughts
         }
