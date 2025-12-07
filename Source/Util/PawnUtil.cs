@@ -24,7 +24,7 @@ public static class PawnUtil
 
         RimTalkSettings settings = Settings.Get();
         if (!settings.AllowBabiesToTalk && pawn.IsBaby()) return false;
-        
+
         return pawn.IsFreeColonist ||
                (settings.AllowSlavesToTalk && pawn.IsSlave) ||
                (settings.AllowPrisonersToTalk && pawn.IsPrisoner) ||
@@ -134,12 +134,11 @@ public static class PawnUtil
         var lines = new List<string>();
 
         // collect all "relevant pawns"
-        var relevantPawns = new List<Pawn> { pawn };
-        if (nearbyPawns != null)
-            relevantPawns.AddRange(nearbyPawns);
+        // 修改：發話人自己不加入相關 Pawn 列表
+        var relevantPawns = new List<Pawn>();
+        if (nearbyPawns != null) relevantPawns.AddRange(nearbyPawns);
 
-        if (pawn.CurJob != null)
-            AddJobTargetsToRelevantPawns(pawn.CurJob, relevantPawns);
+        if (pawn.CurJob != null) AddJobTargetsToRelevantPawns(pawn.CurJob, relevantPawns);
 
         if (nearbyPawns != null)
         {
@@ -158,23 +157,26 @@ public static class PawnUtil
         // Nearby critical statuses: same logic, but wrapped in ReplacePawnNames(...)
         if (nearbyPawns != null && nearbyPawns.Any())
         {
-            var nearbyNotable = nearbyPawns
+            // 修改：先找出處於危險狀態的 Pawn
+            var nearbyNotablePawns = nearbyPawns
                 .Where(p => p.Faction == pawn.Faction && p.IsInDanger(true))
                 .Take(2)
-                .Select(other =>
+                .ToList();
+
+            if (nearbyNotablePawns.Any())
+            {
+                var nearbyNotableStrings = nearbyNotablePawns.Select(other =>
                 {
                     string otherActivity = ReplacePawnNames(other.GetActivity());
                     return $"{ReplacePawnNames(other.LabelShort)} in {otherActivity.Replace("\n", "; ")}";
-                })
-                .ToList();
-
-            if (nearbyNotable.Any())
-            {
-                lines.Add("People in condition nearby: " + string.Join("; ", nearbyNotable));
+                });
+                lines.Add("People in condition nearby: " + string.Join("; ", nearbyNotableStrings));
                 isInDanger = true;
             }
 
+            // 修改：排除已在 nearbyNotablePawns 出現的 Pawn
             var nearbyList = nearbyPawns
+                .Where(p => !nearbyNotablePawns.Contains(p))
                 .Select(p =>
                 {
                     string s = ReplacePawnNames(p.LabelShort);
@@ -187,31 +189,36 @@ public static class PawnUtil
                 })
                 .ToList();
 
-            string nearbyStr =
-                nearbyList.Count == 0 ? "none" :
-                nearbyList.Count > 3 ? string.Join(", ", nearbyList.Take(3)) + ", and others" :
-                string.Join(", ", nearbyList);
+            // 修改：只有當 nearbyList 不為空時才顯示 Nearby
+            if (nearbyList.Any())
+            {
+                string nearbyStr = nearbyList.Count > 3
+                    ? string.Join(", ", nearbyList.Take(3)) + ", and others"
+                    : string.Join(", ", nearbyList);
 
-            lines.Add("Nearby: " + nearbyStr);
+                lines.Add("Nearby: " + nearbyStr);
+            }
         }
         else
+        {
             lines.Add("Nearby people: none");
+        }
 
         if (pawn.IsVisitor())
             lines.Add("Visiting user colony");
 
         if (pawn.IsFreeColonist && pawn.GetMapRole() == MapRole.Invading)
-            lines.Add("You are away from colony, attacking to capture enemy settlement");
-        
+            lines.Add("Away from colony, attacking to enemy");
+
         else if (pawn.IsEnemy())
         {
             if (pawn.GetMapRole() == MapRole.Invading)
                 if (pawn.GetLord()?.LordJob is LordJob_StageThenAttack || pawn.GetLord()?.LordJob is LordJob_Siege)
-                    lines.Add("waiting to invade user colony");
+                    lines.Add("waiting to invade colony");
                 else
-                    lines.Add("invading user colony");
+                    lines.Add("invading colony");
             else
-                lines.Add("Fighting to protect your home from being captured");
+                lines.Add("Fighting to protect your home");
 
             return (string.Join("\n", lines), isInDanger);
         }
@@ -245,6 +252,9 @@ public static class PawnUtil
             var map = new Dictionary<string, string>();
             foreach (var rp in relevantPawns)
             {
+                // 修改：確保發話者自己不被當作相關 Pawn 修飾名字
+                if (rp == pawn) continue;
+
                 string key = rp.LabelShort;
                 string value = ContextHelper.GetDecoratedName(rp);
                 if (!map.ContainsKey(key))
@@ -253,7 +263,7 @@ public static class PawnUtil
 
             // longer names first to avoid partial replacement
             var ordered = map.OrderByDescending(kv => kv.Key.Length).ToList();
-            
+
             return ordered.Aggregate(input, (current, kv) => current.Replace(kv.Key, kv.Value));
         }
     }
@@ -394,13 +404,10 @@ public static class PawnUtil
 
         foreach (var target in targetIndices.Select(job.GetTarget))
         {
+            // 修改：刪除遞迴，對象的對象不需要當作相關 Pawn 修飾名字
             if (target.HasThing && target.Thing is Pawn pawn && !relevantPawns.Contains(pawn))
             {
                 relevantPawns.Add(pawn);
-                if (pawn.CurJob != null)
-                {
-                    AddJobTargetsToRelevantPawns(pawn.CurJob, relevantPawns);
-                }
             }
         }
     }
