@@ -37,6 +37,9 @@ public class RimTalkSettings : ModSettings
     public int DisableAiAtSpeed = 0;
     public Settings.ButtonDisplayMode ButtonDisplay = Settings.ButtonDisplayMode.Tab;
 
+    // 新增：記憶重要性權重，用於長期記憶剔除計算
+    public float MemoryImportanceWeight = 3.0f;
+
     public ContextSettings Context = new();
 
     // Debug mode settings
@@ -148,7 +151,7 @@ public class RimTalkSettings : ModSettings
     public override void ExposeData()
     {
         base.ExposeData();
-            
+
         Scribe_Collections.Look(ref CloudConfigs, "cloudConfigs", LookMode.Deep);
         Scribe_Deep.Look(ref LocalConfig, "localConfig");
         Scribe_Values.Look(ref UseCloudProviders, "useCloudProviders", true);
@@ -168,14 +171,17 @@ public class RimTalkSettings : ModSettings
         Scribe_Values.Look(ref AllowCustomConversation, "allowCustomConversation", true);
         Scribe_Values.Look(ref PlayerDialogueMode, "playerDialogueMode", Settings.PlayerDialogueMode.Manual);
         Scribe_Values.Look(ref PlayerName, "playerName", "Player");
-        
+
         Scribe_Values.Look(ref ContinueDialogueWhileSleeping, "continueDialogueWhileSleeping", false);
         Scribe_Values.Look(ref DisableAiAtSpeed, "DisableAiAtSpeed", 0);
         Scribe_Collections.Look(ref EnabledArchivableTypes, "enabledArchivableTypes", LookMode.Value, LookMode.Value);
         Scribe_Values.Look(ref AllowBabiesToTalk, "allowBabiesToTalk", true);
         Scribe_Values.Look(ref AllowNonHumanToTalk, "allowNonHumanToTalk", true);
         Scribe_Values.Look(ref ApplyMoodAndSocialEffects, "applyMoodAndSocialEffects", false);
-        
+
+        // 新增：記憶權重設定
+        Scribe_Values.Look(ref MemoryImportanceWeight, "memoryImportanceWeight", 3.0f);
+
         Scribe_Deep.Look(ref Context, "context");
 
         // Debug window settings
@@ -184,7 +190,7 @@ public class RimTalkSettings : ModSettings
         Scribe_Values.Look(ref DebugGroupingEnabled, "debugGroupingEnabled", false);
         Scribe_Values.Look(ref DebugSortColumn, "debugSortColumn", null);
         Scribe_Values.Look(ref DebugSortAscending, "debugSortAscending", true);
-        
+
         // Overlay settings
         Scribe_Values.Look(ref OverlayEnabled, "overlayEnabled", false);
         Scribe_Values.Look(ref OverlayOpacity, "overlayOpacity", 0.5f);
@@ -222,16 +228,16 @@ public class RimTalkSettings : ModSettings
         // Initialize collections if null
         if (CloudConfigs == null)
             CloudConfigs = new List<ApiConfig>();
-            
+
         if (LocalConfig == null)
             LocalConfig = new ApiConfig { Provider = AIProvider.Local };
-                
+
         if (EnabledArchivableTypes == null)
             EnabledArchivableTypes = new Dictionary<string, bool>();
 
         if (Context == null)
             Context = new ContextSettings();
-            
+
         // Ensure we have at least one cloud config
         if (CloudConfigs.Count == 0)
         {
