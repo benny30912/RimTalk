@@ -35,10 +35,9 @@ public static class ThoughtTracker
         catch { return null; }
 
         string desc = thought.Description;  // full thought
-        string sign = offset > 0 ? "+" : offset < 0 ? "-" : "±";
         string feelingType = offset > 0 ? "good" : offset < 0 ? "bad" : "neutral";
 
-        return $"new {feelingType} feeling: {thought.LabelCap} ({desc}, mood {sign}{Math.Abs(offset):0})";
+        return $"new {feelingType} feeling: {thought.LabelCap} ({desc})"; //移除描述mood數值只留下描述，避免過度meta
     }
 
     public static bool IsThoughtStillActive(Pawn pawn, string thoughtLabel)
