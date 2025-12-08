@@ -9,4 +9,13 @@
     <RimTalk.Settings.CKAdd>添加</RimTalk.Settings.CKAdd>
     <RimTalk.Settings.CKUpdate>更新</RimTalk.Settings.CKUpdate>
     <RimTalk.Settings.CKCancelClear>取消 / 清除</RimTalk.Settings.CKCancelClear>
+	
+	<RimTalk.TimeAgo.Unknown>某个时间</RimTalk.TimeAgo.Unknown>
+    <RimTalk.TimeAgo.JustNow>刚刚</RimTalk.TimeAgo.JustNow>
+    <RimTalk.TimeAgo.EarlierToday>今天早些时候</RimTalk.TimeAgo.EarlierToday>
+    <RimTalk.TimeAgo.Yesterday>昨天</RimTalk.TimeAgo.Yesterday>
+    <RimTalk.TimeAgo.DaysAgo>{0} 天前</RimTalk.TimeAgo.DaysAgo>
+    <RimTalk.TimeAgo.LastSeason>上一季</RimTalk.TimeAgo.LastSeason>
+    <RimTalk.TimeAgo.EarlierThisYear>今年早些时候</RimTalk.TimeAgo.EarlierThisYear>
+    <RimTalk.TimeAgo.YearsAgo>{0} 年前</RimTalk.TimeAgo.YearsAgo>
 </LanguageData>

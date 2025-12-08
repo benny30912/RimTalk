@@ -8,7 +8,6 @@ using RimTalk.Data;
 using RimTalk.Source.Data;
 using RimTalk.Util;
 using RimWorld;
-using UnityEngine;
 using Verse;
 using Verse.AI.Group;
 using Cache = RimTalk.Data.Cache;
@@ -22,23 +21,39 @@ public static class PromptService
 
     public static string BuildContext(List<Pawn> pawns)
     {
-        var context = new StringBuilder();
-        context.AppendLine(Constant.Instruction).AppendLine();
+        var pawnContexts = new StringBuilder();
+        var allKnowledge = new HashSet<string>();
 
+        // 1. 遍歷所有參與者，生成各自的 Context 並檢索相關記憶與常識
         for (int i = 0; i < pawns.Count; i++)
         {
             var pawn = pawns[i];
             if (pawn.IsPlayer()) continue;
-            var pawnContext = CreatePawnContext(pawn, InfoLevel.Normal); //讓所有 Pawn 都使用 Normal 級別的上下文
 
-            Cache.Get(pawn).Context = pawnContext;
-            context.AppendLine()
+            // 這裡將常識也一併取出
+            var (pawnText, knowledge) = CreatePawnContext(pawn, InfoLevel.Normal); //讓所有 Pawn 都使用 Normal 級別的上下文
+
+            Cache.Get(pawn).Context = pawnText;
+
+            pawnContexts.AppendLine()
                    .AppendLine($"[Person {i + 1} START]")
-                   .AppendLine(pawnContext)
+                   .AppendLine(pawnText)
                    .AppendLine($"[Person {i + 1} END]");
+
+            // 收集常識 (去重)
+            if (knowledge != null)
+            {
+                allKnowledge.AddRange(knowledge);
+            }
         }
 
-        return context.ToString();
+        // 2. 組裝最終的 System Instruction
+        // 將收集到的所有常識注入到 Instruction 中
+        var fullContext = new StringBuilder();
+        fullContext.AppendLine(Constant.GetInstruction(allKnowledge.ToList())).AppendLine();
+        fullContext.Append(pawnContexts);
+
+        return fullContext.ToString();
     }
 
     public static string CreatePawnBackstory(Pawn pawn, InfoLevel infoLevel = InfoLevel.Normal)
@@ -59,7 +74,7 @@ public static class PromptService
 
 
         // Notable genes (Normal/Full only, not for enemies/visitors)
-        if (contextSettings.IncludeNotableGenes && infoLevel != InfoLevel.Short && !pawn.IsVisitor() && !pawn.IsEnemy() && 
+        if (contextSettings.IncludeNotableGenes && infoLevel != InfoLevel.Short && !pawn.IsVisitor() && !pawn.IsEnemy() &&
             ModsConfig.BiotechActive && pawn.genes?.GenesListForReading != null)
         {
             var notableGenes = pawn.genes.GenesListForReading
@@ -133,7 +148,8 @@ public static class PromptService
         return sb.ToString();
     }
 
-    private static string CreatePawnContext(Pawn pawn, InfoLevel infoLevel = InfoLevel.Normal)
+    // 修改：回傳 (Context字串, 常識列表)
+    private static (string text, List<string> knowledge) CreatePawnContext(Pawn pawn, InfoLevel infoLevel = InfoLevel.Normal)
     {
         var contextSettings = Settings.Get().Context;
         var sb = new StringBuilder();
@@ -148,8 +164,8 @@ public static class PromptService
             var hediffGroups = hediffs
                 .GroupBy(h => new { h.def, IsPermanent = h is Hediff_Injury inj && inj.IsPermanent() })
                 .Select(g =>
-                {
-                    var sample = g.First();
+            {
+                var sample = g.First();
                     string label = sample.LabelCap; // 使用 LabelCap 獲取完整名稱（包含階段）
 
                     // 收集部位名稱，過濾掉空的
@@ -161,9 +177,9 @@ public static class PromptService
                     if (partsList.Count == 0)
                         return label; // 全身性或無部位的 Hediff
 
-                    string parts = string.Join(", ", partsList);
-                    return $"{label}({parts})";
-                });
+                string parts = string.Join(", ", partsList);
+                return $"{label}({parts})";
+            });
 
             var healthInfo = string.Join(", ", hediffGroups);
             if (!string.IsNullOrEmpty(healthInfo))
@@ -176,7 +192,7 @@ public static class PromptService
 
         //// INVADER STOP
         if (pawn.IsEnemy())
-            return sb.ToString();
+            return (sb.ToString(), new List<string>());
 
         // Mood
         if (contextSettings.IncludeMood)
@@ -200,6 +216,25 @@ public static class PromptService
                 .Select(t => $"{ContextHelper.Sanitize(t.LabelCap)}: {ContextHelper.Sanitize(t.Description)} (mood {t.MoodOffset():+0;-0;0})");
             if (thoughts.Any())
                 sb.AppendLine($"Thoughts: {string.Join(", ", thoughts)}"); // Memory 改為 Thoughts
+        }
+
+        // ★ 新增：記憶檢索與注入
+        // 1. 取得目前的 Context 作為檢索依據
+        string rawContext = sb.ToString();
+
+        // 2. 呼叫 MemoryService 進行檢索
+        var (memories, knowledgeData) = MemoryService.GetRelevantMemories(rawContext, pawn);
+
+        // 3. 注入記憶 (Recalled Memories)
+        if (!memories.NullOrEmpty())
+        {
+            sb.AppendLine("Recalled Memories:");
+            foreach (var m in memories)
+            {
+                // ★ 修改：加入相對時間描述
+                string timeAgo = CommonUtil.GetTimeAgo(m.CreatedTick);
+                sb.AppendLine($"- [{timeAgo}] {m.Summary}"); // 僅注入 Summary，隱藏 Importance
+            }
         }
 
         if (contextSettings.IncludePrisonerSlaveStatus && (pawn.IsSlave || pawn.IsPrisoner))
@@ -234,7 +269,10 @@ public static class PromptService
                 sb.AppendLine($"Equipment: {string.Join(", ", equipment)}");
         }
 
-        return sb.ToString();
+        // 提取常識內容供上層使用
+        var knowledgeStrings = knowledgeData?.Select(k => k.Content).ToList() ?? [];
+
+        return (sb.ToString(), knowledgeStrings);
     }
 
     public static void DecoratePrompt(TalkRequest talkRequest, List<Pawn> pawns, string status)
@@ -302,7 +340,7 @@ public static class PromptService
             var locationStatus = ContextHelper.GetPawnLocationStatus(mainPawn);
             if (!string.IsNullOrEmpty(locationStatus))
             {
-                var temperature = Mathf.RoundToInt(mainPawn.Position.GetTemperature(mainPawn.Map));
+                var temperature = mainPawn.Position.GetTemperature(mainPawn.Map).ToString("0.0");
                 var room = mainPawn.GetRoom();
                 var roomRole = room is { PsychologicallyOutdoors: false } ? room.Role?.label ?? "" : ""; //若沒有roomRole就留空
 
@@ -364,7 +402,7 @@ public static class PromptService
         // 正規化換行
         var text = prompt.Replace("\r\n", "\n");
 
-        // 把舊標記 [Ongoing events] 改成更自然的Events:
+        // 把舊標記 [Ongoing events] 改成 Events:
         text = text.Replace("[Ongoing events]", "Events: ");
 
         var lines = text.Split('\n').Select(l => l.TrimEnd('\r')).ToList();

@@ -187,4 +187,24 @@ public static class CommonUtil
         TimeSpeed currentGameSpeed = Find.TickManager.CurTimeSpeed;
         return (int)currentGameSpeed < settings.DisableAiAtSpeed;
     }
+
+    // ★ 新增：計算相對時間
+    public static string GetTimeAgo(int createdTick)
+    {
+        if (createdTick <= 0) return "RimTalk.TimeAgo.Unknown".Translate();
+
+        int diff = GenTicks.TicksGame - createdTick;
+        float days = diff / 60000f; // 1 day = 60000 ticks
+
+        if (days < 0.25f) return "RimTalk.TimeAgo.JustNow".Translate(); // 6小時內
+        if (days < 1f) return "RimTalk.TimeAgo.EarlierToday".Translate();
+        if (days < 2f) return "RimTalk.TimeAgo.Yesterday".Translate();
+        if (days < 15f) return "RimTalk.TimeAgo.DaysAgo".Translate((int)days);
+        if (days < 60f) return "RimTalk.TimeAgo.LastSeason".Translate(); // 1 season (quadrum) = 15 days
+
+        float years = days / 60f;
+        if (years < 1f) return "RimTalk.TimeAgo.EarlierThisYear".Translate();
+
+        return "RimTalk.TimeAgo.YearsAgo".Translate((int)years);
+    }
 }
