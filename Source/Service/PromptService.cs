@@ -213,7 +213,7 @@ public static class PromptService
         if (contextSettings.IncludeThoughts)
         {
             var thoughts = ContextHelper.GetThoughts(pawn).Keys
-                .Select(t => $"{ContextHelper.Sanitize(t.LabelCap)}: {ContextHelper.Sanitize(t.Description)} (mood {t.MoodOffset():+0;-0;0})");
+                .Select(t => $"{ContextHelper.Sanitize(t.LabelCap)}"); //只顯示標籤就可以了，連描述都顯示過於冗長
             if (thoughts.Any())
                 sb.AppendLine($"Thoughts: {string.Join(", ", thoughts)}"); // Memory 改為 Thoughts
         }
