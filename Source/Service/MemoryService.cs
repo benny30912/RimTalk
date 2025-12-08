@@ -358,8 +358,15 @@ public static class MemoryService
             foreach (var k in comp.CommonKnowledgeStore) keywords.AddRange(k.Keywords);
         }
 
-        if (keywords.Count == 0) return "None";
+        // 先加入核心關鍵詞
+        foreach (var coreTag in Constant.CoreMemoryTags)
+        {
+            keywords.Add(coreTag);
+        }
 
-        return string.Join(", ", keywords.Take(50));
+        // ...原有邏輯 (從 history 中獲取動態生成的關鍵詞)...
+
+        // 返回時
+        return string.Join(", ", keywords.Take(1000)); // 增加上限以容納核心詞 + 動態詞
     }
 }
