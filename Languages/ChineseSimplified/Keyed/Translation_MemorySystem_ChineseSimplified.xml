@@ -35,7 +35,6 @@
     <RimTalk.Settings.MemoryApiConfigurationsDesc>配置多个 API 用于记忆生成。系统将按顺序尝试使用它们。</RimTalk.Settings.MemoryApiConfigurationsDesc>
 
     <RimTalk.TalkHistory.TaskRetry>任务 {0} 失败（尝试 {1}/{2}）。正在重试...</RimTalk.TalkHistory.TaskRetry>
-    <RimTalk.TalkHistory.TaskException>任务 {0} 发生异常：{1}</RimTalk.TalkHistory.TaskException>
     <RimTalk.TalkHistory.TaskGiveUp>任务 {0} 在 {1} 次尝试后放弃。正在回滚状态。 </RimTalk.TalkHistory.TaskGiveUp>
 
     <RimTalk.Settings.MemoryImportanceWeight>记忆重要性权重：{0}</RimTalk.Settings.MemoryImportanceWeight>

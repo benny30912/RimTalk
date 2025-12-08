@@ -231,12 +231,7 @@ public static class TalkHistory
                 }
                 catch (Exception ex)
                 {
-                    // 發生異常 - 使用翻譯鍵
-                    Messages.Message(
-                        "RimTalk.TalkHistory.TaskException".Translate(taskName, ex.Message),
-                        MessageTypeDefOf.NeutralEvent,
-                        false
-                    );
+                    Logger.Error($"Exception in task {taskName}: {ex.Message}"); //發生異常改回錯誤日誌，方便檢查調用堆疊
                 }
 
                 attempt++;
