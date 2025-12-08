@@ -112,7 +112,7 @@ public static class AIErrorHandler
         if (!_quotaWarningShown)
         {
             _quotaWarningShown = true;
-            string message = "RimTalk.TalkService.QuotaExceeded".Translate();
+            string message = "RimTalk.TalkService.QuotaReached".Translate();
             Messages.Message(message, MessageTypeDefOf.NeutralEvent, false);
             Logger.Warning(ex.Message);
         }

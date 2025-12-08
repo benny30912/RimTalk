@@ -33,4 +33,8 @@
     <RimTalk.Settings.MemoryModelDesc_Disabled>使用主对话模型进行记忆总结（默认）。</RimTalk.Settings.MemoryModelDesc_Disabled>
     <RimTalk.Settings.MemoryApiConfigurations>记忆 API 配置</RimTalk.Settings.MemoryApiConfigurations>
     <RimTalk.Settings.MemoryApiConfigurationsDesc>配置多个 API 用于记忆生成。系统将按顺序尝试使用它们。</RimTalk.Settings.MemoryApiConfigurationsDesc>
+
+    <RimTalk.TalkHistory.TaskRetry>任务 {0} 失败（尝试 {1}/{2}）。正在重试...</RimTalk.TalkHistory.TaskRetry>
+    <RimTalk.TalkHistory.TaskException>任务 {0} 发生异常：{1}</RimTalk.TalkHistory.TaskException>
+    <RimTalk.TalkHistory.TaskGiveUp>任务 {0} 在 {1} 次尝试后放弃。正在回滚状态。 </RimTalk.TalkHistory.TaskGiveUp>
 </LanguageData>

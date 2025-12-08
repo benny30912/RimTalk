@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using RimTalk.Service;
+using RimWorld; // 用於 MessageTypeDefOf
 using Verse;
 
 // 解決 Logger 歧義
@@ -220,13 +221,22 @@ public static class TalkHistory
                     }
                     else
                     {
-                        // 邏輯失敗 (例如 LLM 回傳格式錯誤或拒絕生成)
-                        Logger.Warning($"Task {taskName} failed (attempt {attempt + 1}/{maxRetries}). Retrying...");
+                        // 邏輯失敗 (例如 LLM 回傳格式錯誤或拒絕生成) - 使用翻譯鍵
+                        Messages.Message(
+                            "RimTalk.TalkHistory.TaskRetry".Translate(taskName, attempt + 1, maxRetries),
+                            MessageTypeDefOf.NeutralEvent,
+                            false
+                        );
                     }
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"Exception in task {taskName}: {ex.Message}");
+                    // 發生異常 - 使用翻譯鍵
+                    Messages.Message(
+                        "RimTalk.TalkHistory.TaskException".Translate(taskName, ex.Message),
+                        MessageTypeDefOf.NeutralEvent,
+                        false
+                    );
                 }
 
                 attempt++;
@@ -242,7 +252,14 @@ public static class TalkHistory
             onFailureOrCancel(token.IsCancellationRequested);
 
             if (!token.IsCancellationRequested)
-                Logger.Warning($"Task {taskName} gave up after {maxRetries} attempts. Rolling back state.");
+            {
+                // 最終放棄 - 使用翻譯鍵
+                Messages.Message(
+                    "RimTalk.TalkHistory.TaskGiveUp".Translate(taskName, maxRetries),
+                    MessageTypeDefOf.NeutralEvent,
+                    false
+                );
+            }
 
         }, token);
     }
