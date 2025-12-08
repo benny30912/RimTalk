@@ -64,6 +64,17 @@ public partial class Settings
 
         listingStandard.Gap(6f);
 
+        // ★ 新增：Memory Importance Weight Slider
+        var memWeightLabel = "RimTalk.Settings.MemoryImportanceWeight".Translate(settings.MemoryImportanceWeight.ToString("0.0"));
+        var memWeightRect = listingStandard.GetRect(Text.CalcHeight(memWeightLabel, listingStandard.ColumnWidth));
+        Widgets.Label(memWeightRect, memWeightLabel);
+        TooltipHandler.TipRegion(memWeightRect, "RimTalk.Settings.MemoryImportanceWeightTooltip".Translate());
+
+        // 設定範圍 0.0 ~ 20.0
+        settings.MemoryImportanceWeight = listingStandard.Slider(settings.MemoryImportanceWeight, 0f, 20f);
+
+        listingStandard.Gap(6f);
+
         // --- Checkboxes in two columns ---
 
         // Define column layout

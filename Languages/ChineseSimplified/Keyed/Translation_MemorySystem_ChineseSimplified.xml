@@ -37,4 +37,7 @@
     <RimTalk.TalkHistory.TaskRetry>任务 {0} 失败（尝试 {1}/{2}）。正在重试...</RimTalk.TalkHistory.TaskRetry>
     <RimTalk.TalkHistory.TaskException>任务 {0} 发生异常：{1}</RimTalk.TalkHistory.TaskException>
     <RimTalk.TalkHistory.TaskGiveUp>任务 {0} 在 {1} 次尝试后放弃。正在回滚状态。 </RimTalk.TalkHistory.TaskGiveUp>
+
+    <RimTalk.Settings.MemoryImportanceWeight>记忆重要性权重：{0}</RimTalk.Settings.MemoryImportanceWeight>
+    <RimTalk.Settings.MemoryImportanceWeightTooltip>控制长期记忆在归档时的保留优先级。较高的数值意味着高重要性（Importance）的记忆拥有更高的分数，更不容易被新的记忆覆盖或遗忘。</RimTalk.Settings.MemoryImportanceWeightTooltip>
 </LanguageData>
