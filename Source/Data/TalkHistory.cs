@@ -89,10 +89,14 @@ public static class TalkHistory
                 // 重置計數器
                 record.NewMessagesSinceLastSummary = 0;
 
-                // 2. 執行重試任務
+                // ★ 修改：在主線程（Lock內）準備數據
+                string existingKeywords = MemoryService.GetAllExistingKeywords(pawn);
+                int currentTick = GenTicks.TicksGame;
+
                 RunRetryableTask(
                     taskName: $"STM->MTM for {pawn.LabelShort}",
-                    action: () => MemoryService.SummarizeToMediumAsync(messagesSnapshot, pawn),
+                    // ★ 修改：傳遞準備好的數據
+                    action: () => MemoryService.SummarizeToMediumAsync(messagesSnapshot, pawn, existingKeywords, currentTick),
                     onSuccess: (newMemories) =>
                     {
                         if (!newMemories.NullOrEmpty())
@@ -138,10 +142,13 @@ public static class TalkHistory
                 // 重置計數器
                 record.NewMemoriesSinceLastArchival = 0;
 
-                // 2. 執行重試任務
+                // ★ 修改：在主線程（Lock內）準備數據
+                int currentTick = GenTicks.TicksGame;
+
                 RunRetryableTask(
                     taskName: $"MTM->LTM for {pawn.LabelShort}",
-                    action: () => MemoryService.ConsolidateToLongAsync(mtmSnapshot, pawn),
+                    // ★ 修改：傳遞準備好的數據
+                    action: () => MemoryService.ConsolidateToLongAsync(mtmSnapshot, pawn, currentTick),
                     onSuccess: (longMemories) =>
                     {
                         if (!longMemories.NullOrEmpty())
@@ -158,7 +165,6 @@ public static class TalkHistory
                 );
             }
 
-            // MTM FIFO 維護：移除最舊的記憶直到滿足上限
             while (record.MediumTermMemories.Count > MaxMediumMemories)
             {
                 record.MediumTermMemories.RemoveAt(0);

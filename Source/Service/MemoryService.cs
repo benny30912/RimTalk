@@ -83,14 +83,15 @@ public static class MemoryService
         }
     }
 
+    // ★ 修改：新增參數 existingKeywords 和 currentTick，移除內部的獲取邏輯
     /// <summary>
     /// 將短期對話歷史(30條=15組)總結為多條中期記憶(15條)
     /// </summary>
-    public static async Task<List<MemoryRecord>> SummarizeToMediumAsync(List<TalkMessageEntry> messages, Pawn pawn)
+    public static async Task<List<MemoryRecord>> SummarizeToMediumAsync(List<TalkMessageEntry> messages, Pawn pawn, string existingKeywords, int currentTick)
     {
         if (messages.NullOrEmpty()) return [];
 
-        string existingKeywords = GetAllExistingKeywords(pawn);
+        // 移除：string existingKeywords = GetAllExistingKeywords(pawn); (改由參數傳入)
         string conversationText = FormatConversation(messages);
 
         string prompt =
@@ -133,7 +134,7 @@ public static class MemoryService
                     Keywords = m.Keywords ?? [],  // 防止 Keywords 為 null
                     Importance = Mathf.Clamp(m.Importance, 1, 5),
                     AccessCount = 0,
-                    CreatedTick = GenTicks.TicksGame
+                    CreatedTick = currentTick // 使用傳入的 Tick，避免後台存取 GenTicks
                 }).ToList();
         }
         catch (Exception ex)
@@ -144,10 +145,11 @@ public static class MemoryService
         }
     }
 
+    // ★ 修改：新增參數 currentTick
     /// <summary>
     /// 將大量中期記憶合併為數條長期記憶
     /// </summary>
-    public static async Task<List<MemoryRecord>> ConsolidateToLongAsync(List<MemoryRecord> memories, Pawn pawn)
+    public static async Task<List<MemoryRecord>> ConsolidateToLongAsync(List<MemoryRecord> memories, Pawn pawn, int currentTick)
     {
         if (memories.NullOrEmpty()) return [];
 
@@ -192,7 +194,7 @@ public static class MemoryService
                     Keywords = m.Keywords ?? [],
                     Importance = Mathf.Clamp(m.Importance, 1, 5),
                     AccessCount = 0,
-                    CreatedTick = GenTicks.TicksGame
+                    CreatedTick = currentTick // 使用傳入的 Tick
                 }).ToList();
         }
         catch (Exception ex)
@@ -228,8 +230,8 @@ public static class MemoryService
             if (i < candidates.Count)
             {
                 ltm.Remove(candidates[i]);
-            }
         }
+    }
     }
 
     /// <summary>
@@ -345,7 +347,8 @@ public static class MemoryService
         return sb.ToString();
     }
 
-    private static string GetAllExistingKeywords(Pawn pawn)
+    // ★ 修改：改為 public，供外部在主線程調用
+    public static string GetAllExistingKeywords(Pawn pawn)
     {
         var keywords = new HashSet<string>();
 
