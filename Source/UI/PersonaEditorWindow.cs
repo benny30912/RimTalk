@@ -29,7 +29,7 @@ public class PersonaEditorWindow : Window
         preventCameraMotion = false;
     }
 
-    public override Vector2 InitialSize => new Vector2(520f, 440f);
+    public override Vector2 InitialSize => new Vector2(520f, 460f); // 稍微增加高度以容納新按鈕
 
     public override void DoWindowContents(Rect inRect)
     {
@@ -43,7 +43,7 @@ public class PersonaEditorWindow : Window
         GUI.color = new Color(0.8f, 0.8f, 0.8f);
         Widgets.Label(instructRect, "RimTalk.PersonaEditor.Instruct".Translate());
         GUI.color = Color.white;
-        
+
         // --- Scrollable multi-line text area ---
         Rect textBoxRect = new Rect(inRect.x, instructRect.yMax + 10f, inRect.width, 180f);
 
@@ -51,7 +51,7 @@ public class PersonaEditorWindow : Window
 
         float contentHeight = Mathf.Max(textBoxRect.height, Text.CalcHeight(
             string.IsNullOrEmpty(_editingPersonality) ? " " : _editingPersonality, innerWidth));
-        
+
         Widgets.BeginScrollView(textBoxRect, ref _scrollPos, new Rect(0f, 0f, innerWidth, contentHeight));
         GUI.SetNextControlName(_textControlName);
         _editingPersonality = Widgets.TextArea(new Rect(0f, 0f, innerWidth, contentHeight), _editingPersonality);
@@ -121,14 +121,17 @@ public class PersonaEditorWindow : Window
         float spacing = 10f;
         float buttonY = sliderRowRect.yMax + 15f;
 
-        // Center the button group (4 buttons total)
-        float totalWidth = (buttonWidth * 4f) + (spacing * 3f);
+        // 計算5個按鈕的總寬度，如果太寬則換行或調整 (這裡嘗試擠在同一行，寬度約 490px，視窗寬度 520px，勉強可行)
+        float totalWidth = (buttonWidth * 5f) + (spacing * 4f);
         float startX = inRect.center.x - (totalWidth / 2f);
 
         Rect saveButton = new Rect(startX, buttonY, buttonWidth, buttonHeight);
         Rect smartGenButton = new Rect(saveButton.xMax + spacing, buttonY, buttonWidth, buttonHeight);
         Rect rollGenButton = new Rect(smartGenButton.xMax + spacing, buttonY, buttonWidth, buttonHeight);
         Rect clearButton = new Rect(rollGenButton.xMax + spacing, buttonY, buttonWidth, buttonHeight);
+
+        // 新增：記憶瀏覽器按鈕
+        Rect memoryButton = new Rect(clearButton.xMax + spacing, buttonY, buttonWidth, buttonHeight);
 
         if (Widgets.ButtonText(saveButton, "RimTalk.PersonaEditor.Save".Translate()))
         {
@@ -168,6 +171,12 @@ public class PersonaEditorWindow : Window
         if (Widgets.ButtonText(clearButton, "RimTalk.PersonaEditor.Clear".Translate()))
         {
             _editingPersonality = "";
+        }
+
+        // 新增按鈕邏輯
+        if (Widgets.ButtonText(memoryButton, "RimTalk.PersonaEditor.ViewMemories".Translate()))
+        {
+            Find.WindowStack.Add(new Dialog_MemoryBrowser(_pawn));
         }
     }
 

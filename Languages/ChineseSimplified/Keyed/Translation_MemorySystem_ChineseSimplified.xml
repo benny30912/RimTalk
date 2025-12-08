@@ -18,4 +18,13 @@
     <RimTalk.TimeAgo.LastSeason>上一季</RimTalk.TimeAgo.LastSeason>
     <RimTalk.TimeAgo.EarlierThisYear>今年早些时候</RimTalk.TimeAgo.EarlierThisYear>
     <RimTalk.TimeAgo.YearsAgo>{0} 年前</RimTalk.TimeAgo.YearsAgo>
+	
+	<RimTalk.MemoryBrowser.Title>{0} 的记忆</RimTalk.MemoryBrowser.Title>
+    <RimTalk.MemoryBrowser.ShortTerm>短期记忆</RimTalk.MemoryBrowser.ShortTerm>
+    <RimTalk.MemoryBrowser.MediumTerm>中期记忆</RimTalk.MemoryBrowser.MediumTerm>
+    <RimTalk.MemoryBrowser.LongTerm>长期记忆</RimTalk.MemoryBrowser.LongTerm>
+    <RimTalk.MemoryBrowser.NoHistory>找不到此角色的记录。</RimTalk.MemoryBrowser.NoHistory>
+    <RimTalk.MemoryBrowser.NoRecentMessages>没有最近的对话。</RimTalk.MemoryBrowser.NoRecentMessages>
+    <RimTalk.MemoryBrowser.NoMemories>尚未形成记忆。</RimTalk.MemoryBrowser.NoMemories>
+    <RimTalk.PersonaEditor.ViewMemories>查看记忆</RimTalk.PersonaEditor.ViewMemories>
 </LanguageData>
