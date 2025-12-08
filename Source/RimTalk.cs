@@ -34,6 +34,10 @@ public class RimTalk : GameComponent
             settings.CurrentCloudConfigIndex = 0;
         }
 
+        // 1. 取消所有正在進行的背景任務 (新增)
+        TalkHistory.CancelAllTasks();
+        PersonaService.CancelAllRetries();
+
         AIErrorHandler.ResetQuotaWarning();
         TickManagerPatch.Reset();
         AIClientFactory.Clear();
