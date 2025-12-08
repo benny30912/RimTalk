@@ -309,7 +309,8 @@ public static class MemoryService
                     var responses = JsonUtil.DeserializeFromJson<List<TalkResponse>>(msg.Text);
                     if (responses != null && responses.Any())
                     {
-                        dialogueText = string.Join(" ", responses.Select(r => r.Text));
+                        // ★ 建議這裡也改成包含名字，讓 LLM 總結時知道是誰說的
+                        dialogueText = string.Join("\n", responses.Select(r => $"{r.Name}: {r.Text}"));
                     }
                 }
                 catch

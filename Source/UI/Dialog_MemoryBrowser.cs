@@ -142,7 +142,8 @@ public class Dialog_MemoryBrowser : Window
                     var responses = JsonUtil.DeserializeFromJson<List<TalkResponse>>(msg.Text);
                     if (responses != null && responses.Any())
                     {
-                        displayText = string.Join(" ", responses.Select(r => r.Text));
+                        // ★ 修改：加入說話者名稱，並用換行分隔
+                        displayText = string.Join("\n", responses.Select(r => $"{r.Name}: {r.Text}"));
                     }
                 }
                 catch
