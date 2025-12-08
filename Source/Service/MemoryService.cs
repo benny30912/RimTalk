@@ -45,7 +45,6 @@ public static class MemoryService
         string existingKeywords = GetAllExistingKeywords(pawn);
         string conversationText = FormatConversation(messages);
 
-        // 使用 $$""" 語法
         string prompt =
             $$"""
              Analyze the following conversation history (context + dialogue pairs).
@@ -157,12 +156,15 @@ public static class MemoryService
 
         int removeCount = ltm.Count - maxCount;
 
+        // 計算保留分數：分數越低越容易被移除
+        // 核心保護：Importance >= 5 的記憶給予極高分數 (不參與移除)
         var candidates = ltm.OrderBy(m =>
         {
             float baseScore = m.Importance >= 5 ? 10000f : 0f;
             return baseScore + m.AccessCount + (m.Importance * weightImportance);
         }).ToList();
 
+        // 移除分數最低的
         for (int i = 0; i < removeCount; i++)
         {
             if (i < candidates.Count)
@@ -189,26 +191,42 @@ public static class MemoryService
             allMemories.AddRange(history.LongTermMemories);
         }
 
+        // 優化關鍵字匹配邏輯 (Case-insensitive)
         var contextLower = context.ToLowerInvariant();
 
-        // 1. 檢索記憶
+        // 1. 檢索記憶：計算匹配數 -> 重要性 -> 匹配數 -> 提取次數
         var relevantMemories = allMemories
-            .Where(m => m.Keywords != null && m.Keywords.Any(k => contextLower.Contains(k.ToLowerInvariant())))
-            .OrderByDescending(m => m.Importance)
-            .ThenBy(m => m.AccessCount)
+            .Select(m => new
+            {
+                Memory = m,
+                MatchCount = m.Keywords?.Count(k => contextLower.Contains(k.ToLowerInvariant())) ?? 0
+            })
+            .Where(x => x.MatchCount > 0) // 只取有關聯的
+            .OrderByDescending(x => x.Memory.Importance) // 1. 重要性優先
+            .ThenByDescending(x => x.MatchCount)         // 2. 匹配度次之 (越相關越好)
+            .ThenBy(x => x.Memory.AccessCount)           // 3. 提取次數少者優先 (增加多樣性)
             .Take(limit)
+            .Select(x => x.Memory)
             .ToList();
 
+        // 更新被選中記憶的 AccessCount
         foreach (var mem in relevantMemories)
         {
             mem.AccessCount++;
         }
 
-        // 2. 檢索常識
+        // 2. 檢索常識：計算匹配數 -> 優先取匹配度高的
         var allKnowledge = comp?.CommonKnowledgeStore ?? [];
         var relevantKnowledge = allKnowledge
-            .Where(k => k.Keywords != null && k.Keywords.Any(key => contextLower.Contains(key.ToLowerInvariant())))
+            .Select(k => new
+            {
+                Knowledge = k,
+                MatchCount = k.Keywords?.Count(key => contextLower.Contains(key.ToLowerInvariant())) ?? 0
+            })
+            .Where(x => x.MatchCount > 0)
+            .OrderByDescending(x => x.MatchCount) // 優先顯示匹配關鍵字最多的常識
             .Take(limit)
+            .Select(x => x.Knowledge)
             .ToList();
 
         return (relevantMemories, relevantKnowledge);
