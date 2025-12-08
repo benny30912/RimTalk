@@ -788,7 +788,7 @@ public class DebugWindow : Window
     
     private void Reset()
     {
-        TalkHistory.Clear();
+        //TalkHistory.Clear(); 不要清除我的 TalkHistory 啊啊啊
         Stats.Reset();
         ApiHistory.Clear();
         UpdateData();

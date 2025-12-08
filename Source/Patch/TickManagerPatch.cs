@@ -37,7 +37,8 @@ internal static class TickManagerPatch
             Cache.Refresh();
             _initialCacheRefresh = true;
         }
-        
+
+        /* 不要清理我的 TalkHistory
         if (IsNow(1))
         {
             // Clear LLM history daily to prevent repetitive/degraded dialogue
@@ -52,6 +53,7 @@ internal static class TickManagerPatch
                 _chatHistoryCleared = false;
             }
         }
+        */
 
         if (!_noApiKeyMessageShown && Settings.Get().GetActiveConfig() == null)
         {
