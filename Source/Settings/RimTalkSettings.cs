@@ -40,6 +40,9 @@ public class RimTalkSettings : ModSettings
     // 新增：記憶重要性權重，用於長期記憶剔除計算
     public float MemoryImportanceWeight = 3.0f;
 
+    // ★ 新增：獨立的記憶生成模型設定 (預設不啟用，Provider 為 None)
+    public ApiConfig MemoryConfig = new() { IsEnabled = false, Provider = AIProvider.None };
+
     public ContextSettings Context = new();
 
     // Debug mode settings
@@ -182,6 +185,9 @@ public class RimTalkSettings : ModSettings
         // 新增：記憶權重設定
         Scribe_Values.Look(ref MemoryImportanceWeight, "memoryImportanceWeight", 3.0f);
 
+        // ★ 保存記憶設定
+        Scribe_Deep.Look(ref MemoryConfig, "memoryConfig");
+
         Scribe_Deep.Look(ref Context, "context");
 
         // Debug window settings
@@ -237,6 +243,9 @@ public class RimTalkSettings : ModSettings
 
         if (Context == null)
             Context = new ContextSettings();
+
+        // 防呆初始化
+        if (MemoryConfig == null) MemoryConfig = new ApiConfig { IsEnabled = false, Provider = AIProvider.None };
 
         // Ensure we have at least one cloud config
         if (CloudConfigs.Count == 0)

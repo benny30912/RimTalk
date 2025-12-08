@@ -170,6 +170,50 @@ public partial class Settings
         {
             DrawLocalProviderSection(listingStandard, settings);
         }
+
+        // ★ 新增：在最下方加入記憶模型設定區塊
+        listingStandard.GapLine();
+        DrawMemorySettings(listingStandard, settings);
+    }
+
+    // ★ 新增方法：繪製記憶設定 UI
+    private void DrawMemorySettings(Listing_Standard listingStandard, RimTalkSettings settings)
+    {
+        Rect headerRect = listingStandard.GetRect(24f);
+        Rect labelRect = new Rect(headerRect.x, headerRect.y, headerRect.width - 30f, headerRect.height);
+        Rect toggleRect = new Rect(headerRect.xMax - 24f, headerRect.y, 24f, headerRect.height);
+
+        // 標題與開關
+        Widgets.Label(labelRect, "Independent Memory Generation Model"); // 建議加入翻譯鍵值
+        Widgets.Checkbox(new Vector2(toggleRect.x, toggleRect.y), ref settings.MemoryConfig.IsEnabled);
+
+        Text.Font = GameFont.Tiny;
+        GUI.color = Color.gray;
+        string desc = settings.MemoryConfig.IsEnabled
+            ? "Using separate model for memory summarization."
+            : "Using the main dialogue model for memory summarization (Default).";
+        Widgets.Label(listingStandard.GetRect(Text.LineHeight), desc);
+        GUI.color = Color.white;
+        Text.Font = GameFont.Small;
+
+        if (settings.MemoryConfig.IsEnabled)
+        {
+            if (settings.MemoryConfig.Provider == AIProvider.None)
+                settings.MemoryConfig.Provider = AIProvider.Google;
+
+            listingStandard.Gap(6f);
+            Rect rowRect = listingStandard.GetRect(24f);
+            float x = rowRect.x; float y = rowRect.y; float height = rowRect.height;
+
+            // 重用現有的繪製方法 (Provider -> API Key -> Model)
+            DrawProviderDropdown(ref x, y, height, settings.MemoryConfig);
+            DrawApiKeyInput(ref x, y, height, settings.MemoryConfig);
+
+            if (settings.MemoryConfig.Provider == AIProvider.Custom)
+                DrawCustomProviderRow(ref x, y, height, settings.MemoryConfig);
+            else
+                DrawDefaultProviderRow(ref x, y, height, settings.MemoryConfig);
+        }
     }
 
     private void DrawCloudProvidersSection(Listing_Standard listingStandard, RimTalkSettings settings)

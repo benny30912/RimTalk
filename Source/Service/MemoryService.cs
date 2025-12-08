@@ -1,11 +1,13 @@
-﻿using RimTalk.Data;
-using RimTalk.Util;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
+using RimTalk.Client; // 需要引用 Client
+using RimTalk.Data;
+using RimTalk.Error;  // 需要引用 Error
+using RimTalk.Util;
 using UnityEngine;
 using Verse;
 // ★ 解決 Logger 歧義
@@ -33,6 +35,49 @@ public static class MemoryService
         [DataMember(Name = "memories")] public List<MemoryGenerationDto> Memories;
 
         public string GetText() => $"Generated {Memories?.Count ?? 0} memories";
+    }
+
+    // ★ 新增：私有的記憶查詢方法 (取代 AIService.Query)
+    private static async Task<T> QueryMemory<T>(TalkRequest request) where T : class, IJsonData
+    {
+        // 1. 記錄請求 (Optional: 為了 Debug 方便，還是記一下)
+        var apiLog = ApiHistory.AddRequest(request, "Memory Task");
+
+        try
+        {
+            // 2. 透過 Factory 取得記憶專用 Client
+            // 3. 使用 AIErrorHandler 處理重試 (網路錯誤等)
+            var payload = await AIErrorHandler.HandleWithRetry(async () =>
+            {
+                var client = await AIClientFactory.GetMemoryClientAsync();
+                if (client == null) return null;
+
+                // 記憶生成不使用 System Instruction，直接傳 Prompt
+                return await client.GetChatCompletionAsync("", [(Role.User, request.Prompt)]);
+            });
+
+            if (payload == null)
+            {
+                apiLog.Response = "Failed";
+                return null;
+            }
+
+            // 4. 統計 Token
+            Stats.IncrementCalls();
+            Stats.IncrementTokens(payload.TokenCount);
+
+            // 5. 解析與記錄
+            var jsonData = JsonUtil.DeserializeFromJson<T>(payload.Response);
+            ApiHistory.AddResponse(apiLog.Id, jsonData.GetText(), null, null, payload: payload);
+
+            return jsonData;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Memory Query Failed: {ex.Message}");
+            apiLog.Response = $"Error: {ex.Message}";
+            return null;
+        }
     }
 
     /// <summary>
@@ -71,7 +116,8 @@ public static class MemoryService
         try
         {
             var request = new TalkRequest(prompt, pawn);
-            var result = await AIService.Query<MemoryListDto>(request);
+            // ★ 修改：呼叫自己的 QueryMemory
+            var result = await QueryMemory<MemoryListDto>(request);
 
             if (result?.Memories == null) return [];
 
@@ -125,7 +171,8 @@ public static class MemoryService
         try
         {
             var request = new TalkRequest(prompt, pawn);
-            var result = await AIService.Query<MemoryListDto>(request);
+            // ★ 修改：呼叫自己的 QueryMemory
+            var result = await QueryMemory<MemoryListDto>(request);
 
             if (result?.Memories == null) return [];
 

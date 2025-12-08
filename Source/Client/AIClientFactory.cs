@@ -14,6 +14,10 @@ public static class AIClientFactory
     private static IAIClient _instance;
     private static AIProvider _currentProvider;
 
+    // ★ 新增：記憶 Client 快取
+    private static IAIClient _memoryInstance;
+    private static AIProvider _currentMemoryProvider;
+
     /// <summary>
     /// Async method for getting AI client - required for Player2 local detection
     /// </summary>
@@ -32,6 +36,33 @@ public static class AIClientFactory
         }
 
         return _instance;
+    }
+
+    // ★ 新增方法：取得記憶專用 Client
+    public static async Task<IAIClient> GetMemoryClientAsync()
+    {
+        var settings = Settings.Get();
+        ApiConfig config;
+
+        // 判斷邏輯：如果啟用且有效，用 MemoryConfig；否則回退到主設定
+        if (settings.MemoryConfig != null && settings.MemoryConfig.IsEnabled && settings.MemoryConfig.IsValid())
+        {
+            config = settings.MemoryConfig;
+        }
+        else
+        {
+            // 回退：直接使用對話 Client 的設定 (但建立新實例或重用邏輯)
+            // 為了簡單且共用連線池，這裡我們直接呼叫 GetAIClientAsync() 取得主實例
+            return await GetAIClientAsync();
+        }
+
+        // 如果使用了獨立設定，則維護獨立的快取
+        if (_memoryInstance == null || _currentMemoryProvider != config.Provider)
+        {
+            _memoryInstance = await CreateServiceInstanceAsync(config);
+            _currentMemoryProvider = config.Provider;
+        }
+        return _memoryInstance;
     }
 
     /// <summary>
@@ -75,5 +106,9 @@ public static class AIClientFactory
         }
         _instance = null;
         _currentProvider = AIProvider.None;
+
+        // ★ 新增：清理記憶 Client
+        _memoryInstance = null;
+        _currentMemoryProvider = AIProvider.None;
     }
 }
