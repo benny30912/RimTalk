@@ -40,4 +40,7 @@
 
     <RimTalk.Settings.MemoryImportanceWeight>记忆重要性权重：{0}</RimTalk.Settings.MemoryImportanceWeight>
     <RimTalk.Settings.MemoryImportanceWeightTooltip>控制长期记忆在归档时的保留优先级。较高的数值意味着高重要性（Importance）的记忆拥有更高的分数，更不容易被新的记忆覆盖或遗忘。</RimTalk.Settings.MemoryImportanceWeightTooltip>
+
+    <RimTalk.MemoryService.SummarizeFailed>记忆总结失败：{0}</RimTalk.MemoryService.SummarizeFailed>
+    <RimTalk.MemoryService.ConsolidateFailed>记忆归档失败：{0}</RimTalk.MemoryService.ConsolidateFailed>
 </LanguageData>

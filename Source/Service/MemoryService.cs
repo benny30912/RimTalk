@@ -1,13 +1,14 @@
-﻿using System;
+﻿using RimTalk.Client; // 需要引用 Client
+using RimTalk.Data;
+using RimTalk.Error;  // 需要引用 Error
+using RimTalk.Util;
+using RimWorld;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
-using RimTalk.Client; // 需要引用 Client
-using RimTalk.Data;
-using RimTalk.Error;  // 需要引用 Error
-using RimTalk.Util;
 using UnityEngine;
 using Verse;
 // ★ 解決 Logger 歧義
@@ -134,7 +135,8 @@ public static class MemoryService
         }
         catch (Exception ex)
         {
-            Logger.Error($"Failed to summarize memories: {ex.Message}");
+            // ★ 修改：使用 Messages.Message 並暴露翻譯 Key
+            Messages.Message("RimTalk.MemoryService.SummarizeFailed".Translate(ex.Message), MessageTypeDefOf.NegativeEvent, false);
             return [];
         }
     }
@@ -189,7 +191,8 @@ public static class MemoryService
         }
         catch (Exception ex)
         {
-            Logger.Error($"Failed to consolidate memories: {ex.Message}");
+            // ★ 修改：使用 Messages.Message 並暴露翻譯 Key
+            Messages.Message("RimTalk.MemoryService.ConsolidateFailed".Translate(ex.Message), MessageTypeDefOf.NegativeEvent, false);
             return [];
         }
     }
