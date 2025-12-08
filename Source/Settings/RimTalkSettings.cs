@@ -10,13 +10,20 @@ public class RimTalkSettings : ModSettings
     public List<ApiConfig> CloudConfigs = [];
     public int CurrentCloudConfigIndex = 0;
     public ApiConfig LocalConfig = new() { Provider = AIProvider.Local };
+
+    // ★ 修改：改為列表與獨立開關
+    public bool EnableMemoryModel = false;
+    public List<ApiConfig> MemoryConfigs = [];
+    public int CurrentMemoryConfigIndex = 0;
+
+    // ... (其他欄位保持不變)
     public bool UseCloudProviders = true;
     public bool UseSimpleConfig = true;
     public string SimpleApiKey = "";
     public bool IsUsingFallbackModel = false;
     public bool IsEnabled = true;
     public int TalkInterval = 7;
-    public const int ReplyInterval = 2; //從 4 減少到 2，以加快回應速度
+    public const int ReplyInterval = 2;
     public bool ProcessNonRimTalkInteractions;
     public bool AllowSimultaneousConversations;
     public string CustomInstruction = "";
@@ -36,22 +43,15 @@ public class RimTalkSettings : ModSettings
     public bool ApplyMoodAndSocialEffects = false;
     public int DisableAiAtSpeed = 0;
     public Settings.ButtonDisplayMode ButtonDisplay = Settings.ButtonDisplayMode.Tab;
-
-    // 新增：記憶重要性權重，用於長期記憶剔除計算
     public float MemoryImportanceWeight = 3.0f;
-
-    // ★ 新增：獨立的記憶生成模型設定 (預設不啟用，Provider 為 None)
-    public ApiConfig MemoryConfig = new() { IsEnabled = false, Provider = AIProvider.None };
 
     public ContextSettings Context = new();
 
-    // Debug mode settings
+    // Debug & Overlay settings...
     public bool DebugModeEnabled = false;
     public bool DebugGroupingEnabled = false;
     public string DebugSortColumn;
     public bool DebugSortAscending = true;
-
-    // Overlay settings
     public bool OverlayEnabled = false;
     public float OverlayOpacity = 0.5f;
     public float OverlayFontSize = 15f;
@@ -59,11 +59,7 @@ public class RimTalkSettings : ModSettings
     public Rect OverlayRectDebug = new(200f, 200f, 600f, 450f);
     public Rect OverlayRectNonDebug = new(200f, 200f, 400f, 250f);
 
-    /// <summary>
-    /// Gets the first active and valid API configuration.
-    /// Checks the active provider type (Cloud or Local) and returns the first enabled config with a valid API key/URL.
-    /// </summary>
-    /// <returns>The active ApiConfig, or null if no valid configuration is found.</returns>
+    // ... (GetActiveConfig 保持不變) ...
     public ApiConfig GetActiveConfig()
     {
         if (UseSimpleConfig)
@@ -78,87 +74,108 @@ public class RimTalkSettings : ModSettings
                     IsEnabled = true
                 };
             }
-
             return null;
         }
 
         if (UseCloudProviders)
         {
             if (CloudConfigs.Count == 0) return null;
-
-            // Start searching from the current index
             for (int i = 0; i < CloudConfigs.Count; i++)
             {
                 int index = (CurrentCloudConfigIndex + i) % CloudConfigs.Count;
                 var config = CloudConfigs[index];
                 if (config.IsValid())
                 {
-                    CurrentCloudConfigIndex = index; // Update the current index
+                    CurrentCloudConfigIndex = index;
                     return config;
                 }
             }
-            return null; // No valid config found
+            return null;
         }
         else
         {
-            // Check local configuration
-            if (LocalConfig != null && LocalConfig.IsValid())
-            {
-                return LocalConfig;
-            }
+            if (LocalConfig != null && LocalConfig.IsValid()) return LocalConfig;
         }
-
         return null;
     }
 
-    /// <summary>
-    /// Advances the current cloud configuration index to the next valid configuration.
-    /// </summary>
+    // ★ 新增：取得當前記憶 Config
+    public ApiConfig GetActiveMemoryConfig()
+    {
+        if (!EnableMemoryModel || MemoryConfigs.Count == 0) return null;
+
+        for (int i = 0; i < MemoryConfigs.Count; i++)
+        {
+            int index = (CurrentMemoryConfigIndex + i) % MemoryConfigs.Count;
+            var config = MemoryConfigs[index];
+            if (config.IsValid())
+            {
+                CurrentMemoryConfigIndex = index;
+                return config;
+            }
+        }
+        return null;
+    }
+
+    // ... (TryNextConfig 保持不變) ...
     public void TryNextConfig()
     {
-        if (CloudConfigs.Count <= 1) return; // No need to advance if 0 or 1 config
-
+        if (CloudConfigs.Count <= 1) return;
         int originalIndex = CurrentCloudConfigIndex;
-        for (int i = 1; i < CloudConfigs.Count; i++) // Start from the next one
+        for (int i = 1; i < CloudConfigs.Count; i++)
         {
             int nextIndex = (originalIndex + i) % CloudConfigs.Count;
             var config = CloudConfigs[nextIndex];
             if (config.IsValid())
             {
                 CurrentCloudConfigIndex = nextIndex;
-                Write(); // Save the updated index
+                Write();
                 return;
             }
         }
-        // If no other valid config is found, we stay at the current index or revert to original if it was valid
-        // For now, we'll just stay at the current index.
-        Write(); // Save in case the original was invalid and we couldn't find a new one.
+        Write();
     }
 
-    /// <summary>
-    /// Gets the currently active Gemini model, handling custom model names.
-    /// </summary>
-    /// <returns>The name of the model to use for Gemini API calls.</returns>
+    // ★ 新增：切換下一個記憶 Config
+    public void TryNextMemoryConfig()
+    {
+        if (MemoryConfigs.Count <= 1) return;
+        int originalIndex = CurrentMemoryConfigIndex;
+        for (int i = 1; i < MemoryConfigs.Count; i++)
+        {
+            int nextIndex = (originalIndex + i) % MemoryConfigs.Count;
+            var config = MemoryConfigs[nextIndex];
+            if (config.IsValid())
+            {
+                CurrentMemoryConfigIndex = nextIndex;
+                Write();
+                return;
+            }
+        }
+        Write();
+    }
+
+    // ... (GetCurrentModel 保持不變) ...
     public string GetCurrentModel()
     {
         var activeConfig = GetActiveConfig();
         if (activeConfig == null) return Constant.DefaultCloudModel;
-
-        if (activeConfig.SelectedModel == "Custom")
-        {
-            return activeConfig.CustomModelName;
-        }
-        return activeConfig.SelectedModel;
+        return activeConfig.SelectedModel == "Custom" ? activeConfig.CustomModelName : activeConfig.SelectedModel;
     }
 
     public override void ExposeData()
     {
         base.ExposeData();
-
         Scribe_Collections.Look(ref CloudConfigs, "cloudConfigs", LookMode.Deep);
         Scribe_Deep.Look(ref LocalConfig, "localConfig");
+
+        // ★ 修改：保存新的記憶設定
+        Scribe_Values.Look(ref EnableMemoryModel, "enableMemoryModel", false);
+        Scribe_Collections.Look(ref MemoryConfigs, "memoryConfigs", LookMode.Deep);
+
         Scribe_Values.Look(ref UseCloudProviders, "useCloudProviders", true);
         Scribe_Values.Look(ref UseSimpleConfig, "useSimpleConfig", true);
+        // ... (其他 Scribe 保持不變)
         Scribe_Values.Look(ref SimpleApiKey, "simpleApiKey", "");
         Scribe_Values.Look(ref IsEnabled, "isEnabled", true);
         Scribe_Values.Look(ref TalkInterval, "talkInterval", 7);
@@ -174,36 +191,25 @@ public class RimTalkSettings : ModSettings
         Scribe_Values.Look(ref AllowCustomConversation, "allowCustomConversation", true);
         Scribe_Values.Look(ref PlayerDialogueMode, "playerDialogueMode", Settings.PlayerDialogueMode.Manual);
         Scribe_Values.Look(ref PlayerName, "playerName", "Player");
-
         Scribe_Values.Look(ref ContinueDialogueWhileSleeping, "continueDialogueWhileSleeping", false);
         Scribe_Values.Look(ref DisableAiAtSpeed, "DisableAiAtSpeed", 0);
         Scribe_Collections.Look(ref EnabledArchivableTypes, "enabledArchivableTypes", LookMode.Value, LookMode.Value);
         Scribe_Values.Look(ref AllowBabiesToTalk, "allowBabiesToTalk", true);
         Scribe_Values.Look(ref AllowNonHumanToTalk, "allowNonHumanToTalk", true);
         Scribe_Values.Look(ref ApplyMoodAndSocialEffects, "applyMoodAndSocialEffects", false);
-
-        // 新增：記憶權重設定
         Scribe_Values.Look(ref MemoryImportanceWeight, "memoryImportanceWeight", 3.0f);
-
-        // ★ 保存記憶設定
-        Scribe_Deep.Look(ref MemoryConfig, "memoryConfig");
-
         Scribe_Deep.Look(ref Context, "context");
-
-        // Debug window settings
         Scribe_Values.Look(ref ButtonDisplay, "buttonDisplay", Settings.ButtonDisplayMode.Tab, true);
         Scribe_Values.Look(ref DebugModeEnabled, "debugModeEnabled", false);
         Scribe_Values.Look(ref DebugGroupingEnabled, "debugGroupingEnabled", false);
         Scribe_Values.Look(ref DebugSortColumn, "debugSortColumn", null);
         Scribe_Values.Look(ref DebugSortAscending, "debugSortAscending", true);
-
-        // Overlay settings
         Scribe_Values.Look(ref OverlayEnabled, "overlayEnabled", false);
         Scribe_Values.Look(ref OverlayOpacity, "overlayOpacity", 0.5f);
         Scribe_Values.Look(ref OverlayFontSize, "overlayFontSize", 15f);
         Scribe_Values.Look(ref OverlayDrawAboveUI, "overlayDrawAboveUI", true);
 
-        // Scribe Debug Overlay Rect
+        // Rects...
         Rect defaultDebugRect = new Rect(200f, 200f, 600f, 450f);
         float overlayDebugX = OverlayRectDebug.x;
         float overlayDebugY = OverlayRectDebug.y;
@@ -214,7 +220,6 @@ public class RimTalkSettings : ModSettings
         Scribe_Values.Look(ref overlayDebugWidth, "overlayRectDebug_width", defaultDebugRect.width);
         Scribe_Values.Look(ref overlayDebugHeight, "overlayRectDebug_height", defaultDebugRect.height);
 
-        // Scribe Non-Debug Overlay Rect
         Rect defaultNonDebugRect = new Rect(200f, 200f, 400f, 250f);
         float overlayNonDebugX = OverlayRectNonDebug.x;
         float overlayNonDebugY = OverlayRectNonDebug.y;
@@ -231,26 +236,13 @@ public class RimTalkSettings : ModSettings
             OverlayRectNonDebug = new Rect(overlayNonDebugX, overlayNonDebugY, overlayNonDebugWidth, overlayNonDebugHeight);
         }
 
-        // Initialize collections if null
-        if (CloudConfigs == null)
-            CloudConfigs = new List<ApiConfig>();
-
-        if (LocalConfig == null)
-            LocalConfig = new ApiConfig { Provider = AIProvider.Local };
-
-        if (EnabledArchivableTypes == null)
-            EnabledArchivableTypes = new Dictionary<string, bool>();
-
-        if (Context == null)
-            Context = new ContextSettings();
-
-        // 防呆初始化
-        if (MemoryConfig == null) MemoryConfig = new ApiConfig { IsEnabled = false, Provider = AIProvider.None };
-
-        // Ensure we have at least one cloud config
-        if (CloudConfigs.Count == 0)
-        {
-            CloudConfigs.Add(new ApiConfig());
-        }
+        if (CloudConfigs == null) CloudConfigs = new List<ApiConfig>();
+        if (LocalConfig == null) LocalConfig = new ApiConfig { Provider = AIProvider.Local };
+        if (MemoryConfigs == null) MemoryConfigs = new List<ApiConfig>();
+        if (EnabledArchivableTypes == null) EnabledArchivableTypes = new Dictionary<string, bool>();
+        if (Context == null) Context = new ContextSettings();
+        if (CloudConfigs.Count == 0) CloudConfigs.Add(new ApiConfig());
+        // 確保至少有一個記憶 Config
+        if (MemoryConfigs.Count == 0) MemoryConfigs.Add(new ApiConfig { Provider = AIProvider.Google });
     }
 }

@@ -21,9 +21,9 @@ public static class MemoryService
     [DataContract]
     private class MemoryGenerationDto : IJsonData
     {
-        [DataMember(Name = "summary")] public string Summary;
-        [DataMember(Name = "keywords")] public List<string> Keywords;
-        [DataMember(Name = "importance")] public int Importance;
+        [DataMember(Name = "summary")] public string Summary = "";
+        [DataMember(Name = "keywords")] public List<string> Keywords = new();
+        [DataMember(Name = "importance")] public int Importance = 0;
 
         public string GetText() => Summary;
     }
@@ -32,7 +32,7 @@ public static class MemoryService
     [DataContract]
     private class MemoryListDto : IJsonData
     {
-        [DataMember(Name = "memories")] public List<MemoryGenerationDto> Memories;
+        [DataMember(Name = "memories")] public List<MemoryGenerationDto> Memories = new();
 
         public string GetText() => $"Generated {Memories?.Count ?? 0} memories";
     }
@@ -47,14 +47,16 @@ public static class MemoryService
         {
             // 2. 透過 Factory 取得記憶專用 Client
             // 3. 使用 AIErrorHandler 處理重試 (網路錯誤等)
+            // ★ 修改：傳入 ClientType.Memory
             var payload = await AIErrorHandler.HandleWithRetry(async () =>
             {
+                // ★ 呼叫獨立的 GetMemoryClientAsync
                 var client = await AIClientFactory.GetMemoryClientAsync();
                 if (client == null) return null;
 
                 // 記憶生成不使用 System Instruction，直接傳 Prompt
                 return await client.GetChatCompletionAsync("", [(Role.User, request.Prompt)]);
-            });
+            }, isMemory: true); // ★ 指定 isMemory = true
 
             if (payload == null)
             {

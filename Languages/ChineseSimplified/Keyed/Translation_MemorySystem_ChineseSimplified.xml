@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <LanguageData>
-	<RimTalk.Settings.CommonKnowledge>常识库</RimTalk.Settings.CommonKnowledge>
+	  <RimTalk.Settings.CommonKnowledge>常识库</RimTalk.Settings.CommonKnowledge>
     <RimTalk.Settings.CKStoredInSave>常识库存储在存档文件中。\n请加载游戏以进行编辑。</RimTalk.Settings.CKStoredInSave>
     <RimTalk.Settings.CKNewEntry>新增条目</RimTalk.Settings.CKNewEntry>
     <RimTalk.Settings.CKEditEntry>编辑条目</RimTalk.Settings.CKEditEntry>
@@ -10,7 +10,7 @@
     <RimTalk.Settings.CKUpdate>更新</RimTalk.Settings.CKUpdate>
     <RimTalk.Settings.CKCancelClear>取消 / 清除</RimTalk.Settings.CKCancelClear>
 	
-	<RimTalk.TimeAgo.Unknown>某个时间</RimTalk.TimeAgo.Unknown>
+    <RimTalk.TimeAgo.Unknown>某个时间</RimTalk.TimeAgo.Unknown>
     <RimTalk.TimeAgo.JustNow>刚刚</RimTalk.TimeAgo.JustNow>
     <RimTalk.TimeAgo.EarlierToday>今天早些时候</RimTalk.TimeAgo.EarlierToday>
     <RimTalk.TimeAgo.Yesterday>昨天</RimTalk.TimeAgo.Yesterday>
@@ -19,7 +19,7 @@
     <RimTalk.TimeAgo.EarlierThisYear>今年早些时候</RimTalk.TimeAgo.EarlierThisYear>
     <RimTalk.TimeAgo.YearsAgo>{0} 年前</RimTalk.TimeAgo.YearsAgo>
 	
-	<RimTalk.MemoryBrowser.Title>{0} 的记忆</RimTalk.MemoryBrowser.Title>
+	  <RimTalk.MemoryBrowser.Title>{0} 的记忆</RimTalk.MemoryBrowser.Title>
     <RimTalk.MemoryBrowser.ShortTerm>短期记忆</RimTalk.MemoryBrowser.ShortTerm>
     <RimTalk.MemoryBrowser.MediumTerm>中期记忆</RimTalk.MemoryBrowser.MediumTerm>
     <RimTalk.MemoryBrowser.LongTerm>长期记忆</RimTalk.MemoryBrowser.LongTerm>
@@ -27,4 +27,10 @@
     <RimTalk.MemoryBrowser.NoRecentMessages>没有最近的对话。</RimTalk.MemoryBrowser.NoRecentMessages>
     <RimTalk.MemoryBrowser.NoMemories>尚未形成记忆。</RimTalk.MemoryBrowser.NoMemories>
     <RimTalk.PersonaEditor.ViewMemories>查看记忆</RimTalk.PersonaEditor.ViewMemories>
+
+    <RimTalk.Settings.IndependentMemoryModel>独立记忆生成模型</RimTalk.Settings.IndependentMemoryModel>
+    <RimTalk.Settings.MemoryModelDesc_Enabled>使用独立的模型列表进行记忆总结。</RimTalk.Settings.MemoryModelDesc_Enabled>
+    <RimTalk.Settings.MemoryModelDesc_Disabled>使用主对话模型进行记忆总结（默认）。</RimTalk.Settings.MemoryModelDesc_Disabled>
+    <RimTalk.Settings.MemoryApiConfigurations>记忆 API 配置</RimTalk.Settings.MemoryApiConfigurations>
+    <RimTalk.Settings.MemoryApiConfigurationsDesc>配置多个 API 用于记忆生成。系统将按顺序尝试使用它们。</RimTalk.Settings.MemoryApiConfigurationsDesc>
 </LanguageData>

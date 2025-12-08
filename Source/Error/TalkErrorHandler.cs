@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using RimTalk.Client; // 需要
 using RimTalk.Util;
 using RimWorld;
 using Verse;
@@ -10,7 +11,8 @@ public static class AIErrorHandler
 {
     private static bool _quotaWarningShown;
 
-    public static async Task<T> HandleWithRetry<T>(Func<Task<T>> operation)
+    // ★ 修改：將 ClientType 改為 bool isMemory (預設 false)
+    public static async Task<T> HandleWithRetry<T>(Func<Task<T>> operation, bool isMemory = false)
     {
         try
         {
@@ -20,16 +22,30 @@ public static class AIErrorHandler
         catch (Exception ex)
         {
             var settings = Settings.Get();
-            if (CanRetryGeneration(settings))
+
+            // 嘗試切換到下一個 Config
+            if (CanRetryGeneration(settings, isMemory)) // 傳入 isMemory 標記
             {
-                string nextModel = Settings.Get().GetCurrentModel();
+                // ★ 恢復 ShowRetryMessage 邏輯
                 if (!settings.UseSimpleConfig)
                 {
+                    string nextModel;
+                    if (isMemory)
+                    {
+                        var config = settings.GetActiveMemoryConfig();
+                        nextModel = config?.SelectedModel == "Custom" ? config.CustomModelName : (config?.SelectedModel ?? "Unknown");
+                    }
+                    else
+                    {
+                        nextModel = settings.GetCurrentModel();
+                    }
+
                     ShowRetryMessage(ex, nextModel);
                 }
 
                 try
                 {
+                    // 重試操作
                     T result = await operation();
                     return result;
                 }
@@ -46,20 +62,32 @@ public static class AIErrorHandler
         }
     }
 
-    private static bool CanRetryGeneration(RimTalkSettings settings)
+    // ★ 修改：根據 isMemory 決定輪替哪組 Config
+    private static bool CanRetryGeneration(RimTalkSettings settings, bool isMemory)
     {
-        if (settings.UseSimpleConfig)
+        if (isMemory)
         {
-            if (settings.IsUsingFallbackModel) return false;
-            settings.IsUsingFallbackModel = true;
-            return true;
+            // 如果沒啟用獨立記憶，就不能在這裡重試記憶列表
+            if (!settings.EnableMemoryModel) return false;
+
+            int originalIndex = settings.CurrentMemoryConfigIndex;
+            settings.TryNextMemoryConfig();
+            return settings.CurrentMemoryConfigIndex != originalIndex;
         }
+        else // 對話生成 (Dialogue)
+        {
+            if (settings.UseSimpleConfig)
+            {
+                if (settings.IsUsingFallbackModel) return false;
+                settings.IsUsingFallbackModel = true;
+                return true;
+            }
 
-        if (!settings.UseCloudProviders) return false;
-        int originalIndex = settings.CurrentCloudConfigIndex;
-        settings.TryNextConfig();
-        return settings.CurrentCloudConfigIndex != originalIndex;
-
+            if (!settings.UseCloudProviders) return false;
+            int originalIndex = settings.CurrentCloudConfigIndex;
+            settings.TryNextConfig();
+            return settings.CurrentCloudConfigIndex != originalIndex;
+        }
     }
 
     private static void HandleFinalFailure(Exception ex)

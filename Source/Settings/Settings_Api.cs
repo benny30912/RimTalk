@@ -177,42 +177,68 @@ public partial class Settings
     }
 
     // ★ 新增方法：繪製記憶設定 UI
+    // ★ 修改：支援列表的記憶設定 UI
     private void DrawMemorySettings(Listing_Standard listingStandard, RimTalkSettings settings)
     {
         Rect headerRect = listingStandard.GetRect(24f);
         Rect labelRect = new Rect(headerRect.x, headerRect.y, headerRect.width - 30f, headerRect.height);
         Rect toggleRect = new Rect(headerRect.xMax - 24f, headerRect.y, 24f, headerRect.height);
 
-        // 標題與開關
-        Widgets.Label(labelRect, "Independent Memory Generation Model"); // 建議加入翻譯鍵值
-        Widgets.Checkbox(new Vector2(toggleRect.x, toggleRect.y), ref settings.MemoryConfig.IsEnabled);
+        // 使用翻譯鍵值
+        Widgets.Label(labelRect, "RimTalk.Settings.IndependentMemoryModel".Translate());
+        Widgets.Checkbox(new Vector2(toggleRect.x, toggleRect.y), ref settings.EnableMemoryModel);
 
         Text.Font = GameFont.Tiny;
         GUI.color = Color.gray;
-        string desc = settings.MemoryConfig.IsEnabled
-            ? "Using separate model for memory summarization."
-            : "Using the main dialogue model for memory summarization (Default).";
-        Widgets.Label(listingStandard.GetRect(Text.LineHeight), desc);
+        Rect descRect = listingStandard.GetRect(Text.LineHeight);
+        string desc = settings.EnableMemoryModel
+            ? "RimTalk.Settings.MemoryModelDesc_Enabled".Translate()
+            : "RimTalk.Settings.MemoryModelDesc_Disabled".Translate();
+        Widgets.Label(descRect, desc);
         GUI.color = Color.white;
         Text.Font = GameFont.Small;
 
-        if (settings.MemoryConfig.IsEnabled)
+        if (settings.EnableMemoryModel)
         {
-            if (settings.MemoryConfig.Provider == AIProvider.None)
-                settings.MemoryConfig.Provider = AIProvider.Google;
+            listingStandard.Gap(6f);
+
+            // --- 列表管理標題 (Add/Remove) ---
+            Rect listHeaderRect = listingStandard.GetRect(24f);
+            Rect addButtonRect = new Rect(listHeaderRect.x + listHeaderRect.width - 65f, listHeaderRect.y, 30f, 24f);
+            Rect removeButtonRect = new Rect(listHeaderRect.x + listHeaderRect.width - 30f, listHeaderRect.y, 30f, 24f);
+            listHeaderRect.width -= 70f;
+
+            Widgets.Label(listHeaderRect, "RimTalk.Settings.MemoryApiConfigurations".Translate());
+
+            Text.Font = GameFont.Tiny;
+            GUI.color = Color.gray;
+            Rect listDescRect = listingStandard.GetRect(Text.LineHeight * 2);
+            listDescRect.width -= 70f;
+            Widgets.Label(listDescRect, "RimTalk.Settings.MemoryApiConfigurationsDesc".Translate());
+            GUI.color = Color.white;
+            Text.Font = GameFont.Small;
+
+            if (Widgets.ButtonText(addButtonRect, "+"))
+            {
+                settings.MemoryConfigs.Add(new ApiConfig { Provider = AIProvider.Google });
+            }
+
+            GUI.enabled = settings.MemoryConfigs.Count > 1;
+            if (Widgets.ButtonText(removeButtonRect, "−"))
+            {
+                if (settings.MemoryConfigs.Count > 1)
+                    settings.MemoryConfigs.RemoveAt(settings.MemoryConfigs.Count - 1);
+            }
+            GUI.enabled = true;
 
             listingStandard.Gap(6f);
-            Rect rowRect = listingStandard.GetRect(24f);
-            float x = rowRect.x; float y = rowRect.y; float height = rowRect.height;
 
-            // 重用現有的繪製方法 (Provider -> API Key -> Model)
-            DrawProviderDropdown(ref x, y, height, settings.MemoryConfig);
-            DrawApiKeyInput(ref x, y, height, settings.MemoryConfig);
-
-            if (settings.MemoryConfig.Provider == AIProvider.Custom)
-                DrawCustomProviderRow(ref x, y, height, settings.MemoryConfig);
-            else
-                DrawDefaultProviderRow(ref x, y, height, settings.MemoryConfig);
+            // 繪製每個 Config Row (重用 DrawCloudConfigRow 的邏輯)
+            for (int i = 0; i < settings.MemoryConfigs.Count; i++)
+            {
+                DrawCloudConfigRow(listingStandard, settings.MemoryConfigs[i], i, settings.MemoryConfigs);
+                listingStandard.Gap(3f);
+            }
         }
     }
 

@@ -44,19 +44,28 @@ public static class AIClientFactory
         var settings = Settings.Get();
         ApiConfig config;
 
-        // 判斷邏輯：如果啟用且有效，用 MemoryConfig；否則回退到主設定
-        if (settings.MemoryConfig != null && settings.MemoryConfig.IsEnabled && settings.MemoryConfig.IsValid())
+        // ★ 修改：使用 EnableMemoryModel 與 GetActiveMemoryConfig
+        if (settings.EnableMemoryModel)
         {
-            config = settings.MemoryConfig;
+            config = settings.GetActiveMemoryConfig();
+            // 如果列表全掛了或沒設定好，回退到主對話
+            if (config == null) config = settings.GetActiveConfig();
         }
         else
         {
-            // 回退：直接使用對話 Client 的設定 (但建立新實例或重用邏輯)
-            // 為了簡單且共用連線池，這裡我們直接呼叫 GetAIClientAsync() 取得主實例
+            config = settings.GetActiveConfig();
+        }
+
+        if (config == null) return null;
+
+        // 如果 Config 與當前對話 Config 相同 (回退情況)，直接共用對話實例
+        var activeDialogue = settings.GetActiveConfig();
+        if (config == activeDialogue)
+        {
             return await GetAIClientAsync();
         }
 
-        // 如果使用了獨立設定，則維護獨立的快取
+        // 否則使用獨立的記憶實例
         if (_memoryInstance == null || _currentMemoryProvider != config.Provider)
         {
             _memoryInstance = await CreateServiceInstanceAsync(config);
