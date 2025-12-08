@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using RimTalk.Data;
+using RimTalk.Service; // 新增：用於 PromptService
 using RimTalk.Util;
 using UnityEngine;
 using Verse;
@@ -82,13 +83,14 @@ public class Dialog_MemoryBrowser : Window
         Rect viewRect = rect.ContractedBy(10f);
 
         // 簡單估算高度，確保 ScrollView 能運作 (Listing_Standard 會自動處理佈局，但需要足夠的虛擬高度)
-        int itemCount = _currentTab switch
+        int itemCount = _currentTab switch // Null-safe count access
         {
-            MemoryTab.ShortTerm => history.Messages.Count,
-            MemoryTab.MediumTerm => history.MediumTermMemories.Count,
-            MemoryTab.LongTerm => history.LongTermMemories.Count,
+            MemoryTab.ShortTerm => history.Messages?.Count ?? 0,
+            MemoryTab.MediumTerm => history.MediumTermMemories?.Count ?? 0,
+            MemoryTab.LongTerm => history.LongTermMemories?.Count ?? 0,
             _ => 0
         };
+
         float virtualHeight = Mathf.Max(viewRect.height, itemCount * 150f + 100f);
         Rect scrollRect = new Rect(0, 0, viewRect.width - 16f, virtualHeight);
 
@@ -99,13 +101,13 @@ public class Dialog_MemoryBrowser : Window
         switch (_currentTab)
         {
             case MemoryTab.ShortTerm:
-                DrawShortTerm(listing, history.Messages);
+                DrawShortTerm(listing, history.Messages ?? new List<TalkMessageEntry>());
                 break;
             case MemoryTab.MediumTerm:
-                DrawMemories(listing, history.MediumTermMemories);
+                DrawMemories(listing, history.MediumTermMemories ?? new List<MemoryRecord>());
                 break;
             case MemoryTab.LongTerm:
-                DrawMemories(listing, history.LongTermMemories);
+                DrawMemories(listing, history.LongTermMemories ?? new List<MemoryRecord>());
                 break;
         }
 
@@ -124,18 +126,42 @@ public class Dialog_MemoryBrowser : Window
         // 倒序顯示 (最新的在上面)
         foreach (var msg in Enumerable.Reverse(messages))
         {
-            float textHeight = Text.CalcHeight(msg.Text, listing.ColumnWidth);
+            string displayText = msg.Text;
+            string roleLabel = msg.Role == Role.User ? "Context" : "Dialogue";
+
+            // ★ 修改：處理顯示文字，使其與 MemoryService 邏輯一致
+            if (msg.Role == Role.User)
+            {
+                string extracted = PromptService.ExtractContextFromPrompt(msg.Text);
+                displayText = string.IsNullOrWhiteSpace(extracted) ? "(No context)" : extracted.Trim();
+            }
+            else // Role.AI
+            {
+                try
+                {
+                    var responses = JsonUtil.DeserializeFromJson<List<TalkResponse>>(msg.Text);
+                    if (responses != null && responses.Any())
+                    {
+                        displayText = string.Join(" ", responses.Select(r => r.Text));
+                    }
+                }
+                catch
+                {
+                    // keep raw text
+                }
+            }
+
+            float textHeight = Text.CalcHeight(displayText, listing.ColumnWidth);
             float totalHeight = textHeight + 28f;
 
             Rect rect = listing.GetRect(totalHeight);
             Widgets.DrawBoxSolid(rect, new Color(0.1f, 0.1f, 0.1f, 0.2f));
 
-            string roleLabel = msg.Role == Role.User ? "Context" : "Dialogue";
             GUI.color = msg.Role == Role.User ? new Color(0.7f, 0.7f, 1f) : new Color(0.7f, 1f, 0.7f);
             Widgets.Label(new Rect(rect.x + 5, rect.y + 2, rect.width, 20), roleLabel);
             GUI.color = Color.white;
 
-            Widgets.Label(new Rect(rect.x + 5, rect.y + 24, rect.width - 10, textHeight), msg.Text);
+            Widgets.Label(new Rect(rect.x + 5, rect.y + 24, rect.width - 10, textHeight), displayText);
 
             listing.Gap(5f);
         }
