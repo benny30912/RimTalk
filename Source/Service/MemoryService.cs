@@ -97,7 +97,7 @@ public static class MemoryService
             $$"""
              Analyze the following conversation history (context + dialogue pairs).
              Target: {{pawn.LabelShort}}
-             
+
              History:
              {{conversationText}}
              
@@ -124,14 +124,17 @@ public static class MemoryService
 
             if (result?.Memories == null) return [];
 
-            return result.Memories.Select(m => new MemoryRecord
-            {
-                Summary = m.Summary,
-                Keywords = m.Keywords ?? [],
-                Importance = Mathf.Clamp(m.Importance, 1, 5),
-                AccessCount = 0,
-                CreatedTick = GenTicks.TicksGame
-            }).ToList();
+            // ★ 修改：增加 Where(m => m != null) 過濾，並處理 Summary 為 null 的情況
+            return result.Memories
+                .Where(m => m != null)
+                .Select(m => new MemoryRecord
+                {
+                    Summary = m.Summary ?? "...", // 防止 Summary 為 null
+                    Keywords = m.Keywords ?? [],  // 防止 Keywords 為 null
+                    Importance = Mathf.Clamp(m.Importance, 1, 5),
+                    AccessCount = 0,
+                    CreatedTick = GenTicks.TicksGame
+                }).ToList();
         }
         catch (Exception ex)
         {
@@ -154,7 +157,7 @@ public static class MemoryService
             $$"""
              Consolidate the following memory fragments into distinct, high-level event summaries.
              Target: {{pawn.LabelShort}}
-             
+
              Memories:
              {{memoryText}}
              
@@ -180,14 +183,17 @@ public static class MemoryService
 
             if (result?.Memories == null) return [];
 
-            return result.Memories.Select(m => new MemoryRecord
-            {
-                Summary = m.Summary,
-                Keywords = m.Keywords ?? [],
-                Importance = Mathf.Clamp(m.Importance, 1, 5),
-                AccessCount = 0,
-                CreatedTick = GenTicks.TicksGame
-            }).ToList();
+            // ★ 修改：同樣增加安全過濾
+            return result.Memories
+                .Where(m => m != null)
+                .Select(m => new MemoryRecord
+                {
+                    Summary = m.Summary ?? "...",
+                    Keywords = m.Keywords ?? [],
+                    Importance = Mathf.Clamp(m.Importance, 1, 5),
+                    AccessCount = 0,
+                    CreatedTick = GenTicks.TicksGame
+                }).ToList();
         }
         catch (Exception ex)
         {
@@ -343,6 +349,12 @@ public static class MemoryService
     {
         var keywords = new HashSet<string>();
 
+        // 這裡插入核心關鍵詞庫 (CoreMemoryTags)
+        foreach (var coreTag in Constant.CoreMemoryTags)
+        {
+            keywords.Add(coreTag);
+        }
+
         var comp = Find.World.GetComponent<RimTalkWorldComponent>();
         var history = comp?.SavedTalkHistories.FirstOrDefault(x => x.Pawn == pawn);
 
@@ -361,13 +373,7 @@ public static class MemoryService
             foreach (var k in comp.CommonKnowledgeStore) keywords.AddRange(k.Keywords);
         }
 
-        // 先加入核心關鍵詞
-        foreach (var coreTag in Constant.CoreMemoryTags)
-        {
-            keywords.Add(coreTag);
-        }
-
-        // ...原有邏輯 (從 history 中獲取動態生成的關鍵詞)...
+        if (keywords.Count == 0) return "None";
 
         // 返回時
         return string.Join(", ", keywords.Take(1000)); // 增加上限以容納核心詞 + 動態詞
