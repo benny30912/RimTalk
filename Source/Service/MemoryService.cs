@@ -226,6 +226,7 @@ public static class MemoryService
     /// <summary>
     /// 根據當前 Context 檢索相關記憶與常識
     /// </summary>
+    // ★ 修正：加入空值檢查
     public static (List<MemoryRecord> memories, List<CommonKnowledgeData> knowledge) GetRelevantMemories(string context, Pawn pawn, int limit = 5)
     {
         if (string.IsNullOrWhiteSpace(context)) return ([], []);
@@ -236,8 +237,9 @@ public static class MemoryService
         var allMemories = new List<MemoryRecord>();
         if (history != null)
         {
-            allMemories.AddRange(history.MediumTermMemories);
-            allMemories.AddRange(history.LongTermMemories);
+            // ★ 安全地加入列表，防止 NullReferenceException
+            if (history.MediumTermMemories != null) allMemories.AddRange(history.MediumTermMemories);
+            if (history.LongTermMemories != null) allMemories.AddRange(history.LongTermMemories);
         }
 
         // 優化關鍵字匹配邏輯 (Case-insensitive)
@@ -342,8 +344,12 @@ public static class MemoryService
 
         if (history != null)
         {
-            foreach (var m in history.MediumTermMemories) keywords.AddRange(m.Keywords);
-            foreach (var m in history.LongTermMemories) keywords.AddRange(m.Keywords);
+            // 同樣加入空值檢查
+            if (history.MediumTermMemories != null)
+                foreach (var m in history.MediumTermMemories) keywords.AddRange(m.Keywords);
+
+            if (history.LongTermMemories != null)
+                foreach (var m in history.LongTermMemories) keywords.AddRange(m.Keywords);
         }
 
         if (comp?.CommonKnowledgeStore != null)
