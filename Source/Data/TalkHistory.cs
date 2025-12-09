@@ -157,6 +157,9 @@ public static class TalkHistory
             record.MediumTermMemories.AddRange(newMemories);
             record.NewMemoriesSinceLastArchival += newMemories.Count;
 
+            // ★ 新增：成功提示
+            Messages.Message("RimTalk.MemoryService.MediumMemoryCreated".Translate(pawn.LabelShort), pawn, MessageTypeDefOf.NeutralEvent, false);
+
             // 檢查是否觸發 MTM -> LTM 歸檔 (滿 200 條)
             if (record.NewMemoriesSinceLastArchival >= MaxMediumMemories)
             {
@@ -215,6 +218,9 @@ public static class TalkHistory
 
             // LTM 加權剔除維護
             MemoryService.PruneLongTermMemories(record.LongTermMemories, MaxLongMemories);
+
+            // ★ 新增：成功提示
+            Messages.Message("RimTalk.MemoryService.LongMemoryCreated".Translate(pawn.LabelShort), pawn, MessageTypeDefOf.NeutralEvent, false);
         }
     }
 
@@ -241,6 +247,9 @@ public static class TalkHistory
 
             while (attempt < maxRetries && !token.IsCancellationRequested)
             {
+                // ★ 新增：如果遊戲已經結束（回到主選單），直接中止任務
+                if (Current.Game == null) return;
+
                 try
                 {
                     var result = await action();
@@ -251,8 +260,10 @@ public static class TalkHistory
 
                     if (isValid)
                     {
-                        // ★ 關鍵修改：將成功回調放入主線程隊列
-                        _mainThreadActionQueue.Enqueue(() => onSuccess(result));
+                        // 再次檢查遊戲狀態，避免在退出瞬間寫入隊列
+                        if (Current.Game != null)
+                            // ★ 關鍵修改：將成功回調放入主線程隊列
+                            _mainThreadActionQueue.Enqueue(() => onSuccess(result));
                         return;
                     }
                     else
@@ -275,6 +286,9 @@ public static class TalkHistory
                     try { await Task.Delay(delay, token); } catch (TaskCanceledException) { break; }
                 }
             }
+
+            // 如果遊戲結束，不需要執行失敗回調
+            if (Current.Game == null) return;
 
             // ★ 關鍵修改：將失敗回調放入主線程隊列
             // 因為 onFailureOrCancel 裡面的 RestoreMessageCount 也會存取 WorldComp

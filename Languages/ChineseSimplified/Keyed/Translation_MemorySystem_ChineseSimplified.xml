@@ -42,4 +42,7 @@
 
     <RimTalk.MemoryService.SummarizeFailed>记忆总结失败：{0}</RimTalk.MemoryService.SummarizeFailed>
     <RimTalk.MemoryService.ConsolidateFailed>记忆归档失败：{0}</RimTalk.MemoryService.ConsolidateFailed>
+
+    <RimTalk.MemoryService.MediumMemoryCreated>已为 {0} 生成中期记忆</RimTalk.MemoryService.MediumMemoryCreated>
+    <RimTalk.MemoryService.LongMemoryCreated>已为 {0} 生成长期记忆</RimTalk.MemoryService.LongMemoryCreated>
 </LanguageData>

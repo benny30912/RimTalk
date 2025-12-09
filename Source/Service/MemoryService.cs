@@ -97,19 +97,21 @@ public static class MemoryService
 
         string prompt =
             $$"""
-             Analyze the following conversation history (context + dialogue pairs).
-             Target: {{pawn.LabelShort}}
+             分析以下对话历史（context + dialogue）。
+             目标：{{pawn.LabelShort}}
 
-             History:
+             历史：
              {{conversationText}}
              
-             Task:
-             For EACH [context]+[dialogue] pair, generate a corresponding memory record.
-             1. 'summary': A concise summary of what happened and what was said (1 sentence).
-             2. 'keywords': Extract 3-5 tags (Use existing tags if applicable: {{existingKeywords}}).
-             3. 'importance': Rate from 1 (trivial) to 5 (life-changing).
+             任务：
+             为每组 [context]+[dialogue] 生成相应的记忆记录。
+             1. 'summary'：简明扼要地总结发生了什么和说了什么（1 句话）。
+             2. 'keywords'：提取 3-5 个标签（如果适用，请优先使用现有标签：{{existingKeywords}}）。
+             3. 'importance'：评分从 1（琐碎）到 5（改变人生）。
+
+             重要：summary 字段必须使用简体中文。
              
-             Output JSON object with a 'memories' array containing one object per exchange:
+             输出包含 'memories' 数组的 JSON 对象：
              {
                "memories": [
                  { "summary": "...", "keywords": ["..."], "importance": 3 },
@@ -160,18 +162,20 @@ public static class MemoryService
 
         string prompt =
             $$"""
-             Consolidate the following memory fragments into distinct, high-level event summaries.
-             Target: {{pawn.LabelShort}}
+             将以下记忆片段合并为几个独特的高层次事件摘要。
+             目标：{{pawn.LabelShort}}
 
-             Memories:
+             记忆：
              {{memoryText}}
              
-             Task:
-             1. Merge related events into coherent long-term memories.
-             2. Discard overly trivial details.
-             3. Keep importance high for significant events.
+             任务：
+             1. 将相关事件合并为连贯的长期记忆。
+             2. 丢弃过于琐碎的细节。
+             3. 为重大事件保留高重要性。
+
+             重要：summary 字段必须使用简体中文。
              
-             Output JSON object with a 'memories' array:
+             输出包含 'memories' 数组的 JSON 对象：
              {
                "memories": [
                  { "summary": "...", "keywords": ["..."], "importance": 4 },
