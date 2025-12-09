@@ -246,7 +246,8 @@ public static class MemoryService
     /// 根據當前 Context 檢索相關記憶與常識
     /// </summary>
     // ★ 修正：加入空值檢查
-    public static (List<MemoryRecord> memories, List<CommonKnowledgeData> knowledge) GetRelevantMemories(string context, Pawn pawn, int limit = 5)
+    // 修改方法簽名，增加不同的 limit 參數或直接在內部調整
+    public static (List<MemoryRecord> memories, List<CommonKnowledgeData> knowledge) GetRelevantMemories(string context, Pawn pawn)
     {
         if (string.IsNullOrWhiteSpace(context)) return ([], []);
 
@@ -264,6 +265,10 @@ public static class MemoryService
         // 優化關鍵字匹配邏輯 (Case-insensitive)
         var contextLower = context.ToLowerInvariant();
 
+        // 設定不同的限制
+        int memoryLimit = 5;   // 個人記憶維持 5 條 (避免搶戲)
+        int knowledgeLimit = 10; // 常識擴充到 10 條 (確保名詞解釋完整)
+
         // 1. 檢索記憶：計算匹配數 -> 重要性 -> 匹配數 -> 提取次數
         var relevantMemories = allMemories
             .Select(m => new
@@ -275,7 +280,7 @@ public static class MemoryService
             .OrderByDescending(x => x.Memory.Importance) // 1. 重要性優先
             .ThenByDescending(x => x.MatchCount)         // 2. 匹配度次之 (越相關越好)
             .ThenBy(x => x.Memory.AccessCount)           // 3. 提取次數少者優先 (增加多樣性)
-            .Take(limit)
+            .Take(memoryLimit)
             .Select(x => x.Memory)
             .ToList();
 
@@ -295,7 +300,7 @@ public static class MemoryService
             })
             .Where(x => x.MatchCount > 0)
             .OrderByDescending(x => x.MatchCount) // 優先顯示匹配關鍵字最多的常識
-            .Take(limit)
+            .Take(knowledgeLimit)
             .Select(x => x.Knowledge)
             .ToList();
 
