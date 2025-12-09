@@ -39,10 +39,11 @@ public static class MemoryService
     }
 
     // ★ 新增：私有的記憶查詢方法 (取代 AIService.Query)
+    // ★ 修改：徹底移除 ApiHistory 和 Stats 的調用
     private static async Task<T> QueryMemory<T>(TalkRequest request) where T : class, IJsonData
     {
-        // 1. 記錄請求 (Optional: 為了 Debug 方便，還是記一下)
-        var apiLog = ApiHistory.AddRequest(request, "Memory Task");
+        // 移除：var apiLog = ApiHistory.AddRequest(...) 
+        // 因為 ApiHistory 不是線程安全的，且我們決定不記錄背景任務
 
         try
         {
@@ -61,24 +62,24 @@ public static class MemoryService
 
             if (payload == null)
             {
-                apiLog.Response = "Failed";
+                // 失敗時僅輸出 Log 到控制台，不寫入遊戲內歷史
+                Logger.Warning($"Memory generation failed (Payload is null) for: {request.Initiator?.LabelShort}");
                 return null;
             }
 
-            // 4. 統計 Token
-            Stats.IncrementCalls();
-            Stats.IncrementTokens(payload.TokenCount);
+            // 移除：Stats.IncrementCalls();
+            // 移除：Stats.IncrementTokens(payload.TokenCount);
+            // Stats 類別也不是線程安全的，背景寫入會導致崩潰
 
-            // 5. 解析與記錄
             var jsonData = JsonUtil.DeserializeFromJson<T>(payload.Response);
-            ApiHistory.AddResponse(apiLog.Id, jsonData.GetText(), null, null, payload: payload);
+
+            // 移除：ApiHistory.AddResponse(...)
 
             return jsonData;
         }
         catch (Exception ex)
         {
-            Logger.Error($"Memory Query Failed: {ex.Message}");
-            apiLog.Response = $"Error: {ex.Message}";
+            Logger.Error($"Memory Query Error: {ex.Message}");
             return null;
         }
     }
@@ -139,7 +140,8 @@ public static class MemoryService
         }
         catch (Exception ex)
         {
-            // ★ 修改：使用 Messages.Message 並暴露翻譯 Key
+            // 保持使用 Messages 提示玩家，這是安全的（Unity 主線程會處理 UI 隊列）
+            // 但為了保險，建議將 historical 設為 false
             Messages.Message("RimTalk.MemoryService.SummarizeFailed".Translate(ex.Message), MessageTypeDefOf.NegativeEvent, false);
             return [];
         }
