@@ -1,5 +1,4 @@
 using RimTalk.Patch;
-using RimTalk.Service;
 using RimTalk.Source.Data;
 using RimTalk.Util;
 using Verse;
@@ -16,13 +15,24 @@ public class TalkRequest
     public int CreatedTick { get; set; }
     public bool IsMonologue;
 
+    // 原有的建構函數 (保持不變，給主線程使用)
     public TalkRequest(string prompt, Pawn initiator, Pawn recipient = null, TalkType talkType = TalkType.Other)
     {
         TalkType = talkType;
         Prompt = prompt;
         Initiator = initiator;
         Recipient = recipient;
-        CreatedTick = GenTicks.TicksGame;
+        CreatedTick = GenTicks.TicksGame; // 主線程調用是安全的
+    }
+
+    // ★ 新增：給後台線程使用的建構函數 (手動傳入 tick)
+    public TalkRequest(string prompt, Pawn initiator, int createdTick, TalkType talkType = TalkType.Other)
+    {
+        TalkType = talkType;
+        Prompt = prompt;
+        Initiator = initiator;
+        Recipient = null;
+        CreatedTick = createdTick; // 直接使用傳入的值，不存取 GenTicks
     }
 
     public bool IsExpired()
@@ -36,7 +46,8 @@ public class TalkRequest
             {
                 return true;
             }
-        } else if (TalkType == TalkType.Thought)
+        }
+        else if (TalkType == TalkType.Thought)
         {
             return !ThoughtTracker.IsThoughtStillActive(Initiator, Prompt);
         }

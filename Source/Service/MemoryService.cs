@@ -120,7 +120,8 @@ public static class MemoryService
 
         try
         {
-            var request = new TalkRequest(prompt, pawn);
+            // ★ 修改：使用新的建構函數，傳入 currentTick
+            var request = new TalkRequest(prompt, pawn, currentTick);
             // ★ 修改：呼叫自己的 QueryMemory
             var result = await QueryMemory<MemoryListDto>(request);
 
@@ -181,7 +182,8 @@ public static class MemoryService
 
         try
         {
-            var request = new TalkRequest(prompt, pawn);
+            // ★ 修改：使用新的建構函數，傳入 currentTick
+            var request = new TalkRequest(prompt, pawn, currentTick);
             // ★ 修改：呼叫自己的 QueryMemory
             var result = await QueryMemory<MemoryListDto>(request);
 
