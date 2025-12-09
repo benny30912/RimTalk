@@ -115,7 +115,8 @@ public class Dialog_MemoryBrowser : Window
 
         // 為編輯模式預留額外高度
         float itemBaseHeight = _currentTab == MemoryTab.ShortTerm ? 100f : 150f;
-        float virtualHeight = Mathf.Max(viewRect.height, itemCount * itemBaseHeight + 200f);
+        float editHeightBuffer = _editingItem != null ? 300f : 0f; // 增加 Buffer
+        float virtualHeight = Mathf.Max(viewRect.height, itemCount * itemBaseHeight + 200f + editHeightBuffer);
 
         Rect scrollRect = new Rect(0, 0, viewRect.width - 16f, virtualHeight);
 
@@ -221,7 +222,7 @@ public class Dialog_MemoryBrowser : Window
             if (isEditing)
             {
                 // 編輯模式介面
-                float editHeight = 180f;
+                float editHeight = 280f; // ★ 修改：增加編輯區域高度到 280f，確保下方按鈕可見
                 Rect editRect = listing.GetRect(editHeight);
                 Widgets.DrawBoxSolid(editRect, new Color(0.2f, 0.2f, 0.25f, 0.5f));
 
@@ -230,7 +231,7 @@ public class Dialog_MemoryBrowser : Window
 
                 // 內容編輯
                 editListing.Label("Content:");
-                Rect textRect = editListing.GetRect(60f);
+                Rect textRect = editListing.GetRect(80f); // 稍微加高文本框
                 _editBufferSummary = Widgets.TextArea(textRect, _editBufferSummary);
 
                 // 關鍵字編輯
