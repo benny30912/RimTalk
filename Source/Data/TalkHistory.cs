@@ -29,6 +29,9 @@ public static class TalkHistory
     // 取得 WorldComponent 的捷徑
     private static RimTalkWorldComponent WorldComp => Find.World?.GetComponent<RimTalkWorldComponent>();
 
+    // ★ 新增：主線程任務隊列
+    private static readonly ConcurrentQueue<Action> _mainThreadActionQueue = new();
+
     // Add a new talk with the current game tick
     public static void AddSpoken(Guid id)
     {
@@ -38,6 +41,22 @@ public static class TalkHistory
     public static void AddIgnored(Guid id)
     {
         IgnoredCache.Add(id);
+    }
+
+    // ★ 新增：Update 方法，供 TickManager 調用
+    public static void Update()
+    {
+        while (_mainThreadActionQueue.TryDequeue(out var action))
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error executing main thread action: {ex}");
+            }
+        }
     }
 
     public static int GetSpokenTick(Guid id)
@@ -198,6 +217,7 @@ public static class TalkHistory
     /// <param name="action">要執行的異步操作 (回傳結果)</param>
     /// <param name="onSuccess">成功時的回調</param>
     /// <param name="onFailureOrCancel">失敗或取消時的回調 (參數為是否因取消而結束)</param>
+    // ★ 修改：RunRetryableTask 方法
     private static void RunRetryableTask<T>(
         string taskName,
         Func<Task<T>> action,
@@ -222,17 +242,15 @@ public static class TalkHistory
 
                     if (isValid)
                     {
-                        onSuccess(result);
-                        return; // 成功，結束任務
+                        // ★ 關鍵修改：將成功回調放入主線程隊列
+                        _mainThreadActionQueue.Enqueue(() => onSuccess(result));
+                        return;
                     }
                     else
                     {
-                        // 邏輯失敗 (例如 LLM 回傳格式錯誤或拒絕生成) - 使用翻譯鍵
-                        Messages.Message(
-                            "RimTalk.TalkHistory.TaskRetry".Translate(taskName, attempt + 1, maxRetries),
-                            MessageTypeDefOf.NeutralEvent,
-                            false
-                        );
+                        // 這裡使用 Messages 是安全的，因為 Verse.Messages 內部有處理線程安全（或僅寫入隊列）
+                        // 但為了保險，建議只用 Log
+                        Logger.Warning($"Task {taskName} failed (attempt {attempt + 1}/{maxRetries}). Retrying...");
                     }
                 }
                 catch (Exception ex)
@@ -249,10 +267,12 @@ public static class TalkHistory
                 }
             }
 
-            // 如果重試次數用盡或被取消，執行失敗/回滾回調
-            onFailureOrCancel(token.IsCancellationRequested);
+            // ★ 關鍵修改：將失敗回調放入主線程隊列
+            // 因為 onFailureOrCancel 裡面的 RestoreMessageCount 也會存取 WorldComp
+            bool isCancelled = token.IsCancellationRequested;
+            _mainThreadActionQueue.Enqueue(() => onFailureOrCancel(isCancelled));
 
-            if (!token.IsCancellationRequested)
+            if (!isCancelled)
             {
                 // 最終放棄 - 使用翻譯鍵
                 Messages.Message(
@@ -335,6 +355,9 @@ public static class TalkHistory
         SpokenTickCache.Clear();
         IgnoredCache.Clear(); // 重新生成 ConcurrentBag
         CancelAllTasks(); // 確保清除時也取消任務
+
+        // ★ 新增：清理隊列
+        while (_mainThreadActionQueue.TryDequeue(out _)) { }
 
         // 清理 WorldComponent 中的資料 (通常用於新遊戲或主選單重置)
         var comp = WorldComp;

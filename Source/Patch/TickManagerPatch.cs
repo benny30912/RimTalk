@@ -13,6 +13,7 @@ internal static class TickManagerPatch
     private const double DisplayInterval = 0.5; // Display every half second
     private const double DebugStatUpdateInterval = 1;
     private const int UpdateCacheInterval = 5; // 5 seconds
+    private const double MainThreadQueueCheckInterval = 2; // 每 2 秒檢查一次
     private static double TalkInterval => Settings.Get().TalkInterval;
     private static bool _noApiKeyMessageShown;
     private static bool _initialCacheRefresh;
@@ -21,6 +22,14 @@ internal static class TickManagerPatch
     public static void Postfix()
     {
         Counter.Tick++;
+
+        // ★ 優化：不需要每個 Tick 都檢查，每 2 秒檢查一次即可
+        // 這樣在高倍速下可以節省大量的空檢查
+        if (IsNow(MainThreadQueueCheckInterval))
+        {
+            // ★ 新增：執行 TalkHistory 的主線程隊列
+            TalkHistory.Update();
+        }
 
         if (IsNow(DebugStatUpdateInterval))
         {
