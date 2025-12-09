@@ -44,7 +44,10 @@ public static class TalkService
 
         List<Pawn> nearbyPawns = PawnSelector.GetAllNearByPawns(talkRequest.Initiator);
         if (talkRequest.Recipient.IsPlayer()) nearbyPawns.Insert(0, talkRequest.Recipient);
+
+        // 1. 獲取 Pawn 狀態 (Status) 與環境
         var (status, isInDanger) = talkRequest.Initiator.GetPawnStatusFull(nearbyPawns);
+        string envContext = PromptService.GetEnvironmentContext(talkRequest.Initiator, status); // 這裡需要將 GetEnvironmentContext 改回接收 Pawn，或保持 Request
 
         // Avoid spamming generations if the pawn's status hasn't changed recently.
         if (talkRequest.TalkType != TalkType.User && status == pawn1.LastStatus && pawn1.RejectCount < 2)
@@ -75,10 +78,15 @@ public static class TalkService
         if (!settings.AllowMonologue && talkRequest.IsMonologue && talkRequest.TalkType != TalkType.User)
             return false;
 
-        // Build the context and decorate the prompt with current status information.
-        string context = PromptService.BuildContext(pawns);
+        // ★ 關鍵修改：先執行 DecoratePrompt
+        // 這會完成：指令生成 + 環境注入 + (外部MOD)事件注入
+        PromptService.DecoratePrompt(talkRequest, pawns, envContext);
+        //此時 talkRequest.Prompt 已經包含了 Ongoing Events！
+
+        // ★ 關鍵修改：後執行 BuildContext
+        // 這樣它就能讀到 talkRequest.Prompt 裡面的事件來檢索記憶了
+        string context = PromptService.BuildContext(talkRequest, pawns);
         AIService.UpdateContext(context);
-        PromptService.DecoratePrompt(talkRequest, pawns, status);
 
         var allInvolvedPawns = pawns.Union(nearbyPawns).Distinct().ToList();
 
