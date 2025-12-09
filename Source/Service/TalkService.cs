@@ -32,7 +32,7 @@ public static class TalkService
 
         PawnState pawn1 = Cache.Get(talkRequest.Initiator);
         if (talkRequest.TalkType != TalkType.User && (pawn1 == null || !pawn1.CanGenerateTalk())) return false;
-        
+
         if (!settings.AllowSimultaneousConversations && AnyPawnHasPendingResponses()) return false;
 
         // Ensure the recipient is valid and capable of talking.
@@ -45,16 +45,16 @@ public static class TalkService
         List<Pawn> nearbyPawns = PawnSelector.GetAllNearByPawns(talkRequest.Initiator);
         if (talkRequest.Recipient.IsPlayer()) nearbyPawns.Insert(0, talkRequest.Recipient);
         var (status, isInDanger) = talkRequest.Initiator.GetPawnStatusFull(nearbyPawns);
-        
+
         // Avoid spamming generations if the pawn's status hasn't changed recently.
         if (talkRequest.TalkType != TalkType.User && status == pawn1.LastStatus && pawn1.RejectCount < 2)
         {
             pawn1.RejectCount++;
             return false;
         }
-        
+
         if (talkRequest.TalkType != TalkType.User && isInDanger) talkRequest.TalkType = TalkType.Urgent;
-        
+
         pawn1.RejectCount = 0;
         pawn1.LastStatus = status;
 
@@ -69,7 +69,7 @@ public static class TalkService
             .Distinct()
             .Take(3)
             .ToList();
-        
+
         if (pawns.Count == 1) talkRequest.IsMonologue = true;
 
         if (!settings.AllowMonologue && talkRequest.IsMonologue && talkRequest.TalkType != TalkType.User)
@@ -131,8 +131,11 @@ public static class TalkService
 
                     receivedResponses.Add(talkResponse);
 
-                    // Enqueue the received talk for the pawn to display later.
-                    pawnState.TalkResponses.Add(talkResponse);
+                    // ★ 關鍵修復：寫入時加鎖
+                    lock (pawnState.TalkResponses)
+                    {
+                        pawnState.TalkResponses.Add(talkResponse); // Enqueue the received talk for the pawn to display later.
+                    }
                 }
             );
 
@@ -173,19 +176,28 @@ public static class TalkService
         foreach (Pawn pawn in Cache.Keys)
         {
             PawnState pawnState = Cache.Get(pawn);
-            if (pawnState == null || pawnState.TalkResponses.Empty()) continue;
 
-            var talk = pawnState.TalkResponses.First();
-            if (talk == null)
+            TalkResponse talk = null;
+
+            // ★ 關鍵修復：讀取時加鎖
+            lock (pawnState.TalkResponses)
             {
-                pawnState.TalkResponses.RemoveAt(0);
-                continue;
+                if (pawnState.TalkResponses.Any())
+                {
+                    talk = pawnState.TalkResponses.First();
+                }
             }
+
+            if (talk == null) continue;
 
             // Skip this talk if its parent was ignored or the pawn is currently unable to speak.
             if (TalkHistory.IsTalkIgnored(talk.ParentTalkId) || !pawnState.CanDisplayTalk())
             {
-                pawnState.IgnoreTalkResponse();
+                // ★ 關鍵修復：移除時加鎖
+                lock (pawnState.TalkResponses)
+                {
+                    pawnState.IgnoreTalkResponse();
+                }
                 continue;
             }
 
@@ -198,7 +210,11 @@ public static class TalkService
             if (pawn.IsInDanger())
             {
                 replyInterval = 2;
-                pawnState.IgnoreAllTalkResponses([TalkType.Urgent, TalkType.User]);
+                // ★ 關鍵修復：移除時加鎖
+                lock (pawnState.TalkResponses)
+                {
+                    pawnState.IgnoreAllTalkResponses([TalkType.Urgent, TalkType.User]);
+                }
             }
 
             // Enforce a delay for replies to make conversations feel more natural.
@@ -206,7 +222,7 @@ public static class TalkService
             if (parentTalkTick == -1 || !CommonUtil.HasPassed(parentTalkTick, replyInterval)) continue;
 
             CreateInteraction(pawn, talk);
-            
+
             break; // Display only one talk per tick to prevent overwhelming the screen.
         }
     }
@@ -230,19 +246,23 @@ public static class TalkService
     /// </summary>
     private static TalkResponse ConsumeTalk(PawnState pawnState)
     {
-        // Failsafe check
-        if (pawnState.TalkResponses.Empty()) 
-            return new TalkResponse(TalkType.Other, null!, "");
-        
-        var talkResponse = pawnState.TalkResponses.First();
-        pawnState.TalkResponses.Remove(talkResponse);
-        TalkHistory.AddSpoken(talkResponse.Id);
-        var apiLog = ApiHistory.GetApiLog(talkResponse.Id);
-        if (apiLog != null)
-            apiLog.SpokenTick = GenTicks.TicksGame;
+        // ★ 關鍵修復：移除時加鎖
+        lock (pawnState.TalkResponses)
+        {
+            if (pawnState.TalkResponses.Empty())
+                return new TalkResponse(TalkType.Other, null!, "");
 
-        Overlay.NotifyLogUpdated();
-        return talkResponse;
+            var talkResponse = pawnState.TalkResponses.First();
+            pawnState.TalkResponses.Remove(talkResponse);
+
+            TalkHistory.AddSpoken(talkResponse.Id);
+            var apiLog = ApiHistory.GetApiLog(talkResponse.Id);
+            if (apiLog != null)
+                apiLog.SpokenTick = GenTicks.TicksGame;
+
+            Overlay.NotifyLogUpdated();
+            return talkResponse;
+        }
     }
 
     private static void CreateInteraction(Pawn pawn, TalkResponse talk)
@@ -271,6 +291,13 @@ public static class TalkService
 
     private static bool AnyPawnHasPendingResponses()
     {
-        return Cache.GetAll().Any(pawnState => pawnState.TalkResponses.Count > 0);
+        return Cache.GetAll().Any(pawnState =>
+        {
+            // ★ 關鍵修復：檢查時加鎖
+            lock (pawnState.TalkResponses)
+            {
+                return pawnState.TalkResponses.Count > 0;
+            }
+        });
     }
 }
