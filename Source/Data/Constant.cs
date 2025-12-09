@@ -63,50 +63,51 @@ public static class Constant
         return baseInstruction + knowledgeBlock + "\n" + JsonInstruction + (settings.ApplyMoodAndSocialEffects ? "\n" + SocialInstruction : "");
     }
 
-    public static readonly List<string> CoreMemoryTags = new List<string>
-{
-    // --- 情緒 (精準匹配當下心情) ---
+    public static readonly HashSet<string> CoreMemoryTags = new HashSet<string>
+    {
+    // --- 情緒 (對應 MentalState & Mood) ---
     "开心",
     "悲伤",
     "愤怒",
-    "焦虑", // 涵蓋壓力大、精神崩潰前兆
-    "恐惧", // 對應逃跑、被俘虜等狀態
+    "焦虑", // 對應：壓力大、戒斷反應、生病前兆
+    "恐惧", // 對應：逃跑、被俘、精神崩潰(Panic)
     "平静",
+    "孤独",
+    "绝望", // 對應：極低心情、崩潰邊緣
+    "无助", // 對應：倒地(Downed)、無法行動
+    "厌恶", // [新增] 對應：看到屍體、醜陋環境、吃生食
 
-    // --- 社交與關係 (區分互動性質) ---
-    "闲聊", // 最普通的互動
-    "深谈", // Deep talk，通常能建立深層關係
-    "争吵", // 侮辱、輕視
-    "爱情", // 表白、求婚、愛愛
-    "仇恨", // 成為宿敵、傷害
+    // --- 社交 (對應 InteractionDef) ---
+    "闲聊",
+    "深谈",
+    "争吵", // 對應：侮辱、社交鬥毆(SocialFight)
+    "爱情", // 對應：求愛、Lovin'、結婚
+    "仇恨", // 對應：宿敵、傷害行為
     "友谊",
+    "劝说", // [新增] 對應：招募囚犯、傳教(Conversion)、安撫
 
-    // --- 狀態與健康 ---
-    "受伤",
-    "生病",
-    "治疗", // 區分「我受傷」與「我治療別人」
-    "死亡",
-    "崩溃", // 這是一個非常具體的 RimWorld 狀態，值得單獨列出
+    // --- 生理與健康 (對應 Health & Needs) ---
+    "受伤", // 對應：有 Hediff (Wound)
+    "生病", // 對應：有 Hediff (Flu, Plague...)
+    "治疗", // 對應：Job (TendPatient)
+    "死亡", // 對應：看到屍體、親友去世
+    "饥饿", // [新增] 對應：Food level low
+    "疲劳", // [新增] 對應：Rest level low
+    "成瘾", // [新增] 對應：Addiction / Withdrawal
 
-    // --- 關鍵事件 (機制類名詞) ---
-    "战斗",
-    "袭击", // 區分主動進攻與被敵襲
-    "逃跑",
-    "紧急",
-    "任务", // 代表 Quest 成功
-    "聚会",     // 涵蓋派對、婚禮
-    "贸易",
-    "谈判",
+    // --- 關鍵事件與狀態 (對應 Game Mechanics) ---
+    "战斗", // 對應：Drafted, Job (Attack)
+    "袭击", // 對應：Map condition (Raid)
+    "逃跑", // 對應：Job (Flee)
+    "崩溃", // 對應：MentalState (任何 Break)
+    "囚犯", // [新增] 對應：IsPrisoner
+    "仪式", // [新增] 對應：LordJob (Ritual) - 婚禮/葬禮/演講
+    "聚会", // 對應：Party
+    "工作", // [新增] 對應：通用工作狀態 (如果需要觸發「抱怨工作累」)
+    "火灾", // [新增] 對應：Map condition (Fire)，非常高頻的驚慌源
 
-    // --- 主要工作 (選取最具代表性的) ---
-    "建造",
-    "种植",
-    "烹饪",
-    "制作", // 涵蓋鍛造、裁縫、工藝
-    "研究",
-    "采矿",
-    "艺术",
-    "医疗"
+    // --- 抽象概念 (長期記憶用) ---
+    "家园", "生存", "自由", "复仇", "信念", "艺术"
     };
 
     public const string Prompt =

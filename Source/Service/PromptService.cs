@@ -298,6 +298,21 @@ public static class PromptService
                 sb.AppendLine($"Equipment: {string.Join(", ", equipment)}");
         }
 
+        // ==========================================
+        // ★ 核心修改：注入抽象標籤 (Context Enrichment)
+        // ==========================================
+        var abstractTags = CoreTagMapper.GetAbstractTags(pawn);
+        if (abstractTags.Any())
+        {
+            // 這些標籤會被加入 dynamicContext，用於 GetRelevantMemories 的關鍵字匹配
+            // 但我們可以選擇 "不" 加入 sb (顯示給 LLM 的 Context)，
+            // 除非您覺得讓 LLM 看到這些顯式標籤也有助於它理解。
+            // 建議：加入 dynamicContext 即可，保持 Prompt 簡潔。
+
+            string tagsLine = $"[System Tags: {string.Join(", ", abstractTags)}]";
+            dynamicSb.AppendLine(tagsLine);
+        }
+
         return (sb.ToString(), new List<string>(), dynamicSb.ToString()); // knowledge 在這裡暫時為空，稍後統一處理
     }
 

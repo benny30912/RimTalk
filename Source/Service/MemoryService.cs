@@ -106,7 +106,11 @@ public static class MemoryService
              任务：
              为每组 [context]+[dialogue] 生成相应的记忆记录。
              1. 'summary'：简明扼要地总结发生了什么和说了什么（1 句话）。
-             2. 'keywords'：提取 3-5 个标签（如果适用，请优先使用现有标签：{{existingKeywords}}）。**注意：绝对不要将角色名“{{pawn.LabelShort}}”包含在关键字中。**
+             2. 'keywords'：**必须且只能**从以下两个来源中选择总共 3-5 个标签：
+                A. **本次[context]或[dialogue]中实际出现的词汇**（如地名、物品名、状态名）。
+                B. **现有的参考标签列表**：{{existingKeywords}}。
+                **禁止创造文本中不存在的新词汇。**
+                **绝对不要包含角色名“{{pawn.LabelShort}}”**
              3. 'importance'：评分从 1（琐碎）到 5（改变人生）。
 
              重要：summary 字段必须使用简体中文。
@@ -172,7 +176,9 @@ public static class MemoryService
              1. 将相关事件合并为连贯的长期记忆。
              2. 丢弃过于琐碎的细节。
              3. 为重大事件保留高重要性。
-             4. **keywords：提取关键标签，但绝对不要包含角色名“{{pawn.LabelShort}}”。**
+             4. 'keywords'：**必须且只能**从上方提供的“记忆片段”原有的 keywords 中选择最核心的 3-5 个。
+                **严禁发明新的关键词。**
+                **绝对不要包含角色名“{{pawn.LabelShort}}”**
 
              重要：summary 字段必须使用简体中文。
              
