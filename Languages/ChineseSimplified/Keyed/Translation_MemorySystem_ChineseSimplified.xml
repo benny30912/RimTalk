@@ -45,4 +45,9 @@
 
     <RimTalk.MemoryService.MediumMemoryCreated>已为 {0} 生成中期记忆</RimTalk.MemoryService.MediumMemoryCreated>
     <RimTalk.MemoryService.LongMemoryCreated>已为 {0} 生成长期记忆</RimTalk.MemoryService.LongMemoryCreated>
+
+    <RimTalk.UI.Edit>编辑</RimTalk.UI.Edit>
+    <RimTalk.UI.Delete>删除</RimTalk.UI.Delete>
+    <RimTalk.UI.Save>保存</RimTalk.UI.Save>
+    <RimTalk.UI.Cancel>取消</RimTalk.UI.Cancel>
 </LanguageData>

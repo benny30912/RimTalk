@@ -15,9 +15,10 @@ namespace RimTalk.Data;
 
 public static class TalkHistory
 {
-    private const int MaxMessages = 30;       //從 6 增加到 30，以保留更多的對話歷史記錄
-    private const int MaxMediumMemories = 200; // 中期記憶上限
-    private const int MaxLongMemories = 100;   // 長期記憶上限
+    // ★ 修改：將常數改為 public 以便 UI 讀取
+    public const int MaxMessages = 30;       //從 6 增加到 30，以保留更多的對話歷史記錄
+    public const int MaxMediumMemories = 200; // 中期記憶上限
+    public const int MaxLongMemories = 100;   // 長期記憶上限
 
     // 這些快取屬於運行時狀態，不需要存檔
     private static readonly ConcurrentDictionary<Guid, int> SpokenTickCache = new() { [Guid.Empty] = 0 };
