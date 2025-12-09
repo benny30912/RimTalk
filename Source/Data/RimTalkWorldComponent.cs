@@ -36,6 +36,12 @@ public class MemoryRecord : IExposable
         Scribe_Values.Look(ref Importance, "importance");
         Scribe_Values.Look(ref AccessCount, "accessCount");
         Scribe_Values.Look(ref CreatedTick, "createdTick");
+
+        // ★ 確保 Keywords 不為 null
+        if (Scribe.mode == LoadSaveMode.PostLoadInit)
+        {
+            Keywords ??= [];
+        }
     }
 }
 
@@ -49,6 +55,12 @@ public class CommonKnowledgeData : IExposable
     {
         Scribe_Collections.Look(ref Keywords, "keywords", LookMode.Value);
         Scribe_Values.Look(ref Content, "content");
+
+        // ★ 確保 Keywords 不為 null
+        if (Scribe.mode == LoadSaveMode.PostLoadInit)
+        {
+            Keywords ??= [];
+        }
     }
 }
 
@@ -82,6 +94,14 @@ public class PawnMessageHistoryRecord : IExposable
 
         Scribe_Values.Look(ref NewMessagesSinceLastSummary, "newMessagesSinceLastSummary", 0);
         Scribe_Values.Look(ref NewMemoriesSinceLastArchival, "newMemoriesSinceLastArchival", 0);
+
+        // ★ 關鍵修復：讀檔後若列表為 null，則重新初始化
+        if (Scribe.mode == LoadSaveMode.PostLoadInit)
+        {
+            Messages ??= [];
+            MediumTermMemories ??= [];
+            LongTermMemories ??= [];
+        }
     }
 }
 
@@ -135,6 +155,14 @@ public class RimTalkWorldComponent(World world) : WorldComponent(world)
         // 初始化列表並清理無效資料
         SavedTalkHistories ??= [];
         SavedTalkHistories.RemoveAll(x => x.Pawn == null);
+
+        // ★ 額外保護：遍歷所有記錄，確保內部列表也不為空
+        foreach (var record in SavedTalkHistories)
+        {
+            record.Messages ??= [];
+            record.MediumTermMemories ??= [];
+            record.LongTermMemories ??= [];
+        }
 
         CommonKnowledgeStore ??= [];
     }

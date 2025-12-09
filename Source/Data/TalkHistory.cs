@@ -91,6 +91,9 @@ public static class TalkHistory
                 comp.SavedTalkHistories.Add(record);
             }
 
+            // ★ 防禦性初始化
+            record.Messages ??= new List<TalkMessageEntry>();
+
             // 加入訊息
             record.Messages.Add(new TalkMessageEntry { Role = Role.User, Text = request });
             record.Messages.Add(new TalkMessageEntry { Role = Role.AI, Text = response });
@@ -148,6 +151,9 @@ public static class TalkHistory
             var record = comp.SavedTalkHistories.FirstOrDefault(x => x.Pawn == pawn);
             if (record == null) return;
 
+            // ★ 防禦性初始化：這是報錯的關鍵點
+            record.MediumTermMemories ??= new List<MemoryRecord>();
+
             record.MediumTermMemories.AddRange(newMemories);
             record.NewMemoriesSinceLastArchival += newMemories.Count;
 
@@ -202,6 +208,9 @@ public static class TalkHistory
             var record = comp.SavedTalkHistories.FirstOrDefault(x => x.Pawn == pawn);
             if (record == null) return;
 
+            // ★ 防禦性初始化
+            record.LongTermMemories ??= new List<MemoryRecord>();
+
             record.LongTermMemories.AddRange(newMemories);
 
             // LTM 加權剔除維護
@@ -227,7 +236,7 @@ public static class TalkHistory
     {
         Task.Run(async () =>
         {
-            int maxRetries = 10;
+            int maxRetries = 5;
             int attempt = 0;
 
             while (attempt < maxRetries && !token.IsCancellationRequested)
@@ -324,6 +333,9 @@ public static class TalkHistory
         {
             var record = comp.SavedTalkHistories.FirstOrDefault(x => x.Pawn == pawn);
             if (record == null) return [];
+
+            // 防禦性檢查
+            if (record.Messages == null) return [];
 
             // 轉換回原本的 Tuple 格式以相容其他代碼
             return record.Messages.Select(m => (m.Role, m.Text)).ToList();
