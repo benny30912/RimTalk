@@ -104,9 +104,13 @@ public class Dialog_MemoryBrowser : Window
         Widgets.DrawMenuSection(rect);
         Rect viewRect = rect.ContractedBy(10f);
 
+        // ★ 修改：先計算出實際的 listWidth (ScrollRect 的寬度)
+        float listWidth = viewRect.width - 16f;
+
         // ★ 修改：使用精確計算的高度，而不是估算
         // 加上一些緩衝區 (Buffer) 以防萬一
-        float contentHeight = CalculateTotalHeight(history);
+        // ★ 修改：將正確的寬度傳入計算方法
+        float contentHeight = CalculateTotalHeight(history, listWidth);
         float virtualHeight = Mathf.Max(viewRect.height, contentHeight + 50f);
 
         Rect scrollRect = new Rect(0, 0, viewRect.width - 16f, virtualHeight);
@@ -327,11 +331,11 @@ public class Dialog_MemoryBrowser : Window
         }
     }
 
-    private float CalculateTotalHeight(PawnMessageHistoryRecord history)
+    // ★ 修改：增加 width 參數，並移除內部的寫死寬度
+    private float CalculateTotalHeight(PawnMessageHistoryRecord history, float width)
     {
         if (history == null) return 0f;
         float totalHeight = 0f;
-        float width = InitialSize.x - 36f; // 減去邊距和捲軸寬度
 
         if (_currentTab == MemoryTab.ShortTerm)
         {
