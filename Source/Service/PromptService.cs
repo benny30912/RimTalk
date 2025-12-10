@@ -25,9 +25,21 @@ public static class PromptService
         var pawnContexts = new StringBuilder();
         var allKnowledge = new HashSet<string>();
 
+        // 1. [新增] 從 Prompt 中提取 Event 標籤 (例如 "羞辱" -> "愤怒")
+        var eventTags = CoreTagMapper.GetEventTags(request.Prompt);
+        string interactionTagsString = "";
+        if (eventTags.Any())
+        {
+            // 將標籤轉換為字串，稍後加入檢索上下文
+            // 格式不重要，只要包含這些關鍵字即可讓 MemoryService 檢索到
+            interactionTagsString = $"{string.Join(", ", eventTags)}";
+        }
+
         // ★ 關鍵策略：直接使用已經被 DecoratePrompt + Event+ Patch 處理過的 Prompt 作為檢索源
         // 這包含了：指令 + 環境描述 + Ongoing Events
-        string combinedSearchContext = request.Prompt;
+        // 2. [修改] 將互動標籤加入 combinedSearchContext
+        // 這樣當 Pawn 進行 "羞辱" 互動時，系統就會自動去檢索帶有 "愤怒" 標籤的記憶
+        string combinedSearchContext = request.Prompt + "\n" + interactionTagsString;
 
         // 遍歷所有參與者，生成各自的 Context 並檢索相關記憶與常識
         for (int i = 0; i < pawns.Count; i++)
@@ -309,7 +321,7 @@ public static class PromptService
             // 除非您覺得讓 LLM 看到這些顯式標籤也有助於它理解。
             // 建議：加入 dynamicContext 即可，保持 Prompt 簡潔。
 
-            string tagsLine = $"[System Tags: {string.Join(", ", abstractTags)}]";
+            string tagsLine = $"{string.Join(", ", abstractTags)}";
             dynamicSb.AppendLine(tagsLine);
         }
 
