@@ -75,6 +75,17 @@ public partial class Settings
 
         listingStandard.Gap(6f);
 
+        // ★ 新增：Keyword Weight Slider
+        var keywordWeightLabel = "RimTalk.Settings.KeywordWeight".Translate(settings.KeywordWeight.ToString("0.0"));
+        var keywordWeightRect = listingStandard.GetRect(Text.CalcHeight(keywordWeightLabel, listingStandard.ColumnWidth));
+        Widgets.Label(keywordWeightRect, keywordWeightLabel);
+        TooltipHandler.TipRegion(keywordWeightRect, "RimTalk.Settings.KeywordWeightDesc".Translate());
+
+        // 設定範圍 0.0 ~ 20.0
+        settings.KeywordWeight = listingStandard.Slider(settings.KeywordWeight, 0f, 20f);
+
+        listingStandard.Gap(6f);
+
         // --- Checkboxes in two columns ---
 
         // Define column layout

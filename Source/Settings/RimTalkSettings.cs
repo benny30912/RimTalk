@@ -44,6 +44,8 @@ public class RimTalkSettings : ModSettings
     public int DisableAiAtSpeed = 0;
     public Settings.ButtonDisplayMode ButtonDisplay = Settings.ButtonDisplayMode.Tab;
     public float MemoryImportanceWeight = 3.0f;
+    // ★ 新增：關鍵字權重 (預設 2.0)
+    public float KeywordWeight = 2.0f;
 
     public ContextSettings Context = new();
 
@@ -198,6 +200,7 @@ public class RimTalkSettings : ModSettings
         Scribe_Values.Look(ref AllowNonHumanToTalk, "allowNonHumanToTalk", true);
         Scribe_Values.Look(ref ApplyMoodAndSocialEffects, "applyMoodAndSocialEffects", false);
         Scribe_Values.Look(ref MemoryImportanceWeight, "memoryImportanceWeight", 3.0f);
+        Scribe_Values.Look(ref KeywordWeight, "KeywordWeight", 2.0f);
         Scribe_Deep.Look(ref Context, "context");
         Scribe_Values.Look(ref ButtonDisplay, "buttonDisplay", Settings.ButtonDisplayMode.Tab, true);
         Scribe_Values.Look(ref DebugModeEnabled, "debugModeEnabled", false);

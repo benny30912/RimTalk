@@ -111,7 +111,13 @@ public static class MemoryService
                 B. **现有的参考标签列表**：{{existingKeywords}}。
                 **禁止创造文本中不存在的新词汇。**
                 **绝对不要包含角色名“{{pawn.LabelShort}}”**
-             3. 'importance'：评分从 1（琐碎）到 5（改变人生）。
+             3. 'importance'：根据以下标准严格评分（1-5）：
+                - 1 (琐碎)：日常闲聊、天气、吃饭、无意义的抱怨。
+                - 2 (普通)：工作交流、轻微的不适、一般的交易。
+                - 3 (值得记住)：建立友谊/仇恨、轻伤、社交争吵、完成任务。
+                - 4 (重大)：精神崩溃、袭击战斗、确立恋爱关系、重伤/疾病。
+                - 5 (刻骨铭心)：死亡、结婚、永久性残疾、家园毁灭。
+                **警告：对于大多数日常对话，评分不应超过 2。只有真正危及生命或改变关系的事件才能评为 4 或 5。**
 
              重要：summary 字段必须使用简体中文。
              
@@ -249,6 +255,12 @@ public static class MemoryService
     }
     }
 
+    private class ScoredMemory
+    {
+        public MemoryRecord Memory;
+        public float Score;
+    }
+
     /// <summary>
     /// 根據當前 Context 檢索相關記憶與常識
     /// </summary>
@@ -276,17 +288,34 @@ public static class MemoryService
         int memoryLimit = 5;   // 個人記憶維持 5 條 (避免搶戲)
         int knowledgeLimit = 10; // 常識擴充到 10 條 (確保名詞解釋完整)
 
-        // 1. 檢索記憶：計算匹配數 -> 重要性 -> 匹配數 -> 提取次數
-        var relevantMemories = allMemories
-            .Select(m => new
-            {
-                Memory = m,
-                MatchCount = m.Keywords?.Count(k => contextLower.Contains(k.ToLowerInvariant())) ?? 0
-            })
-            .Where(x => x.MatchCount > 0) // 只取有關聯的
-            .OrderByDescending(x => x.Memory.Importance) // 1. 重要性優先
-            .ThenByDescending(x => x.MatchCount)         // 2. 匹配度次之 (越相關越好)
-            .ThenBy(x => x.Memory.AccessCount)           // 3. 提取次數少者優先 (增加多樣性)
+        // ★ 讀取設定權重
+        float weightKeyword = Settings.Get().KeywordWeight;
+        float weightImportance = Settings.Get().MemoryImportanceWeight;
+        const float weightAccess = 0.5f;     // 依照您的要求固定為 0.5 (微擾)
+
+        var scoredMemories = new List<ScoredMemory>();
+
+        foreach (var mem in allMemories)
+        {
+            // 1. 計算匹配數
+            int matchCount = mem.Keywords?.Count(k => contextLower.Contains(k.ToLowerInvariant())) ?? 0;
+
+            // ★ 規則：無論如何至少要命中一個關鍵字
+            if (matchCount == 0) continue;
+
+            // 2. 計算分數
+            // 公式：(重要性 * W_imp) + (關鍵字數 * W_key) - (提及次數 * 0.5)
+            float score = (mem.Importance * weightImportance) +
+                          (matchCount * weightKeyword) -
+                          (mem.AccessCount * weightAccess);
+
+            scoredMemories.Add(new ScoredMemory { Memory = mem, Score = score });
+        }
+
+        // 3. 排序與選取
+        var relevantMemories = scoredMemories
+            .OrderByDescending(x => x.Score) // 分數高的優先
+            .ThenBy(x => x.Memory.AccessCount) // 同分時，選講過最少次的 (再次確保新鮮度)
             .Take(memoryLimit)
             .Select(x => x.Memory)
             .ToList();
@@ -297,7 +326,7 @@ public static class MemoryService
             mem.AccessCount++;
         }
 
-        // 2. 檢索常識：計算匹配數 -> 優先取匹配度高的
+        // 檢索常識：計算匹配數 -> 優先取匹配度高的
         var allKnowledge = comp?.CommonKnowledgeStore ?? [];
         var relevantKnowledge = allKnowledge
             .Select(k => new

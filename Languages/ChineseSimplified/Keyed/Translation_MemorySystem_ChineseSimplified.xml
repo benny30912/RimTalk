@@ -38,7 +38,9 @@
     <RimTalk.TalkHistory.TaskGiveUp>任务 {0} 在 {1} 次尝试后放弃。正在回滚状态。 </RimTalk.TalkHistory.TaskGiveUp>
 
     <RimTalk.Settings.MemoryImportanceWeight>记忆重要性权重：{0}</RimTalk.Settings.MemoryImportanceWeight>
-    <RimTalk.Settings.MemoryImportanceWeightTooltip>控制长期记忆在归档时的保留优先级。较高的数值意味着高重要性（Importance）的记忆拥有更高的分数，更不容易被新的记忆覆盖或遗忘。</RimTalk.Settings.MemoryImportanceWeightTooltip>
+    <RimTalk.Settings.MemoryImportanceWeightTooltip>控制长期记忆在归档时的保留优先级。较高的数值意味着高重要性（Importance）的记忆拥有更高的分数，更不容易被新的记忆覆盖或遗忘。同時也决定重要性对记忆检索的影响力。</RimTalk.Settings.MemoryImportanceWeightTooltip>
+    <RimTalk.Settings.KeywordWeight>关键字匹配权重：{0}</RimTalk.Settings.KeywordWeight>
+    <RimTalk.Settings.KeywordWeightDesc>决定关键词匹配数量对记忆检索的影响力。较高的值会让 AI 更倾向于聊当前话题；较低的值（如 2.0）会让高重要性的记忆更容易浮现。</RimTalk.Settings.KeywordWeightDesc>
 
     <RimTalk.MemoryService.SummarizeFailed>记忆总结失败：{0}</RimTalk.MemoryService.SummarizeFailed>
     <RimTalk.MemoryService.ConsolidateFailed>记忆归档失败：{0}</RimTalk.MemoryService.ConsolidateFailed>
@@ -50,4 +52,5 @@
     <RimTalk.UI.Delete>删除</RimTalk.UI.Delete>
     <RimTalk.UI.Save>保存</RimTalk.UI.Save>
     <RimTalk.UI.Cancel>取消</RimTalk.UI.Cancel>
+
 </LanguageData>
