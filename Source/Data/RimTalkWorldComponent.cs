@@ -12,11 +12,13 @@ public class TalkMessageEntry : IExposable
 {
     public Role Role;
     public string Text;
+    public int Tick; // ★ 新增：記錄該條訊息發生的時間
 
     public void ExposeData()
     {
         Scribe_Values.Look(ref Role, "role");
         Scribe_Values.Look(ref Text, "text");
+        Scribe_Values.Look(ref Tick, "tick", 0); // ★ 保存時間，預設為 0 以相容舊存檔
     }
 }
 

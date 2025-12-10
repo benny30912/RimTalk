@@ -95,9 +95,12 @@ public static class TalkHistory
             // ★ 防禦性初始化
             record.Messages ??= new List<TalkMessageEntry>();
 
+            // ★ 修改：加入訊息時記錄當前 Tick
+            int currentTick = GenTicks.TicksGame;
+
             // 加入訊息
-            record.Messages.Add(new TalkMessageEntry { Role = Role.User, Text = request });
-            record.Messages.Add(new TalkMessageEntry { Role = Role.AI, Text = response });
+            record.Messages.Add(new TalkMessageEntry { Role = Role.User, Text = request, Tick = currentTick });
+            record.Messages.Add(new TalkMessageEntry { Role = Role.AI, Text = response, Tick = currentTick });
 
             // 更新計數器 (新增 2 條)
             record.NewMessagesSinceLastSummary += 2;
@@ -114,7 +117,6 @@ public static class TalkHistory
 
                 // ★ 修改：在主線程（Lock內）準備數據
                 string existingKeywords = MemoryService.GetAllExistingKeywords(pawn);
-                int currentTick = GenTicks.TicksGame;
 
                 RunRetryableTask(
                     taskName: $"STM->MTM for {pawn.LabelShort}",

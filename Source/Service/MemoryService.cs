@@ -84,16 +84,27 @@ public static class MemoryService
         }
     }
 
-    // ★ 修改：新增參數 existingKeywords 和 currentTick，移除內部的獲取邏輯
+    // ★ 修改：請確保這裡的最後一個參數名稱是 fallbackTick，而不是 currentTick
     /// <summary>
-    /// 將短期對話歷史(30條=15組)總結為多條中期記憶(15條)
+    /// 將短期對話歷史(30條=15組)總結為多條中期記憶(15條)(繼承短期記憶時間)
     /// </summary>
-    public static async Task<List<MemoryRecord>> SummarizeToMediumAsync(List<TalkMessageEntry> messages, Pawn pawn, string existingKeywords, int currentTick)
+    public static async Task<List<MemoryRecord>> SummarizeToMediumAsync(List<TalkMessageEntry> messages, Pawn pawn, string existingKeywords, int fallbackTick)
     {
         if (messages.NullOrEmpty()) return [];
 
-        // 移除：string existingKeywords = GetAllExistingKeywords(pawn); (改由參數傳入)
         string conversationText = FormatConversation(messages);
+
+        // ★ 新增：提取每一組對話的時間戳
+        // 假設 messages 是 [User, AI, User, AI...] 的順序
+        // 我們取 User (發起話題者) 的時間作為該段記憶的時間
+        var conversationTicks = new List<int>();
+        for (int i = 0; i < messages.Count; i++)
+        {
+            if (messages[i].Role == Role.User)
+            {
+                conversationTicks.Add(messages[i].Tick);
+            }
+        }
 
         string prompt =
             $$"""
@@ -132,23 +143,37 @@ public static class MemoryService
 
         try
         {
-            // ★ 修改：使用新的建構函數，傳入 currentTick
-            var request = new TalkRequest(prompt, pawn, currentTick);
+            // ★ 修改：使用新的建構函數，傳入 fallbackTick
+            var request = new TalkRequest(prompt, pawn, fallbackTick);
             // ★ 修改：呼叫自己的 QueryMemory
             var result = await QueryMemory<MemoryListDto>(request);
 
             if (result?.Memories == null) return [];
 
             // ★ 修改：增加 Where(m => m != null) 過濾，並處理 Summary 為 null 的情況
+            // ★ 修改：按索引對應時間
+            // 因為 Prompt 要求 "為每組生成記錄"，理想情況下 LLM 回傳的列表長度會等於 conversationTicks 的長度
+            // 若 LLM 合併了某些對話，我們依序使用時間；若 LLM 產生更多，則後面的使用最後一個已知時間或 fallback
             return result.Memories
                 .Where(m => m != null)
-                .Select(m => new MemoryRecord
+                .Select((m, index) =>
                 {
-                    Summary = m.Summary ?? "...", // 防止 Summary 為 null
-                    Keywords = m.Keywords ?? [],  // 防止 Keywords 為 null
-                    Importance = Mathf.Clamp(m.Importance, 1, 5),
-                    AccessCount = 0,
-                    CreatedTick = currentTick // 使用傳入的 Tick，避免後台存取 GenTicks
+                    // 嘗試獲取對應的 Tick，如果索引超出範圍（LLM 產生了額外記憶），則使用最後一個對話的時間，或是 fallbackTick
+                    int tick = index < conversationTicks.Count
+                        ? conversationTicks[index]
+                        : (conversationTicks.Any() ? conversationTicks.Last() : fallbackTick);
+
+                    // 如果從舊存檔讀取，Tick 可能是 0，這時使用 fallbackTick (當前時間)
+                    if (tick <= 0) tick = fallbackTick;
+
+                    return new MemoryRecord
+                    {
+                        Summary = m.Summary ?? "...", // 防止 Summary 為 null
+                        Keywords = m.Keywords ?? [],  // 防止 Keywords 為 null
+                        Importance = Mathf.Clamp(m.Importance, 1, 5),
+                        AccessCount = 0,
+                        CreatedTick = tick
+                    };
                 }).ToList();
         }
         catch (Exception ex)
@@ -162,13 +187,22 @@ public static class MemoryService
 
     // ★ 修改：新增參數 currentTick
     /// <summary>
-    /// 將大量中期記憶合併為數條長期記憶
+    /// 將大量中期記憶合併為數條長期記憶 (使用中期記憶的平均時間)
     /// </summary>
     public static async Task<List<MemoryRecord>> ConsolidateToLongAsync(List<MemoryRecord> memories, Pawn pawn, int currentTick)
     {
         if (memories.NullOrEmpty()) return [];
 
         string memoryText = FormatMemories(memories);
+
+        // ★ 新增：計算這批中期記憶的平均時間
+        // 如果記憶列表有效且有時間數據，則計算平均值；否則使用 currentTick
+        int averageTick = currentTick;
+        if (memories.Any(m => m.CreatedTick > 0))
+        {
+            double avg = memories.Where(m => m.CreatedTick > 0).Average(m => m.CreatedTick);
+            averageTick = (int)avg;
+        }
 
         string prompt =
             $$"""
@@ -215,7 +249,7 @@ public static class MemoryService
                     Keywords = m.Keywords ?? [],
                     Importance = Mathf.Clamp(m.Importance, 1, 5),
                     AccessCount = 0,
-                    CreatedTick = currentTick // 使用傳入的 Tick
+                    CreatedTick = averageTick // ★ 修改：使用計算出的平均時間
                 }).ToList();
         }
         catch (Exception ex)
