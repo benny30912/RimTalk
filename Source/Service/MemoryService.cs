@@ -327,37 +327,79 @@ public static class MemoryService
         float weightImportance = Settings.Get().MemoryImportanceWeight;
         const float weightAccess = 0.5f;     // 依照您的要求固定為 0.5 (微擾)
 
+        // ★ 定義標準長度 (Prompt 要求產生 3-5 個，我們以 5 作為標準化基底)
+        const float standardLength = 5.0f;
+
+        // 預先計算所有記憶中，每個關鍵詞出現的次數
+        var keywordCounts = new Dictionary<string, int>();
+        foreach (var m in allMemories)
+        {
+            foreach (var k in m.Keywords)
+            {
+                if (!keywordCounts.ContainsKey(k)) keywordCounts[k] = 0;
+                keywordCounts[k]++;
+            }
+        }
+        int totalDocs = allMemories.Count;
+
         var scoredMemories = new List<ScoredMemory>();
 
         foreach (var mem in allMemories)
         {
-            // 1. 計算匹配數
-            int matchCount = mem.Keywords?.Count(k => contextLower.Contains(k.ToLowerInvariant())) ?? 0;
-
             // ★ 規則：無論如何至少要命中一個關鍵字
-            if (matchCount == 0) continue;
+            if ((mem.Keywords?.Count(k => contextLower.Contains(k.ToLowerInvariant())) ?? 0) == 0) continue;
 
-            // 2. 計算分數
-            // 公式：(重要性 * W_imp) + (關鍵字數 * W_key) - (提及次數 * 0.5)
-            float score = (mem.Importance * weightImportance) +
-                          (matchCount * weightKeyword) -
-                          (mem.AccessCount * weightAccess);
+            // ★ 新增：計算修正係數
+            // 如果關鍵詞少於 5 個，每個命中的權重會放大
+            // 例如只有 3 個關鍵詞，每個命中的價值是 5/3 = 1.66 倍
+            int totalKeywords = mem.Keywords?.Count ?? 1;
+            // 防呆：避免 totalKeywords 為 0 (雖然不應發生)
+            if (totalKeywords < 1) totalKeywords = 1;
+
+            float lengthMultiplier = standardLength / totalKeywords;
+
+            // 1. 計算分數，新公式：(重要性 * W_imp) - (提及次數 * 0.5)  + Sum(關鍵字稀有分 * 修正係數 * W_key)
+            float score = (mem.Importance * weightImportance) - (mem.AccessCount * weightAccess);
+
+            foreach (var k in mem.Keywords)
+            {
+                if (contextLower.Contains(k))
+                {
+                    // 稀有詞加分，常見詞(如出現超過一半)降分
+                    float rarity = (float)Math.Log((double)totalDocs / (keywordCounts[k] + 1));
+                    // 將 rarity 乘入分數
+                    score += rarity * lengthMultiplier * weightKeyword;
+                }
+            }
 
             scoredMemories.Add(new ScoredMemory { Memory = mem, Score = score });
         }
 
-        // 3. 排序與選取
-        var relevantMemories = scoredMemories
-            .OrderByDescending(x => x.Score) // 分數高的優先
-            .ThenBy(x => x.Memory.AccessCount) // 同分時，選講過最少次的 (再次確保新鮮度)
-            .Take(memoryLimit)
-            .Select(x => x.Memory)
-            .ToList();
+        // 2. 排序，分數高的優先
+        var sortedMemories = scoredMemories.OrderByDescending(x => x.Score)
+                                           .ThenBy(x => x.Memory.AccessCount) // 同分時，選講過最少次的 (再次確保新鮮度)
+                                           .ToList();
 
-        // 更新被選中記憶的 AccessCount
-        foreach (var mem in relevantMemories)
+        var relevantMemories = new List<MemoryRecord>();
+
+        if (sortedMemories.Any())
         {
-            mem.AccessCount++;
+            // 3. 找出當前環境下的「天花板」
+            float maxScore = sortedMemories.First().Score;
+            // 4. 動態閾值：只允許分數達到最高分 50% 的記憶進入
+            float dynamicThreshold = maxScore * 0.5f;
+            //選取
+            relevantMemories = sortedMemories
+                .Where(x => x.Score >= dynamicThreshold)
+                .Take(memoryLimit)
+                .Select(x => x.Memory)
+                .ToList();
+
+            // 更新被選中記憶的 AccessCount
+            foreach (var mem in relevantMemories)
+            {
+                mem.AccessCount++;
+            }
         }
 
         // 檢索常識：計算匹配數 -> 優先取匹配度高的
