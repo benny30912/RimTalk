@@ -104,19 +104,10 @@ public class Dialog_MemoryBrowser : Window
         Widgets.DrawMenuSection(rect);
         Rect viewRect = rect.ContractedBy(10f);
 
-        // 簡單估算高度
-        int itemCount = _currentTab switch
-        {
-            MemoryTab.ShortTerm => history.Messages?.Count ?? 0,
-            MemoryTab.MediumTerm => history.MediumTermMemories?.Count ?? 0,
-            MemoryTab.LongTerm => history.LongTermMemories?.Count ?? 0,
-            _ => 0
-        };
-
-        // 為編輯模式預留額外高度
-        float itemBaseHeight = _currentTab == MemoryTab.ShortTerm ? 100f : 150f;
-        float editHeightBuffer = _editingItem != null ? 300f : 0f; // 增加 Buffer
-        float virtualHeight = Mathf.Max(viewRect.height, itemCount * itemBaseHeight + 200f + editHeightBuffer);
+        // ★ 修改：使用精確計算的高度，而不是估算
+        // 加上一些緩衝區 (Buffer) 以防萬一
+        float contentHeight = CalculateTotalHeight(history);
+        float virtualHeight = Mathf.Max(viewRect.height, contentHeight + 50f);
 
         Rect scrollRect = new Rect(0, 0, viewRect.width - 16f, virtualHeight);
 
@@ -154,10 +145,8 @@ public class Dialog_MemoryBrowser : Window
         {
             var msg = messages[i];
 
-            // 編輯模式 (ShortTerm 只簡單支援刪除，或者您可以添加編輯文本功能)
-            // 這裡為了保持簡單，只做刪除按鈕
-
-            string displayText = msg.Text;
+            // ★ 修改：呼叫共用方法
+            string displayText = GetDisplayText(msg);
             string roleLabel = msg.Role == Role.User ? "Context" : "Dialogue";
 
             // ★ 修改：處理顯示文字，使其與 MemoryService 邏輯一致
@@ -183,6 +172,7 @@ public class Dialog_MemoryBrowser : Window
                 }
             }
 
+            // 計算高度 (這裡必須跟 CalculateTotalHeight 的邏輯保持一致)
             float textHeight = Text.CalcHeight(displayText, listing.ColumnWidth);
             float totalHeight = textHeight + 28f;
 
@@ -310,5 +300,69 @@ public class Dialog_MemoryBrowser : Window
 
             listing.Gap(5f);
         }
+    }
+
+    // 新增：統一處理文本提取，避免重複邏輯
+    private string GetDisplayText(TalkMessageEntry msg)
+    {
+        if (msg.Role == Role.User)
+        {
+            string extracted = PromptService.ExtractContextFromPrompt(msg.Text);
+            return string.IsNullOrWhiteSpace(extracted) ? "(No context)" : extracted.Trim();
+        }
+        else
+        {
+            try
+            {
+                // 簡單緩存或直接解析，考慮到只有30條，直接解析效能尚可
+                // 如果想要極致效能，可以在 TalkMessageEntry 裡加個緩存欄位
+                var responses = JsonUtil.DeserializeFromJson<List<TalkResponse>>(msg.Text);
+                if (responses != null && responses.Any())
+                {
+                    return string.Join("\n", responses.Select(r => $"{r.Name}: {r.Text}"));
+                }
+            }
+            catch { }
+            return msg.Text; // 解析失敗則顯示原始文本
+        }
+    }
+
+    private float CalculateTotalHeight(PawnMessageHistoryRecord history)
+    {
+        if (history == null) return 0f;
+        float totalHeight = 0f;
+        float width = InitialSize.x - 36f; // 減去邊距和捲軸寬度
+
+        if (_currentTab == MemoryTab.ShortTerm)
+        {
+            if (history.Messages == null) return 0f;
+            foreach (var msg in history.Messages)
+            {
+                string text = GetDisplayText(msg);
+                float textHeight = Text.CalcHeight(text, width);
+                totalHeight += textHeight + 28f + 5f; // Header(28) + Gap(5)
+            }
+        }
+        else // Medium & Long Term
+        {
+            var list = _currentTab == MemoryTab.MediumTerm ? history.MediumTermMemories : history.LongTermMemories;
+            if (list == null) return 0f;
+
+            foreach (var mem in list)
+            {
+                // 如果正在編輯這個項目，高度會不同
+                if (_editingItem == mem)
+                {
+                    totalHeight += 280f + 5f; // EditHeight(280) + Gap(5)
+                }
+                else
+                {
+                    float summaryHeight = Text.CalcHeight(mem.Summary, width);
+                    totalHeight += summaryHeight + 50f + 5f; // Header+Footer(50) + Gap(5)
+                }
+            }
+        }
+
+        return totalHeight;
     }
 }
