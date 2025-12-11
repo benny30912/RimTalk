@@ -305,18 +305,21 @@ public static class MemoryService
         if (string.IsNullOrWhiteSpace(context)) return ([], []);
 
         var comp = Find.World.GetComponent<RimTalkWorldComponent>();
-        var history = comp?.SavedTalkHistories.FirstOrDefault(x => x.Pawn == pawn);
-
         var allMemories = new List<MemoryRecord>();
-        if (history != null)
-        {
-            // ★ 安全地加入列表，防止 NullReferenceException
-            if (history.MediumTermMemories != null) allMemories.AddRange(history.MediumTermMemories);
-            if (history.LongTermMemories != null) allMemories.AddRange(history.LongTermMemories);
-        }
 
-        // 優化關鍵字匹配邏輯 (Case-insensitive)
-        var contextLower = context.ToLowerInvariant();
+        // ★ 線程安全：讀取列表時必須加鎖
+        if (comp != null)
+        {
+            lock (comp.SavedTalkHistories)
+            {
+                var history = comp.SavedTalkHistories.FirstOrDefault(x => x.Pawn == pawn);
+                if (history != null)
+                {
+                    if (history.MediumTermMemories != null) allMemories.AddRange(history.MediumTermMemories);
+                    if (history.LongTermMemories != null) allMemories.AddRange(history.LongTermMemories);
+                }
+            }
+        }
 
         // 設定不同的限制
         int memoryLimit = 5;   // 個人記憶維持 5 條 (避免搶戲)
@@ -331,7 +334,9 @@ public static class MemoryService
         const float standardLength = 5.0f;
 
         // 預先計算所有記憶中，每個關鍵詞出現的次數
-        var keywordCounts = new Dictionary<string, int>();
+        // 使用 StringComparer.OrdinalIgnoreCase 忽略大小寫
+        var keywordCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        int totalDocs = allMemories.Count;
         foreach (var m in allMemories)
         {
             foreach (var k in m.Keywords)
@@ -340,52 +345,62 @@ public static class MemoryService
                 keywordCounts[k]++;
             }
         }
-        int totalDocs = allMemories.Count;
 
         var scoredMemories = new List<ScoredMemory>();
 
         foreach (var mem in allMemories)
         {
+            if (mem.Keywords == null) continue;
+
+            float rarityScoreSum = 0f;
+            int matchCount = 0;
+
+            foreach (var k in mem.Keywords)
+            {
+                // ★ 效能優化：使用 IndexOf 替代 ToLower + Contains
+                // 這避免了在主執行緒產生大量字串垃圾 (GC Alloc)
+                if (context.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    matchCount++;
+                    // 查表獲取詞頻，計算稀有度
+                    int count = keywordCounts.TryGetValue(k, out int c) ? c : 0;
+                    // IDF 公式：log(總文件數 / (包含該詞的文件數 + 1))
+                    // 常見詞分數低，稀有詞分數高
+                    float rarity = (float)Math.Log((double)totalDocs / (count + 1));
+                    rarityScoreSum += rarity;
+                }
+            }
+
             // ★ 規則：無論如何至少要命中一個關鍵字
-            if ((mem.Keywords?.Count(k => contextLower.Contains(k.ToLowerInvariant())) ?? 0) == 0) continue;
+            if (matchCount == 0) continue;
 
             // ★ 新增：計算修正係數
             // 如果關鍵詞少於 5 個，每個命中的權重會放大
             // 例如只有 3 個關鍵詞，每個命中的價值是 5/3 = 1.66 倍
-            int totalKeywords = mem.Keywords?.Count ?? 1;
+            int totalKeywords = mem.Keywords.Count;
             // 防呆：避免 totalKeywords 為 0 (雖然不應發生)
             if (totalKeywords < 1) totalKeywords = 1;
 
             float lengthMultiplier = standardLength / totalKeywords;
 
-            // 1. 計算分數，新公式：(重要性 * W_imp) - (提及次數 * 0.5)  + Sum(關鍵字稀有分 * 修正係數 * W_key)
-            float score = (mem.Importance * weightImportance) - (mem.AccessCount * weightAccess);
-
-            foreach (var k in mem.Keywords)
-            {
-                if (contextLower.Contains(k))
-                {
-                    // 稀有詞加分，常見詞(如出現超過一半)降分
-                    float rarity = (float)Math.Log((double)totalDocs / (keywordCounts[k] + 1));
-                    // 將 rarity 乘入分數
-                    score += rarity * lengthMultiplier * weightKeyword;
-                }
-            }
+            // 1. 計算分數，新公式：(關鍵字稀有分總和 * 修正係數 * W_key) + (重要性 * W_imp) - (提及次數 * 0.5)
+            float score = (rarityScoreSum * lengthMultiplier * weightKeyword) + (mem.Importance * weightImportance) - (mem.AccessCount * weightAccess);
 
             scoredMemories.Add(new ScoredMemory { Memory = mem, Score = score });
         }
 
-        // 2. 排序，分數高的優先
-        var sortedMemories = scoredMemories.OrderByDescending(x => x.Score)
-                                           .ThenBy(x => x.Memory.AccessCount) // 同分時，選講過最少次的 (再次確保新鮮度)
-                                           .ToList();
-
         var relevantMemories = new List<MemoryRecord>();
-
-        if (sortedMemories.Any())
+        
+        if (scoredMemories.Any())
         {
+            // 2. 排序，分數高的優先
+            var sortedMemories = scoredMemories
+                .OrderByDescending(x => x.Score)
+                .ThenBy(x => x.Memory.AccessCount) // 同分時優先選存取少的
+                .ToList();
+
             // 3. 找出當前環境下的「天花板」
-            float maxScore = sortedMemories.First().Score;
+            float maxScore = sortedMemories[0].Score;
             // 4. 動態閾值：只允許分數達到最高分 50% 的記憶進入
             float dynamicThreshold = maxScore * 0.5f;
             //選取
@@ -403,14 +418,28 @@ public static class MemoryService
         }
 
         // 檢索常識：計算匹配數 -> 優先取匹配度高的
+        // (優化版：同樣使用 IndexOf 避免 GC)
         var allKnowledge = comp?.CommonKnowledgeStore ?? [];
-        var relevantKnowledge = allKnowledge
-            .Select(k => new
+        var scoredKnowledge = new List<(CommonKnowledgeData Knowledge, int MatchCount)>();
+
+        foreach (var k in allKnowledge)
+        {
+            if (k.Keywords == null) continue;
+            int count = 0;
+            foreach (var key in k.Keywords)
             {
-                Knowledge = k,
-                MatchCount = k.Keywords?.Count(key => contextLower.Contains(key.ToLowerInvariant())) ?? 0
-            })
-            .Where(x => x.MatchCount > 0)
+                if (context.IndexOf(key, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    count++;
+                }
+            }
+            if (count > 0)
+            {
+                scoredKnowledge.Add((k, count));
+            }
+        }
+
+        var relevantKnowledge = scoredKnowledge
             .OrderByDescending(x => x.MatchCount) // 優先顯示匹配關鍵字最多的常識
             .Take(knowledgeLimit)
             .Select(x => x.Knowledge)
