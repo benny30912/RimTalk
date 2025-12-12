@@ -26,17 +26,17 @@ public static class CoreTagMapper
         { "Agony", ["疼痛"] },
         { "Infection", ["生病", "肮脏"] },
         { "Flu", ["生病"] },
-        { "Plague", ["生病", "危险"] },
+        { "Plague", ["生病"] },
         { "Malaria", ["生病"] },
         { "SleepingSickness", ["生病", "虚弱"] },
-        { "FoodPoisoning", ["不适", "恶心"] },
+        { "FoodPoisoning", ["不适", "恶心", "生病"] },
         { "Disease", ["生病"] },
         { "Cancer", ["生病", "绝望"] },
         { "Trauma", ["受伤", "疼痛"] },
         { "Wound", ["受伤", "疼痛"] },
         { "Missing", ["残疾", "受伤"] },
         { "Amputated", ["残疾", "受伤"] },
-        { "Burn", ["受伤", "火灾", "疼痛"] },
+        { "Burn", ["受伤", "火焰", "疼痛"] },
         { "Frostbite", ["受伤", "寒冷", "疼痛"] },
         { "Gunshot", ["受伤", "战斗", "疼痛"] },
         { "Cut", ["受伤", "疼痛"] },
@@ -48,48 +48,48 @@ public static class CoreTagMapper
         { "Shredded", ["受伤", "疼痛", "战斗"] },
         { "Bruise", ["受伤", "疼痛"] },
         { "SurgicalCut", ["受伤", "手术", "疼痛"] },
-        { "ExecutionCut", ["处决", "死亡"] },
-        { "TraumaSavant", ["觉醒", "残疾", "异种"] },
+        { "ExecutionCut", ["死亡", "攻击", "仪式"] },
+        { "TraumaSavant", ["觉醒", "残疾", "严重"] },
         { "Heatstroke", ["高温", "不适"] },
-        { "Hypothermia", ["生病", "寒冷", "危险"] },
-        { "Toxic", ["中毒", "危险"] },
+        { "Hypothermia", ["生病", "寒冷"] },
+        { "Toxic", ["中毒"] },
         { "Poison", ["中毒"] },
         { "Hungry", ["饥饿"] },
         { "Starving", ["饥饿", "生存"] },
         { "Malnutrition", ["饥饿", "生存", "不适"] },
-        { "Addiction", ["成瘾", "痛苦"] },
+        { "Addiction", ["成瘾"] },
         { "Withdrawal", ["成瘾", "疼痛", "精神崩溃"] }, 
         { "High", ["成瘾"] },
         { "Inebriated", ["中毒"] },
         { "Drunk", ["中毒"] },
         { "Hangover", ["疼痛", "不适"] },
         { "Pregnant", ["家人", "不适"] },
-        { "Labor", ["健康", "疼痛", "家人", "不适"] },
-        { "Miscarriage", ["死亡", "悲伤", "家人", "事故", "离别"] },
+        { "Labor", ["疼痛", "家人", "不适"] },
+        { "Miscarriage", ["死亡", "悲伤", "家人", "事故"] },
         
         // Detailed Hediffs
         { "Anesthetic", ["昏迷", "医护", "治疗", "不适"] },
-        { "BloodLoss", ["流血", "虚弱", "危险", "不适"] },
-        { "Bleeding", ["流血", "受伤", "危险", "不适"] },
+        { "BloodLoss", ["流血", "虚弱", "不适"] },
+        { "Bleeding", ["流血", "受伤", "不适"] },
         { "BrainShock", ["精神崩溃", "受伤", "不适"] },
         { "CatatonicBreakdown", ["精神崩溃", "昏迷", "无助", "不适"] },
         { "CryptosleepSickness", ["生病", "恶心", "不适"] },
         { "DrugOverdose", ["成瘾", "中毒", "危险", "不适"] },
-        { "HeartAttack", ["生病", "危险", "疼痛", "不适"] },
+        { "HeartAttack", ["生病", "危险", "疼痛"] },
         { "PsychicComa", ["灵能", "昏迷", "无助", "不适"] },
         { "PsychicShock", ["灵能", "精神崩溃", "不适"] },
         { "PsychicInvisibility", ["灵能", "超自然"] },
         { "ResurrectionSickness", ["虚弱", "不适"] },
-        { "ToxicBuildup", ["中毒", "危险", "不适"] },
+        { "ToxicBuildup", ["中毒", "不适"] },
         
         // Infections & Parasites
-        { "GutWorms", ["生病", "恶心", "饥饿", "不适"] },
-        { "MuscleParasites", ["生病", "虚弱", "疼痛", "不适"] },
+        { "GutWorms", ["生病", "恶心", "饥饿"] },
+        { "MuscleParasites", ["生病", "虚弱", "疼痛"] },
         { "FibrousMechanites", ["生病", "疼痛", "科技"] },
         { "SensoryMechanites", ["生病", "疼痛", "科技"] },
-        { "WoundInfection", ["生病", "疼痛", "危险"] },
-        { "Scaria", ["生病", "愤怒", "变异", "危险"] },
-        { "LungRotExposure", ["危险", "不适"] },
+        { "WoundInfection", ["生病", "疼痛", "肮脏"] },
+        { "Scaria", ["生病", "愤怒"] },
+        { "LungRotExposure", ["生病", "不适"] },
         { "Cirrhosis", ["生病", "成瘾", "不适"] },
         { "ChemicalDamage", ["生病", "中毒", "残疾"] },
         
@@ -103,64 +103,52 @@ public static class CoreTagMapper
         { "Dementia", ["生病", "残疾", "不适"] },
         { "Frail", ["虚弱", "不适"] },
         { "HearingLoss", ["残疾", "不适"] },
-        { "HeartArteryBlockage", ["生病", "危险", "不适"] },
-        { "OrganDecay", ["生病", "危险", "不适"] },
+        { "HeartArteryBlockage", ["生病", "不适"] },
+        { "OrganDecay", ["生病", "不适"] },
         
         // Mental States (DefNames)
         { "Berserk", ["精神崩溃", "攻击", "愤怒"] },
         { "Binging", ["饥饿", "成瘾"] },
-        { "Manhunter", ["精神崩溃", "攻击", "变异"] },
-        { "Panic", ["精神崩溃", "恐惧", "逃跑"] },
-        { "Flee", ["恐惧", "逃跑"] },
+        { "Manhunter", ["精神崩溃", "攻击"] },
+        { "Panic", ["精神崩溃", "恐惧"] },
+        { "Flee", ["恐惧"] },
         { "GiveUp", ["精神崩溃", "绝望"] },
         { "Tantrum", ["精神崩溃", "愤怒", "冲突"] },
         { "Sadistic", ["精神崩溃", "折磨"] },
         { "CorpseObsession", ["精神崩溃", "尸体"] },
-        { "FireStarting", ["精神崩溃", "纵火", "危险"] },
-        { "Jailbreaker", ["精神崩溃", "越狱", "冲突"] },
-        { "Slaughterer", ["精神崩溃", "攻击", "屠宰"] },
+        { "FireStarting", ["精神崩溃", "火焰", "危险"] },
+        { "Jailbreaker", ["精神崩溃", "冲突"] },
+        { "Slaughterer", ["精神崩溃", "攻击"] },
         { "Insulting", ["精神崩溃", "羞辱", "争吵"] },
         { "Confused", ["精神崩溃", "无助"] },
         { "Wander", ["精神崩溃"] },
         { "Sad", ["悲伤"] },
-        { "Pyromania", ["纵火", "危险"] },
+        { "Pyromania", ["火焰", "危险"] },
         
         // Relationships / Opinions / Bonds (DefNames)
-        { "Bond", ["关系"] },
-        { "PsychicBond", ["心灵纽带", "爱人", "关系"] },
-        { "Lover", ["爱人", "关系"] },
-        { "Spouse", ["爱人", "关系", "家人"] },
-        { "Fiance", ["爱人", "关系"] },
-        { "Parent", ["家人", "关系"] },
-        { "Child", ["家人", "关系"] },
-        { "Sibling", ["家人", "关系"] },
-        { "RomanceAttempt", ["浪漫", "爱人"] },
-        { "MarriageProposal", ["求婚", "爱人"] },
+        { "Bond", ["羁绊"] },
+        { "PsychicBond", ["爱人", "羁绊"] },
+        { "Lover", ["爱人", "羁绊"] },
+        { "Spouse", ["爱人", "羁绊", "家人", "婚姻"] },
+        { "Fiance", ["爱人", "羁绊", "婚姻"] },
+        { "Parent", ["家人", "羁绊"] },
+        { "Child", ["家人", "羁绊"] },
+        { "Sibling", ["家人", "羁绊"] },
+        { "RomanceAttempt", ["交谈", "浪漫", "爱人"] },
+        { "MarriageProposal", ["交谈", "婚姻", "浪漫", "爱人"] },
         { "TameAttempt", ["驯兽"] },
         { "TrainAttempt", ["驯兽", "学习"] },
 
         // Tech / Misc (DefNames)
         // Weather & Conditions (English DefNames)
-        { "Eclipse", ["黑暗", "天灾"] },
-        { "SolarFlare", ["电力", "天灾"] },
+        { "Eclipse", ["黑暗", "灾难"] },
+        { "SolarFlare", ["电力", "灾难"] },
         { "Aurora", ["开心", "光亮", "平静"] },
-        { "DryThunderstorm", ["天灾", "危险", "火灾"] },
-        { "RainyThunderstorm", ["雨", "危险"] },
-        { "FoggyRain", ["雨", "迷雾"] },
-        { "SnowHard", ["雪", "寒冷"] },
-        { "SnowGentle", ["雪", "寒冷"] },
-        { "Clear", ["光亮", "舒适"] }, 
-        { "Fog", ["迷雾"] },
-        { "Rain", ["雨"] },
-        
-        // Seasons (DefNames or Enum Strings)
-        { "Spring", ["春天"] },
-        { "Summer", ["高温", "夏天"] },
-        { "Autumn", ["秋天"] },
-        { "Fall", ["秋天"] },
-        { "Winter", ["寒冷", "冬天"] },
-        { "PermanentSummer", ["高温", "夏天"] },
-        { "PermanentWinter", ["寒冷", "冬天"] },
+        { "DryThunderstorm", ["灾难", "危险", "火焰"] },
+        { "RainyThunderstorm", ["不适"] },
+        { "SnowHard", ["寒冷"] },
+        { "SnowGentle", ["寒冷"] },
+        { "Clear", ["光亮", "舒适"] },
 
         // ==========================================
         // Section B: Chinese Keywords (Localized Text Analysis)
@@ -169,25 +157,24 @@ public static class CoreTagMapper
 
         // Health & Disease (Localized)
         { "流感", ["生病"] },
-        { "瘟疫", ["生病", "危险"] },
+        { "瘟疫", ["生病"] },
         { "疟疾", ["生病"] },
         { "感染", ["生病", "肮脏"] }, // Wound infection
-        { "食物中毒", ["生病", "恶心"] },
-        { "中暑", ["生病", "高温", "危险"] },
-        { "低温症", ["生病", "寒冷", "危险"] },
-        { "中毒", ["危险"] },
-        { "成瘾", ["痛苦"] },
+        { "食物中毒", ["生病", "恶心", "不适"] },
+        { "中暑", ["生病", "高温"] },
+        { "低温症", ["生病", "寒冷"] },
+        { "中毒", ["生病", "中毒"] },
         { "戒断", ["成瘾", "疼痛", "精神崩溃"] },
         { "麻醉", ["昏迷", "医护", "治疗"] },
-        { "失血", ["流血", "虚弱", "危险"] },
+        { "失血", ["流血", "虚弱"] },
         { "休克", ["昏迷", "危险"] },
         { "昏迷", ["无助"] },
         { "骨折", ["受伤", "疼痛"] },
-        { "烧伤", ["受伤", "火灾", "疼痛"] },
+        { "烧伤", ["受伤", "火焰", "疼痛"] },
         { "冻伤", ["受伤", "寒冷", "疼痛"] },
         { "失明", ["残疾", "黑暗"] },
         { "耳聋", ["残疾", "不适"] },
-        { "癌症", ["生病", "绝望", "危险"] },
+        { "癌症", ["生病", "绝望"] },
         { "哮喘", ["生病", "不适"] },
         { "痴呆", ["生病", "残疾", "不适"] },
         { "体弱", ["虚弱"] },
@@ -202,33 +189,33 @@ public static class CoreTagMapper
         { "惊恐", ["恐惧"] },
         
         // Social Events (Localized)
-        { "深谈", ["互动"] },
-        { "深入交流", ["深谈", "互动"] },
-        { "羞辱", ["愤怒"] },
-        { "侮辱", ["羞辱", "愤怒"] },
-        { "怠慢", ["羞辱", "愤怒"] },
-        { "美言", ["互动", "开心"] },
-        { "调情", ["爱人", "浪漫"] },
-        { "求爱", ["浪漫", "爱人"] },
-        { "求婚", ["爱人"] },
-        { "离婚", ["悲伤", "关系"] },
+        { "闲聊", ["交谈"] },
+        { "深谈", ["交谈", "羁绊"] },
+        { "深入交流", ["交谈", "羁绊"] },
+        { "羞辱", ["交谈", "愤怒"] },
+        { "侮辱", ["交谈", "羞辱", "愤怒"] },
+        { "怠慢", ["交谈", "羞辱", "愤怒"] },
+        { "美言", ["交谈", "开心"] },
+        { "调情", ["交谈", "爱人", "浪漫"] },
+        { "求爱", ["交谈", "爱人", "浪漫"] },
+        { "求婚", ["交谈", "婚姻", "浪漫", "爱人"] },
+        { "离婚", ["婚姻", "分手", "悲伤"] },
         { "分手", ["悲伤"] },
         { "感情破裂", ["分手", "悲伤"] },
-        { "被拒绝", ["尴尬"] }, // Rebuffed
         { "背叛", ["悲伤", "愤怒"] },
         // { "招募", ["互动"] }, // Specific act, implied
         // { "劝说", ["互动"] }, // Specific act, implied
-        { "尝试交流", ["劝说"] },
+        { "尝试交流", ["交谈", "劝说"] },
         { "越狱", ["冲突"] },
         { "鼓动越狱", ["背叛"] },
         { "驯服", ["驯兽"] },
         { "训练", ["驯兽", "学习"] },
         { "放生", ["善意"] },
         { "亲昵", ["宠物", "善意"] },
-        { "婚礼", ["仪式", "开心"] },
+        { "婚礼", ["婚姻", "仪式", "幸福"] },
         { "聚会", ["开心"] },
         { "派对", ["聚会", "开心"] },
-        { "葬礼", ["悲伤"] },
+        { "葬礼", ["死亡", "仪式", "悲伤"] },
         { "演说", ["仪式"] },
         { "节日", ["开心"] },
         { "生日", ["成长"] },
@@ -241,14 +228,15 @@ public static class CoreTagMapper
         { "掠夺", ["背叛", "敌人"] },
         { "俘虏", ["囚犯", "战斗"] },
         { "拘捕", ["囚犯", "冲突"] },
-        { "释放", ["放生"] },
         { "押送", ["囚犯"] },
         { "剪毛", ["驯兽", "生产"] },
         { "割除", ["种植", "生产"] },
-        { "处决", ["死亡", "恐惧"] },
-        { "骇入", ["科技", "危险"] },
+        { "处决", ["死亡", "攻击", "仪式"] },
+        { "骇入", ["科技", "劳动"] },
         { "粉饰", ["建造", "艺术"] },
         { "打磨", ["建造"] },
+        { "塌顶", ["事故"] }, // Roof collapsed
+        { "开采失败", ["事故", "采矿"] }, // Mining fail
         { "调查", ["科研", "学习"] }, // Study/Analyze
         { "分析", ["科研", "学习"] },
 
@@ -268,15 +256,14 @@ public static class CoreTagMapper
 
         // Major Events (Letters - Tooltip Text)
         { "袭击", ["战斗", "危险"] },
-        { "猎杀", ["袭击", "战斗", "危险", "动物"] }, // Manhunter
+        { "猎杀", ["袭击", "战斗", "危险"] }, // Manhunter
         { "围攻", ["战斗", "危险"] },
         { "坠落", ["事故", "危险"] }, // Drop pods / Crashed ship
         { "飞船", ["科技", "危险"] }, // Ship part
         { "虫害", ["虫族", "灾难", "危险"] },
-        { "甚至", ["危险"] }, // Often appears in "Situation is dangerous, even..." (Weak, remove if noisy)
-        { "请求", ["请求", "互动"] }, // Quest request
+        { "请求", ["互动"] }, // Quest request
         { "任务", ["任务", "互动"] },
-        { "商船", ["交易", "互动"] },
+        { "商船", ["交易", "互动", "交谈"] },
         { "过路", ["互动"] }, // Visitors passing
         { "访客", ["互动"] },
         { "旅行邀请", ["任务", "互动"] }, // Quest: Journey Offer
@@ -287,14 +274,14 @@ public static class CoreTagMapper
         { "流浪者加入", ["互动", "招募"] },
         { "逃生舱", ["事故", "获救"] }, // Refugee pod
         { "货舱", ["生产", "开心"] }, // Cargo pod
-        { "短路", ["灾难", "电力", "危险"] },
-        { "电气爆炸", ["灾难", "电力", "危险"] },
+        { "短路", ["事故", "电力"] },
+        { "电气爆炸", ["事故", "电力"] },
         { "间谍", ["背叛", "敌人", "危险"] },
         { "阿尔法海狸", ["灾难", "种植"] },
         { "自行驯服", ["驯兽", "开心"] },
         { "罕见的敲击兽", ["驯兽", "开心", "稀有"] }, // Thrumbo
-        { "索要赎金", ["赎金", "互动"] },
-        { "绑架", ["赎金", "危险", "敌人"] }, // Kidnap -> Ransom potential
+        { "索要赎金", ["互动"] },
+        { "绑架", ["危险", "敌人"] }, // Kidnap -> Ransom potential
         { "发现飞船", ["科技", "希望"] },
         { "远行队相遇", ["互动", "交易"] },
         { "远行队被", ["袭击", "战斗", "危险"] }, // Caravan ambushed
@@ -314,12 +301,11 @@ public static class CoreTagMapper
         { "救助", ["治疗"] }, // Was "治疗" in old code for "rescue/tend"
         // { "治疗", ["治疗"] }, // Self-mapping removed
         // { "手术", ["手术"] }, // Self-mapping removed
-        { "结婚", ["婚礼", "开心", "浪漫"] },
+        { "结婚", ["婚姻", "仪式", "幸福", "浪漫"] },
         { "典礼", ["仪式"] },
-        { "演讲", ["演说"] },
+        { "演讲", ["聚会", "仪式"] },
         // { "精神崩溃", ["精神崩溃"] }, // Self-mapping removed
         { "发狂", ["精神崩溃"] },
-        { "游荡", ["孤独"] },
         { "迷茫", ["无助"] },
         
         // ==========================================
@@ -359,10 +345,10 @@ public static class CoreTagMapper
         // Archive/Letters (Common English words in templates if any)
         { "Quest", ["任务"] },
         { "Mission", ["任务"] },
-        { "Bounty", ["任务", "奖励"] },
+        { "Bounty", ["任务"] },
         { "Decree", ["任务", "荣耀"] }, // Royal Decree
         { "Charity", ["任务", "善意"] }, // Ideology Charity
-        { "Opportunity", ["任务", "机会"] },
+        { "Opportunity", ["任务"] },
         { "Ritual", ["仪式"] },
         { "Conversion", ["仪式", "劝说"] },
 
@@ -380,7 +366,7 @@ public static class CoreTagMapper
         // Quality/Rarity
         { "Legendary", ["稀有", "艺术"] },
         { "Masterwork", ["稀有", "艺术"] },
-        { "Relic", ["稀有", "仪式", "神圣"] },
+        { "Relic", ["稀有", "仪式"] },
         { "Artifact", ["稀有", "科技"] },
 
         // 2. Social Roles (Restored)
@@ -391,19 +377,20 @@ public static class CoreTagMapper
         // 3. Events & Concepts (Restored)
         { "Raid", ["袭击", "战斗", "危险"] },
         { "Ambush", ["袭击", "战斗"] },
-        { "Siege", ["围攻", "战斗", "危险"] },
+        { "Siege", ["战斗", "危险"] },
         { "Infestation", ["虫族", "灾难", "危险"] },
         { "ManhunterPack", ["战斗", "灾难", "危险"] },
         { "Manhunter pack", ["战斗", "灾难", "危险"] },
         { "Mad animal", ["危险", "战斗"] },
         { "Crop Blight", ["灾难", "种植"] },
         { "Blight", ["灾难", "种植"] },
-        { "Miracle", ["治疗", "开心"] },
+        { "Miracle", ["治疗", "幸福"] },
         { "Transport pod crash", ["事故", "获救"] },
         { "Refugee", ["获救", "互动", "善意"] },
         { "Wanderer joins", ["互动", "招募", "善意"] },
         { "Cargo pod", ["生产", "开心"] },
-        { "Short circuit", ["灾难", "电力", "危险"] },
+        { "Roof collapsed", ["事故"] },
+        { "Short circuit", ["事故", "电力"] },
         { "Agent revealed", ["背叛", "敌人", "危险"] },
         { "Beavers", ["灾难", "种植"] },
         { "Self-tame", ["驯兽", "开心"] },
@@ -420,12 +407,12 @@ public static class CoreTagMapper
         { "ReactorReady", ["科技", "希望", "电力"] },
         { "Caravan meeting", ["互动", "交易"] },
         { "Caravan demand", ["袭击", "战斗", "危险"] },
-        { "Speech", ["聚会", "仪式"] },
+        { "Speech", ["聚会", "仪式", "交谈"] },
         { "Festival", ["聚会"] },
         { "Party", ["聚会", "互动", "开心"] },
-        { "Marriage", ["婚礼", "仪式", "开心", "浪漫"] },
-        { "Wedding", ["婚礼", "仪式", "开心", "浪漫"] },
-        { "Funeral", ["葬礼", "仪式", "悲伤"] },
+        { "Marriage", ["婚姻", "仪式", "幸福", "浪漫"] },
+        { "Wedding", ["婚姻", "仪式", "幸福", "浪漫"] },
+        { "Funeral", ["死亡", "仪式", "悲伤"] },
         
         // Life Stages (Growth)
         { "Birthday", ["成长"] },
@@ -438,23 +425,20 @@ public static class CoreTagMapper
         { "Night", ["黑暗"] },
         
         // Chinese Weather Terms (Localized)
-        { "旱天雷", ["天灾", "危险", "火灾"] }, // DryThunderstorm
-        { "暴风雨", ["危险"] },         // RainyThunderstorm
-        { "雾雨", ["迷雾"] },            // FoggyRain
+        { "旱天雷", ["灾难", "危险", "火焰"] }, // DryThunderstorm
+        { "暴风雨", ["不适"] },         // RainyThunderstorm
         { "小雪", ["寒冷"] },            // SnowGentle
         { "大雪", ["寒冷"] },            // SnowHard
         { "晴", ["光亮", "舒适"] },            // Clear
         { "雪", ["寒冷"] },
-        { "雾", ["迷雾"] },
 
         // 5. Relationships (Restored)
         { "Friend", ["朋友"] },
-        { "Rival", ["敌人", "关系"] },
-        { "Enemy", ["敌人", "威胁"] },
+        { "Enemy", ["敌人"] },
         // { "Secret", ["秘密", "关系"] },
 
         // 6. Social Misc (Restored)
-        { "Gossip", ["闲聊"] },
+        { "Gossip", ["交谈"] },
         { "Joy", ["娱乐", "开心"] },
         { "Recreation", ["娱乐", "舒适"] },
         { "Filth", ["肮脏"] },
@@ -462,26 +446,26 @@ public static class CoreTagMapper
         { "Insulted", ["羞辱", "愤怒"] },
 
         // Interactions (English DefNames/Labels)
-        { "Chitchat", ["闲聊"] },
-        { "Deep Talk", ["深谈", "互动"] },
-        { "DeepTalk", ["深谈", "互动"] }, 
-        { "Slight", ["羞辱", "愤怒"] },
-        { "Inhuman", ["异种", "变异", "觉醒"] },
-        { "Insult", ["羞辱", "愤怒"] },
-        { "Kind words", ["互动", "开心"] },
-        { "Romance", ["浪漫", "爱人"] },
-        { "Proposal", ["求婚", "爱人"] },
+        { "Chitchat", ["交谈"] },
+        { "Deep Talk", ["交谈", "羁绊"] },
+        { "DeepTalk", ["交谈", "羁绊"] }, 
+        { "Slight", ["交谈", "羞辱", "愤怒"] },
+        { "Inhuman", ["觉醒"] },
+        { "Insult", ["交谈", "羞辱", "愤怒"] },
+        { "Kind words", ["交谈", "开心"] },
+        { "Romance", ["交谈", "浪漫", "爱人"] },
+        { "Proposal", ["交谈", "婚姻", "浪漫", "爱人"] },
         { "breakup", ["分手", "悲伤"] },
-        { "BuildRapport", ["互动", "劝说"] },
-        { "try to get to know", ["互动", "劝说"] },
-        { "RecruitAttempt", ["招募"] },
-        { "recruit attempt", ["招募"] }, 
-        { "spark jailbreak", ["越狱", "背叛"] },
+        { "BuildRapport", ["交谈", "劝说"] },
+        { "try to get to know", ["交谈", "劝说"] },
+        { "RecruitAttempt", ["招募", "交谈"] },
+        { "recruit attempt", ["招募", "交谈"] }, 
+        { "spark jailbreak", ["背叛"] },
         { "AnimalChat", ["驯兽", "互动"] },
         { "animal chat", ["驯兽", "互动"] },
         { "animal chat", ["驯兽", "互动", "善意"] },
-        { "Nuzzle", ["亲昵", "宠物", "善意"] },
-        { "release to the wild", ["放生", "善意"] },
+        { "Nuzzle", ["宠物", "善意", "开心", "羁绊"] },
+        { "release to the wild", ["善意"] },
 
         // Additional BattleLog
         { "Hit", ["攻击"] },
@@ -494,36 +478,33 @@ public static class CoreTagMapper
         // We will add the Nouns/Adj forms from old file if unique.
         { "Kill", ["攻击", "死亡"] },
         { "Destroy", ["攻击", "破坏"] },
-        { "Ugly", ["丑陋"] },
-        { "Hideous", ["丑陋"] },
-        { "Defend", ["防御", "战斗"] },
-        { "Defense", ["防御", "战斗"] },
+        { "Defend", ["战斗"] },
+        { "Defense", ["战斗"] },
 
         // Mined Thoughts (English Keys only, CN keys handled in Section B)
         { "butchered humanlike", ["恐惧", "尸体", "恶心"] },
         { "butchered up", ["恐惧", "尸体", "恶心"] },
-        { "prisoner sold", ["奴隶"] },
-        { "banished", ["放逐", "离别"] },
-        { "witnessed death", ["目睹", "死亡", "悲伤"] },
-        { "witnessed ally's death", ["目睹", "死亡", "悲伤"] },
-        { "witnessed family", ["目睹", "死亡", "悲伤", "家人"] },
+        // { "banished", ["放逐", "离别"] },
+        { "witnessed death", ["死亡", "悲伤"] },
+        { "witnessed ally's death", ["死亡", "悲伤"] },
+        { "witnessed family", ["死亡", "悲伤", "家人"] },
         { "observed corpse", ["尸体", "恐惧"] },
         { "observed rotting corpse", ["尸体", "恐惧", "恶心"] },
         { "botched my surgery", ["手术", "事故", "受伤"] },
         
-        { "divorced", ["离婚", "悲伤", "关系"] },
+        { "divorced", ["婚姻", "分手", "悲伤"] },
         { "cheated on", ["背叛", "悲伤", "愤怒"] },
-        { "rejected my proposal", ["拒绝", "悲伤"] },
+        { "rejected my proposal", ["婚姻", "拒绝", "悲伤"] },
         { "broke up", ["分手", "悲伤"] },
-        { "rebuffed", ["拒绝", "尴尬"] },
-        { "failed to romance", ["拒绝", "尴尬"] },
+        { "rebuffed", ["拒绝"] },
+        { "failed to romance", ["拒绝"] },
         
-        { "Lovin", ["浪漫", "开心", "亲昵"] },
+        { "Lovin", ["浪漫", "开心"] },
         { "got some lovin'", ["浪漫", "开心"] },
-        { "honeymoon phase", ["浪漫", "开心"] },
-        { "rescued", ["获救", "善意"] },
+        { "honeymoon phase", ["浪漫", "幸福"] },
+        { "rescued", ["获救", "幸福", "善意"] },
         { "defeated", ["胜利", "荣耀", "战斗"] },
-        { "freed from slavery", ["奴隶", "开心"] },
+        { "freed from slavery", ["奴隶", "幸福"] },
         { "catharsis", ["开心", "平静"] },
         { "soaked", ["潮湿", "不适"] },
         { "soaking wet", ["潮湿", "不适"] },
@@ -542,14 +523,14 @@ public static class CoreTagMapper
         { "Sleep", ["舒适"] },
         { "Sow", ["种植", "生产"] },
         { "Harvest", ["种植"] },
-        { "Hunt", ["攻击", "驯兽"] },
+        { "Hunt", ["攻击", "生存"] },
         { "Tame", ["驯兽"] },
         { "Train", ["驯兽", "学习"] },
-        { "TrainAttempt", ["驯兽", "学习"] }, // DefName
-        { "train attempt", ["驯兽", "学习"] }, // Label
-        { "尝试训练", ["驯兽", "学习"] },
+        { "TrainAttempt", ["驯兽", "学习", "交谈"] }, // DefName
+        { "train attempt", ["驯兽", "学习", "交谈"] }, // Label
+        { "尝试训练", ["驯兽", "学习", "交谈"] },
         { "Cook", ["制作", "生存"] },
-        { "Butcher", ["屠宰", "生产"] },
+        { "Butcher", ["尸体"] },
         { "Clean", ["劳动", "肮脏"] },
         { "Wash", ["肮脏", "舒适"] }, 
         { "Haul", ["劳动"] },
@@ -561,7 +542,7 @@ public static class CoreTagMapper
         { "Pray", ["娱乐", "仪式", "平静"] },
         { "GoForWalk", ["娱乐", "舒适"] },
         { "BuildSnowman", ["娱乐", "开心"] },
-        { "VisitGrave", ["娱乐", "仪式", "悲伤", "回忆"] },
+        { "VisitGrave", ["娱乐", "仪式", "悲伤", "死亡"] },
         { "ViewArt", ["娱乐", "艺术", "开心"] },
         { "VisitSickPawn", ["互动", "医护", "善意"] },
         { "Play", ["娱乐", "开心"] }, // General Play
@@ -575,13 +556,13 @@ public static class CoreTagMapper
         { "Steal", ["背叛", "敌人"] },
         { "Capture", ["囚犯", "绑架"] },
         { "Arrest", ["囚犯", "冲突"] },
-        { "ReleasePrisoner", ["放生", "善意"] },
+        { "ReleasePrisoner", ["善意"] },
         { "EscortPrisoner", ["囚犯"] },
         { "Milk", ["驯兽", "生产"] },
         { "Shear", ["驯兽", "生产"] },
         { "CutPlant", ["种植", "生产"] },
-        { "Execution", ["攻击", "死亡"] },
-        { "Execute", ["攻击", "死亡"] },
+        { "Execution", ["死亡", "攻击", "仪式"] },
+        { "Execute", ["死亡", "攻击", "仪式"] },
         { "Hack", ["科技", "危险"] },
         { "Roof", ["建造"] },
         { "Smooth", ["建造"] },
@@ -606,8 +587,8 @@ public static class CoreTagMapper
         { "Robot", ["机械", "科技"] },
         { "Mech", ["机械", "科技"] },
         { "Droid", ["机械", "科技"] },
-        { "Laser", ["武器", "科技"] },
-        { "Plasma", ["武器", "科技"] },
+        { "Laser", ["科技"] },
+        { "Plasma", ["科技"] },
         { "Power", ["电力"] },
         { "Battery", ["电力"] },
         { "Generator", ["电力"] },
@@ -637,7 +618,6 @@ public static class CoreTagMapper
             // Pain (Dynamic)
             float pain = p.health.hediffSet.PainTotal;
             if (pain > 0.1f) tags.Add("疼痛");
-            if (pain > 0.4f) tags.Add("痛苦"); // Severe pain
             if (pain > 0.8f) { tags.Add("绝望"); tags.Add("昏迷"); } // Extreme pain (Shock)
 
             // Consciousness / Capacities
@@ -649,6 +629,7 @@ public static class CoreTagMapper
 
             // Bleeding
             if (p.health.hediffSet.BleedRateTotal > 0.1f) { tags.Add("流血"); }
+            if (p.health.hediffSet.BleedRateTotal > 0.3f) { tags.Add("严重"); } // Moderate bleeding
             if (p.health.hediffSet.BleedRateTotal > 0.6f) { tags.Add("危险"); } // Significant bleeding is danger
 
             foreach (var hediff in p.health.hediffSet.hediffs)
@@ -668,23 +649,17 @@ public static class CoreTagMapper
                     
                     if (isDisease) tags.Add("生病");
                     
-                    // Severity Logic
-                    if (hediff.CurStage != null)
-                    {
-                        if (hediff.CurStage.lifeThreatening) { 
-                             tags.Add("危险"); 
-                             tags.Add("绝望"); 
-                        }
-                    }
-                }
-                else
-                {
-                    // Positive / Neutral Hediffs
-                    if (hediff is Hediff_High) // Alcohol/Drug Highs (Covers subclasses)
-                    {
-                         tags.Add("状态");
-                         // If it gives good mood? We rely on Thoughts for "开心".
-                    }
+                     // Severity Logic
+                     if (hediff.CurStage != null)
+                     {
+                         if (hediff.CurStage.lifeThreatening) { 
+                              tags.Add("危险"); 
+                              tags.Add("绝望"); 
+                         }
+                     }
+                     
+                     // Generic Severity Check
+                     if (hediff.Severity > 0.6f) tags.Add("严重");
                 }
                 
                 // Specific Logic (Independent of isBad)
@@ -710,12 +685,12 @@ public static class CoreTagMapper
             
             string msName = ms.defName;
             if (msName.Contains("Sad") || msName.Contains("Cry") || msName.Contains("Grief")) tags.Add("悲伤");
-            if (msName.Contains("Panic") || msName.Contains("Flee") || msName.Contains("Terrified")) { tags.Add("恐惧"); tags.Add("逃跑"); }
+            if (msName.Contains("Panic") || msName.Contains("Flee") || msName.Contains("Terrified")) { tags.Add("恐惧"); }
             if (msName.Contains("Confused") || msName.Contains("Wander")) tags.Add("无助");
             if (msName.Contains("Binge")) { tags.Add("暴食"); tags.Add("成瘾"); }
             if (msName.Contains("Insult")) { tags.Add("羞辱"); tags.Add("愤怒"); }
-            if (msName.Contains("Fire")) { tags.Add("纵火"); tags.Add("危险"); }
-            if (msName.Contains("Jail")) { tags.Add("越狱"); tags.Add("冲突"); }
+            if (msName.Contains("Fire")) { tags.Add("火焰"); tags.Add("危险"); }
+            if (msName.Contains("Jail")) { tags.Add("冲突"); }
         }
 
         // 3. Thoughts (Memories & Situational)
@@ -730,8 +705,9 @@ public static class CoreTagMapper
             float breakMajor = p.mindState.mentalBreaker.BreakThresholdMajor;
             // float breakExtreme = p.mindState.mentalBreaker.BreakThresholdExtreme; // Optional
 
-            if (curMood < breakMajor) { tags.Add("绝望"); } // High risk
+            if (curMood < breakMajor) { tags.Add("绝望"); tags.Add("严重"); } // High risk
             else if (curMood < breakMinor) { tags.Add("压力"); tags.Add("焦虑"); } // Moderate risk
+            else if (curMood > 0.9f) { tags.Add("幸福"); } // Extreme Happiness
             else if (curMood > 0.65f) { tags.Add("开心"); } // High mood
 
             foreach (var thought in thoughts)
@@ -746,7 +722,6 @@ public static class CoreTagMapper
                 {
                     tags.Add("悲伤"); 
                     tags.Add("死亡");
-                    tags.Add("回忆");
                     if (tName.Contains("My") || tName.Contains("Kin") || tName.Contains("Family")) tags.Add("家人");
                     if (tName.Contains("Bond")) tags.Add("爱人");
                 }
@@ -827,8 +802,8 @@ public static class CoreTagMapper
                 if (rel.def.defName == "PsychicBond") { tags.Add("心灵纽带"); tags.Add("爱人"); }
 
                 // Family (Granular)
-                if (rel.def.defName == "Parent") { tags.Add("父母"); tags.Add("家人"); }
-                if (rel.def.defName == "Child") { tags.Add("孩子"); tags.Add("家人"); }
+                if (rel.def.defName == "Parent") { tags.Add("家人"); }
+                if (rel.def.defName == "Child") { tags.Add("家人"); }
                 if (rel.def.defName == "Sibling") tags.Add("家人");
                 
                 if (rel.def.defName == "Spouse" || rel.def.defName == "Lover" || rel.def.defName == "Fiance") tags.Add("爱人");
