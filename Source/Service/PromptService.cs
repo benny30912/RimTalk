@@ -26,20 +26,20 @@ public static class PromptService
         var allKnowledge = new HashSet<string>();
 
         // 1. [新增] 從 Prompt 中提取 Event 標籤 (例如 "羞辱" -> "愤怒")
-        var eventTags = CoreTagMapper.GetEventTags(request.Prompt);
-        string interactionTagsString = "";
+        var eventTags = CoreTagMapper.GetTextTags(request.Prompt);
+        string eventTagsString = "";
         if (eventTags.Any())
         {
             // 將標籤轉換為字串，稍後加入檢索上下文
             // 格式不重要，只要包含這些關鍵字即可讓 MemoryService 檢索到
-            interactionTagsString = $"{string.Join(", ", eventTags)}";
+            eventTagsString = $"{string.Join(", ", eventTags)}";
         }
 
         // ★ 關鍵策略：直接使用已經被 DecoratePrompt + Event+ Patch 處理過的 Prompt 作為檢索源
         // 這包含了：指令 + 環境描述 + Ongoing Events
         // 2. [修改] 將互動標籤加入 combinedSearchContext
         // 這樣當 Pawn 進行 "羞辱" 互動時，系統就會自動去檢索帶有 "愤怒" 標籤的記憶
-        string combinedSearchContext = request.Prompt + "\n" + interactionTagsString;
+        string combinedSearchContext = request.Prompt + "\n" + eventTagsString;
 
         // 遍歷所有參與者，生成各自的 Context 並檢索相關記憶與常識
         for (int i = 0; i < pawns.Count; i++)
@@ -48,7 +48,7 @@ public static class PromptService
             if (pawn.IsPlayer()) continue;
 
             // 獲取 Pawn 的上下文 (包含 dynamicContext)
-            var (pawnText, _, pawnDynamicContext) = CreatePawnContext(pawn, InfoLevel.Normal); //讓所有 Pawn 都使用 Normal 級別的上下文
+            var (pawnText, _, pawnDynamicContext) = CreatePawnContext(pawn, pawns, InfoLevel.Normal); //讓所有 Pawn 都使用 Normal 級別的上下文
 
             // ★ 組合檢索：Pawn 自身狀態 + 包含事件的完整 Prompt
             string searchContext = pawnDynamicContext + "\n" + combinedSearchContext;
@@ -187,7 +187,7 @@ public static class PromptService
 
     // 修改：回傳 (Context字串, 常識列表)
     // 修改回傳類型，多回傳一個 dynamicContext
-    private static (string text, List<string> knowledge, string dynamicContext) CreatePawnContext(Pawn pawn, InfoLevel infoLevel = InfoLevel.Normal)
+    private static (string text, List<string> knowledge, string dynamicContext) CreatePawnContext(Pawn pawn, List<Pawn> nearbyPawns, InfoLevel infoLevel = InfoLevel.Normal)
     {
         var contextSettings = Settings.Get().Context;
         var sb = new StringBuilder();
