@@ -12,13 +12,10 @@
 	
     <RimTalk.TimeAgo.Unknown>某个时间</RimTalk.TimeAgo.Unknown>
     <RimTalk.TimeAgo.JustNow>刚刚</RimTalk.TimeAgo.JustNow>
-    <RimTalk.TimeAgo.EarlierToday>今天早些时候</RimTalk.TimeAgo.EarlierToday>
-    <RimTalk.TimeAgo.Yesterday>昨天</RimTalk.TimeAgo.Yesterday>
+    <RimTalk.TimeAgo.HoursAgo>{0} 小时前</RimTalk.TimeAgo.HoursAgo>
     <RimTalk.TimeAgo.DaysAgo>{0} 天前</RimTalk.TimeAgo.DaysAgo>
-    <RimTalk.TimeAgo.LastSeason>上一季</RimTalk.TimeAgo.LastSeason>
-    <RimTalk.TimeAgo.EarlierThisYear>今年早些时候</RimTalk.TimeAgo.EarlierThisYear>
     <RimTalk.TimeAgo.YearsAgo>{0} 年前</RimTalk.TimeAgo.YearsAgo>
-	
+  
 	  <RimTalk.MemoryBrowser.Title>{0} 的记忆</RimTalk.MemoryBrowser.Title>
     <RimTalk.MemoryBrowser.ShortTerm>短期记忆</RimTalk.MemoryBrowser.ShortTerm>
     <RimTalk.MemoryBrowser.MediumTerm>中期记忆</RimTalk.MemoryBrowser.MediumTerm>
@@ -52,5 +49,4 @@
     <RimTalk.UI.Delete>删除</RimTalk.UI.Delete>
     <RimTalk.UI.Save>保存</RimTalk.UI.Save>
     <RimTalk.UI.Cancel>取消</RimTalk.UI.Cancel>
-
 </LanguageData>

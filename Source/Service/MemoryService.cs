@@ -25,6 +25,8 @@ public static class MemoryService
         [DataMember(Name = "summary")] public string Summary = "";
         [DataMember(Name = "keywords")] public List<string> Keywords = new();
         [DataMember(Name = "importance")] public int Importance = 0;
+        // ★ 新增：用於追蹤長期記憶的來源片段 ID
+        [DataMember(Name = "source_ids")] public List<int> SourceIds = new();
 
         public string GetText() => Summary;
     }
@@ -106,6 +108,7 @@ public static class MemoryService
             }
         }
 
+        // ★ 更新：Medium Prompt (Vivid, No Relative Time, Strict Keywords)
         string prompt =
             $$"""
              分析以下对话历史（context + dialogue）。
@@ -113,25 +116,35 @@ public static class MemoryService
 
              历史：
              {{conversationText}}
-             
+     
              任务：
              为每组 [context]+[dialogue] 生成相应的记忆记录。
-             1. 'summary'：简明扼要地总结发生了什么和说了什么（1 句话）。
+             1. 'summary'：以第三人称生动概括对话全貌。 
+                 核心要求：
+                 - 必须记录独有的互动细节（如：给人起的绰号、特定的玩笑梗、承诺或激烈的语气）。 
+                 - **不要**直接复制粘贴大段原始对话，而是将其转述（例如："Ray嘲笑Benny是胆小鬼" 而非 "Ray说：'Benny你是胆小鬼'"）。 
+                 - 目标：提供足够的情感上下文，以便未来能自然地回想起这段经历的氛围，而不仅有事实。
+                 - **严禁**使用相对时间（如“昨天”、“三天前”），因为这会随时间失效。
+                 - 允许使用模糊跨度（如“这段时期”、“近期”）或绝对时间（如“5501年”）。
              2. 'keywords'：**必须且只能**从以下两个来源中选择总共 3-5 个标签：
-                A. **本次[context]或[dialogue]中实际出现的词汇**（如地名、物品名、状态名）。
-                B. **现有的参考标签列表**：{{existingKeywords}}。
-                **禁止创造文本中不存在的新词汇。**
-                **绝对不要包含角色名“{{pawn.LabelShort}}”**
+                 A. **本次[context]中实际出现的词汇**。 
+                 B. **现有的参考标签列表**：{{existingKeywords}}。 
+                 关键词组合策略：
+                 - 必选 (Anchor)：1-2 个具体的实体名词（人名、生物名、物品名、地名）。 **必须优先从[context]中提取。 **
+                 - 必选 (Link)：1-2 个核心概念/动作（优先从参考标签列表中选择）。这用于建立与其他记忆的关联。 
+                 - 可选：1 个强烈的情感/状态。 
+                 **禁止创造文本中不存在的新词汇。 **
+                 **绝对不要包含角色名“{{pawn.LabelShort}}”**
              3. 'importance'：根据以下标准严格评分（1-5）：
                 - 1 (琐碎)：日常闲聊、天气、吃饭、无意义的抱怨。
                 - 2 (普通)：工作交流、轻微的不适、一般的交易。
                 - 3 (值得记住)：建立友谊/仇恨、轻伤、社交争吵、完成任务。
                 - 4 (重大)：精神崩溃、袭击战斗、确立恋爱关系、重伤/疾病。
                 - 5 (刻骨铭心)：死亡、结婚、永久性残疾、家园毁灭。
-                **警告：对于大多数日常对话，评分不应超过 2。只有真正危及生命或改变关系的事件才能评为 4 或 5。**
+                提示：对于大多数日常对话，评分不应超过 2。只有真正危及生命或改变关系的事件才能评为 4 或 5。
 
              重要：summary 字段必须使用简体中文。
-             
+     
              输出包含 'memories' 数组的 JSON 对象：
              {
                "memories": [
@@ -187,49 +200,58 @@ public static class MemoryService
 
     // ★ 修改：新增參數 currentTick
     /// <summary>
-    /// 將大量中期記憶合併為數條長期記憶 (使用中期記憶的平均時間)
+    /// 将大量中期记忆合并为数条长期记忆 (使用 SourceIds 精確計算時間)
     /// </summary>
     public static async Task<List<MemoryRecord>> ConsolidateToLongAsync(List<MemoryRecord> memories, Pawn pawn, int currentTick)
     {
         if (memories.NullOrEmpty()) return [];
 
-        string memoryText = FormatMemories(memories);
+        // ★ 更新：注入 ID 和 Day 
+        string memoryText = FormatMemoriesWithIds(memories);
 
-        // ★ 新增：計算這批中期記憶的平均時間
-        // 如果記憶列表有效且有時間數據，則計算平均值；否則使用 currentTick
-        int averageTick = currentTick;
-        if (memories.Any(m => m.CreatedTick > 0))
-        {
-            double avg = memories.Where(m => m.CreatedTick > 0).Average(m => m.CreatedTick);
-            averageTick = (int)avg;
-        }
-
+        // ★ 更新：Long Prompt (Biographical, Multi-Dim, Clean, Source Tracking)
         string prompt =
             $$"""
-             将以下记忆片段合并为几个独特的高层次事件摘要。
-             目标：{{pawn.LabelShort}}
+              将以下记忆片段合并为 3-6 个独特的高层次事件摘要。
+              目标：{{pawn.LabelShort}}
 
-             记忆：
-             {{memoryText}}
-             
-             任务：
-             1. 将相关事件合并为连贯的长期记忆。
-             2. 丢弃过于琐碎的细节。
-             3. 为重大事件保留高重要性。
-             4. 'keywords'：**必须且只能**从上方提供的“记忆片段”原有的 keywords 中选择最核心的 3-5 个。
-                **严禁发明新的关键词。**
-                **绝对不要包含角色名“{{pawn.LabelShort}}”**
+              记忆片段池：
+              {{memoryText}}
 
-             重要：summary 字段必须使用简体中文。
-             
-             输出包含 'memories' 数组的 JSON 对象：
-             {
-               "memories": [
-                 { "summary": "...", "keywords": ["..."], "importance": 4 },
-                 ...
-               ]
-             }
-             """;
+              任务：
+              1. 多维度归纳：
+                 找出这段时期并行发生的几个主要主题（如生存主线、人际长弧、重大危机、平稳发展期）并分别归纳。
+              2. 去芜存菁：
+                 彻底忽略无意义的日常琐事，除非它们构成了主要的生活基调。
+                 确保生成的记忆是涵盖数天甚至数周的高层概括。
+              3. 'summary'：
+                 以第三人称书写传记风格的摘要，着重描述这段经历对他的长远影响、心境变化或人际格局的改变。
+                 **时间禁令：**
+                 - **严禁**使用相对时间（如“昨天”、“三天前”）。
+                 - 允许使用模糊跨度（如“这段时期”）或绝对时间（如“5501年”）。
+              4. 'keywords'：
+                 **必须且只能**从该条综述所涵盖的原始片段中选择最核心的 3-5 个 keywords。
+                 严禁发明新的关键词。
+                 **绝对不要包含角色名“{{pawn.LabelShort}}”**
+              5. 'importance'：
+                 - 继承原则：如果合并的片段中包含高重要性事件（4-5分），**必须继承该高分**。
+                 - 综述原则：由日常琐事合并成的“生活综述”，请提升至 3 分。
+
+              重要：summary 字段必须使用简体中文。 
+
+              输出包含 'memories' 数组的 JSON 对象：
+              {
+                "memories": [
+                  { 
+                    "summary": "...", 
+                    "keywords": ["..."], 
+                    "importance": 3,
+                    "source_ids": [1, 2, 5] // 必须列出合并到此条记忆的所有原始片段编号
+                  },
+                  ...
+                ]
+              }
+            """;
 
         try
         {
@@ -243,13 +265,48 @@ public static class MemoryService
             // ★ 修改：同樣增加安全過濾
             return result.Memories
                 .Where(m => m != null)
-                .Select(m => new MemoryRecord
+                .Select(m =>
                 {
-                    Summary = m.Summary ?? "...",
-                    Keywords = m.Keywords ?? [],
-                    Importance = Mathf.Clamp(m.Importance, 1, 5),
-                    AccessCount = 0,
-                    CreatedTick = averageTick // ★ 修改：使用計算出的平均時間
+                    // ★ 核心邏輯：計算 SourceIds 的平均時間與平均 AccessCount
+                    int calculatedTick = currentTick;
+                    var sourceAccessCounts = new List<int>();
+
+                    if (m.SourceIds != null && m.SourceIds.Any())
+                    {
+                        var validTicks = new List<long>();
+                        foreach (var id in m.SourceIds)
+                        {
+                            // 使用索引查找 (ID 從 1 開始，所以索引是 ID - 1)
+                            int index = id - 1;
+                            if (index >= 0 && index < memories.Count)
+                            {
+                                var sourceMem = memories[index];
+                                sourceAccessCounts.Add(sourceMem.AccessCount); // 收集次數
+
+                                if (sourceMem.CreatedTick > 0)
+                                {
+                                    validTicks.Add(sourceMem.CreatedTick);
+                                }
+                            }
+                        }
+
+                        if (validTicks.Any())
+                        {
+                            calculatedTick = (int)validTicks.Average();
+                        }
+                    }
+
+                    // 計算平均提及次數 (四雪五入或無條件捨去皆可，這裡用整數除法簡單處理)
+                    int avgAccess = sourceAccessCounts.Any() ? (int)sourceAccessCounts.Average() : 0;
+
+                    return new MemoryRecord
+                    {
+                        Summary = m.Summary ?? "...",
+                        Keywords = m.Keywords ?? [],
+                        Importance = Mathf.Clamp(m.Importance, 1, 5),
+                        AccessCount = avgAccess, // ★ 賦值平均數
+                        CreatedTick = calculatedTick // 使用精確計算出的時間
+                    };
                 }).ToList();
         }
         catch (Exception ex)
@@ -263,30 +320,65 @@ public static class MemoryService
     /// <summary>
     /// 根據權重剔除多餘的長期記憶
     /// </summary>
-    public static void PruneLongTermMemories(List<MemoryRecord> ltm, int maxCount)
+    // ★ 修改：增加 currentTick 參數，避免在背景呼叫 Find.TickManager
+    public static void PruneLongTermMemories(List<MemoryRecord> ltm, int maxCount, int currentTick)
     {
         if (ltm.Count <= maxCount) return;
 
+        // 設定權重
         float weightImportance = Settings.Get().MemoryImportanceWeight;
+        float weightAccess = 0.5f;     // 提及次數的權重
+        float timeDecayHalfLifeDays = 60f; // 1年半衰期
+
+        // 寬限期 (Grace Period)：15 天 (0.25 年)
+        // 剛生成的記憶通常提及數為 0，給予豁免權以免被秒殺
+        int gracePeriodTicks = 15 * 60000;
 
         int removeCount = ltm.Count - maxCount;
 
         // 計算保留分數：分數越低越容易被移除
-        // 核心保護：Importance >= 5 的記憶給予極高分數 (不參與移除)
-        var candidates = ltm.OrderBy(m =>
-        {
-            float baseScore = m.Importance >= 5 ? 10000f : 0f;
-            return baseScore + m.AccessCount + (m.Importance * weightImportance);
-        }).ToList();
+        var candidates = ltm
+            .Select(m => new { Memory = m, Score = CalculateRetentionScore(m) })
+            .OrderBy(x => x.Score) // 分數低的排前面 (準備被刪)
+            .ToList();
 
-        // 移除分數最低的
+        // 內部計分函數
+        float CalculateRetentionScore(MemoryRecord m)
+        {
+            // 1. 新手保護期：給予極大分數，確保不被刪除
+            if (currentTick - m.CreatedTick < gracePeriodTicks) return 9999f;
+
+            // 2. 計算原始衰減 (無保底)
+            float elapsedDays = (currentTick - m.CreatedTick) / 60000f;
+            if (elapsedDays < 0) elapsedDays = 0;
+            float rawDecay = (float)Math.Exp(-elapsedDays / timeDecayHalfLifeDays);
+
+            // 3. 計算階梯式保底衰減 (用於重要性)
+            float minFloor = m.Importance switch
+            {
+                >= 5 => 0.5f,
+                4 => 0.3f, // 微調：給 4 分一點生存空間
+                _ => 0f
+            };
+            float flooringDecay = Math.Max(rawDecay, minFloor);
+
+            // 4. 總分公式
+            // 本質價值 (有保底) + 實用價值 (無保底，隨時間消逝)
+            return (m.Importance * weightImportance * flooringDecay)
+                 + (m.AccessCount * weightAccess * rawDecay);
+        }
+
+        // 執行移除
         for (int i = 0; i < removeCount; i++)
         {
             if (i < candidates.Count)
             {
-                ltm.Remove(candidates[i]);
+                // 如果連最低分的都是保護期內的(9999)，那就什麼都不刪
+                if (candidates[i].Score >= 9999f) break;
+
+                ltm.Remove(candidates[i].Memory);
+            }
         }
-    }
     }
 
     private class ScoredMemory
@@ -328,7 +420,12 @@ public static class MemoryService
         // ★ 讀取設定權重
         float weightKeyword = Settings.Get().KeywordWeight;
         float weightImportance = Settings.Get().MemoryImportanceWeight;
-        const float weightAccess = 0.5f;     // 依照您的要求固定為 0.5 (微擾)
+        const float weightAccess = 0.5f; // 要求固定為 0.5 (微擾)
+
+        // ★ 新增：時間衰減參數 (60000 ticks = 1 day)
+        // 假設半衰期為 1 年 (60 days)，數值可根據需求微調
+        const float timeDecayHalfLifeDays = 60f; 
+        int currentTick = Find.TickManager.TicksGame;
 
         // ★ 定義標準長度 (Prompt 要求產生 3-5 個，我們以 5 作為標準化基底)
         const float standardLength = 5.0f;
@@ -383,8 +480,30 @@ public static class MemoryService
 
             float lengthMultiplier = standardLength / totalKeywords;
 
-            // 1. 計算分數，新公式：(關鍵字稀有分總和 * 修正係數 * W_key) + (重要性 * W_imp) - (提及次數 * 0.5)
-            float score = (rarityScoreSum * lengthMultiplier * weightKeyword) + (mem.Importance * weightImportance) - (mem.AccessCount * weightAccess);
+            // ★ 新增：時間衰減計算
+            // 公式：e^(-elapsedDays / halfLife)
+            // 結果會在 0.0 ~ 1.0 之間
+            float elapsedDays = (currentTick - mem.CreatedTick) / 60000f;
+            if (elapsedDays < 0) elapsedDays = 0; // 防呆
+
+            float timeDecayFactor = (float)Math.Exp(-elapsedDays / timeDecayHalfLifeDays);
+
+            // ★ 階梯式保底機制 (Stepped Floor)
+            // Level 5 (刻骨銘心): 永遠保留 50% 強度 (至少比普通更值得記住)
+            // Level 4 (重大事件): 永遠保留 30% 強度 (至少比琐碎更值得記住)
+            // Level 1-3 (普通): 無保底，自然衰減至 0
+
+            float minFloor = mem.Importance switch
+            {
+                >= 5 => 0.5f,
+                4 => 0.3f,
+                _ => 0f
+            };
+
+            timeDecayFactor = Math.Max(timeDecayFactor, minFloor);
+
+            // 1. 計算分數，新公式：(關鍵字稀有分總和 * 修正係數 * W_key) + (重要性 * W_imp * 時間衰減係數) - (提及次數 * 0.5)
+            float score = (rarityScoreSum * lengthMultiplier * weightKeyword) + (mem.Importance * weightImportance * timeDecayFactor) - (mem.AccessCount * weightAccess);
 
             scoredMemories.Add(new ScoredMemory { Memory = mem, Score = score });
         }
@@ -490,13 +609,27 @@ public static class MemoryService
         return sb.ToString();
     }
 
-    private static string FormatMemories(List<MemoryRecord> memories)
+    // ★ 新增：帶有 ID 和 Day 的格式化方法
+    private static string FormatMemoriesWithIds(List<MemoryRecord> memories)
     {
         var sb = new StringBuilder();
-        foreach (var m in memories)
+        if (memories.NullOrEmpty()) return "";
+
+        // 設定基準時間 (第一條記憶的時間)
+        long baseTick = memories.Min(m => m.CreatedTick);
+
+        // ★ 修正：改用 for 迴圈，用索引 i + 1 作為臨時 ID
+        for (int i = 0; i < memories.Count; i++)
         {
+            var m = memories[i];
             string tags = string.Join(",", m.Keywords);
-            sb.AppendLine($"- [{tags}] (Imp:{m.Importance}) {m.Summary}");
+            // 計算相對天數
+            int dayIndex = (int)((m.CreatedTick - baseTick) / 60000); // 60000 ticks = 1 day
+            if (dayIndex < 0) dayIndex = 0; // 防呆
+
+            // 格式：[ID: 1] [Day: 0] (Imp:3) ...
+            // ID 使用 1-based index (i + 1)
+            sb.AppendLine($"[ID: {i + 1}] [Day: {dayIndex}] (Imp:{m.Importance}) [{tags}] {m.Summary}");
         }
         return sb.ToString();
     }
@@ -529,7 +662,7 @@ public static class MemoryService
         {
             foreach (var k in comp.CommonKnowledgeStore) keywords.AddRange(k.Keywords);
         }
-
+        
         if (keywords.Count == 0) return "None";
 
         // 返回時

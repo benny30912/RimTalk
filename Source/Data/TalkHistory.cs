@@ -183,7 +183,7 @@ public static class TalkHistory
                     onSuccess: (longMemories) =>
                     {
                         if (!longMemories.NullOrEmpty())
-                            OnLongMemoriesGenerated(pawn, longMemories);
+                            OnLongMemoriesGenerated(pawn, longMemories, currentTick);
                     },
                     onFailureOrCancel: (isCancelled) =>
                     {
@@ -204,7 +204,8 @@ public static class TalkHistory
     }
 
     // 處理生成的長期記憶
-    private static void OnLongMemoriesGenerated(Pawn pawn, List<MemoryRecord> newMemories)
+    // ★ 修改：增加 currentTick 參數
+    private static void OnLongMemoriesGenerated(Pawn pawn, List<MemoryRecord> newMemories, int currentTick)
     {
         var comp = WorldComp;
         if (comp == null) return;
@@ -214,16 +215,18 @@ public static class TalkHistory
             var record = comp.SavedTalkHistories.FirstOrDefault(x => x.Pawn == pawn);
             if (record == null) return;
 
-            // ★ 防禦性初始化
             record.LongTermMemories ??= new List<MemoryRecord>();
 
-            record.LongTermMemories.AddRange(newMemories);
+            if (newMemories != null && newMemories.Any())
+            {
+                record.LongTermMemories.AddRange(newMemories);
 
-            // LTM 加權剔除維護
-            MemoryService.PruneLongTermMemories(record.LongTermMemories, MaxLongMemories);
+                // ★ LTM 加權剔除維護 (直接使用傳遞進來的正確時間)
+                MemoryService.PruneLongTermMemories(record.LongTermMemories, MaxLongMemories, currentTick);
 
-            // ★ 新增：成功提示
-            Messages.Message("RimTalk.MemoryService.LongMemoryCreated".Translate(pawn.LabelShort), pawn, MessageTypeDefOf.NeutralEvent, false);
+                // ★ 新增：成功提示
+                Messages.Message("RimTalk.MemoryService.LongMemoryCreated".Translate(pawn.LabelShort), pawn, MessageTypeDefOf.NeutralEvent, false);
+            }
         }
     }
 

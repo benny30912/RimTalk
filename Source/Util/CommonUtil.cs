@@ -194,16 +194,18 @@ public static class CommonUtil
         if (createdTick <= 0) return "RimTalk.TimeAgo.Unknown".Translate();
 
         int diff = GenTicks.TicksGame - createdTick;
-        float days = diff / 60000f; // 1 day = 60000 ticks
+        if (diff < 0) diff = 0; // ¨¾§b
 
-        if (days < 0.25f) return "RimTalk.TimeAgo.JustNow".Translate(); // 6¤p®É¤º
-        if (days < 1f) return "RimTalk.TimeAgo.EarlierToday".Translate();
-        if (days < 2f) return "RimTalk.TimeAgo.Yesterday".Translate();
-        if (days < 15f) return "RimTalk.TimeAgo.DaysAgo".Translate((int)days);
-        if (days < 60f) return "RimTalk.TimeAgo.LastSeason".Translate(); // 1 season (quadrum) = 15 days
+        float hours = diff / 2500f; // 1 hour = 2500 ticks
 
-        float years = days / 60f;
-        if (years < 1f) return "RimTalk.TimeAgo.EarlierThisYear".Translate();
+        if (hours < 1f) return "RimTalk.TimeAgo.JustNow".Translate();
+        if (hours < 24f) return "RimTalk.TimeAgo.HoursAgo".Translate((int)hours);
+
+        float days = hours / 24f; // 1 day = 24 hours = 60000 ticks
+
+        if (days < 60f) return "RimTalk.TimeAgo.DaysAgo".Translate((int)days);
+
+        float years = days / 60f; // 1 year = 60 days
 
         return "RimTalk.TimeAgo.YearsAgo".Translate((int)years);
     }
