@@ -10,15 +10,12 @@ namespace RimTalk.Util;
 
 public static class CoreTagMapper
 {
-    private static ThoughtDef _observedLayingCorpseDef;
-
     // Mapping Key: Partial Keyword (Case-Insensitive usually, but we'll use Contains)
     // Value: List of Tags to apply
     private static readonly Dictionary<string, string[]> _commonKeywordMap = new(StringComparer.OrdinalIgnoreCase)
     {
         // ==========================================
         // Section A: English DefNames (State Analysis)
-        // Source: GetAbstractTags -> AddTagsFromDef
         // ==========================================
         
         // Physiology & Health
@@ -119,10 +116,12 @@ public static class CoreTagMapper
         { "FireStarting", ["精神崩溃", "火焰", "危险"] },
         { "Jailbreaker", ["精神崩溃", "冲突"] },
         { "Slaughterer", ["精神崩溃", "攻击"] },
-        { "Insulting", ["精神崩溃", "羞辱", "争吵"] },
         { "Confused", ["精神崩溃", "无助"] },
         { "Wander", ["精神崩溃"] },
         { "Sad", ["悲伤"] },
+        { "Cry", ["悲伤"] }, // Restored logic moved to map
+        { "Grief", ["悲伤"] }, // Restored logic moved to map
+        { "Terrified", ["恐惧"] }, // Restored logic moved to map
         { "Pyromania", ["火焰", "危险"] },
         
         // Relationships / Opinions / Bonds (DefNames)
@@ -134,6 +133,9 @@ public static class CoreTagMapper
         { "Parent", ["家人", "羁绊"] },
         { "Child", ["家人", "羁绊"] },
         { "Sibling", ["家人", "羁绊"] },
+        { "My", ["家人"] }, // Logic from Step 3b
+        { "Kin", ["家人"] }, // Logic from Step 3b
+        { "Family", ["家人"] }, // Logic from Step 3b
         { "RomanceAttempt", ["交谈", "浪漫", "爱人"] },
         { "MarriageProposal", ["交谈", "婚姻", "浪漫", "爱人"] },
         { "TameAttempt", ["驯兽"] },
@@ -152,7 +154,6 @@ public static class CoreTagMapper
 
         // ==========================================
         // Section B: Chinese Keywords (Localized Text Analysis)
-        // Source: ArchivePatch (Letter), HediffPatch (Label), ThoughtPatch (Label)
         // ==========================================
 
         // Health & Disease (Localized)
@@ -203,8 +204,6 @@ public static class CoreTagMapper
         { "分手", ["悲伤"] },
         { "感情破裂", ["分手", "悲伤"] },
         { "背叛", ["悲伤", "愤怒"] },
-        // { "招募", ["互动"] }, // Specific act, implied
-        // { "劝说", ["互动"] }, // Specific act, implied
         { "尝试交流", ["交谈", "劝说"] },
         { "越狱", ["冲突"] },
         { "鼓动越狱", ["背叛"] },
@@ -219,11 +218,9 @@ public static class CoreTagMapper
         { "演说", ["仪式"] },
         { "节日", ["开心"] },
         { "生日", ["成长"] },
-        // { "成长时刻", ["成长"] }, // Substring removed
         { "成年", ["成长"] },
         
         // Job Verbs (Chinese)
-        // { "搬运", ["劳动"] }, // Keyword mapped to Labor.
         { "搬运", ["劳动"] }, 
         { "掠夺", ["背叛", "敌人"] },
         { "俘虏", ["囚犯", "战斗"] },
@@ -299,18 +296,14 @@ public static class CoreTagMapper
         { "贸易", ["交易"] },
         { "商人", ["交易"] },
         { "救助", ["治疗"] }, // Was "治疗" in old code for "rescue/tend"
-        // { "治疗", ["治疗"] }, // Self-mapping removed
-        // { "手术", ["手术"] }, // Self-mapping removed
         { "结婚", ["婚姻", "仪式", "幸福", "浪漫"] },
         { "典礼", ["仪式"] },
         { "演讲", ["聚会", "仪式"] },
-        // { "精神崩溃", ["精神崩溃"] }, // Self-mapping removed
         { "发狂", ["精神崩溃"] },
         { "迷茫", ["无助"] },
         
         // ==========================================
         // Section C: English Template Phrases (Function-Specific)
-        // Source: SkillLearnPatch, VocalLink, BattleLogPatch
         // ==========================================
         
         // Skill & Growth (SkillLearnPatch)
@@ -337,7 +330,6 @@ public static class CoreTagMapper
         { "hit", ["攻击"] },
         { "missed", ["战斗"] },
         { "deflected", ["战斗"] },
-        { "attacked", ["攻击"] },
         { "shot", ["攻击"] },
         { "bit", ["攻击"] }, // Bite
         { "scratched", ["攻击"] },
@@ -354,7 +346,6 @@ public static class CoreTagMapper
 
         // ==========================================
         // Section D: Extended Coverage (Restored from Old)
-        // Includes: Interactions, Detailed Thoughts, Work, Tech, Magic, & ALL Strict Mappings
         // ==========================================
 
         // 1. Bionics & Tech (Restored)
@@ -382,7 +373,6 @@ public static class CoreTagMapper
         { "ManhunterPack", ["战斗", "灾难", "危险"] },
         { "Manhunter pack", ["战斗", "灾难", "危险"] },
         { "Mad animal", ["危险", "战斗"] },
-        { "Crop Blight", ["灾难", "种植"] },
         { "Blight", ["灾难", "种植"] },
         { "Miracle", ["治疗", "幸福"] },
         { "Transport pod crash", ["事故", "获救"] },
@@ -395,11 +385,8 @@ public static class CoreTagMapper
         { "Beavers", ["灾难", "种植"] },
         { "Self-tame", ["驯兽", "开心"] },
         { "Thrumbo", ["驯兽", "开心", "稀有"] }, // Singular generic
-        { "Thrumbos", ["驯兽", "开心", "稀有"] },
         { "Ransom", ["绑架", "互动"] }, // Generic English mapping
-        { "Ransom demand", ["绑架", "互动"] },
         { "Kidnap", ["绑架", "危险", "敌人"] },
-        { "Kidnapped", ["绑架", "危险", "敌人"] },
         { "Ship found", ["科技", "希望"] },
         { "EscapeShip", ["科技", "希望", "胜利"] },
         { "Archonexus", ["超自然", "希望", "胜利"] },
@@ -427,15 +414,12 @@ public static class CoreTagMapper
         // Chinese Weather Terms (Localized)
         { "旱天雷", ["灾难", "危险", "火焰"] }, // DryThunderstorm
         { "暴风雨", ["不适"] },         // RainyThunderstorm
-        { "小雪", ["寒冷"] },            // SnowGentle
-        { "大雪", ["寒冷"] },            // SnowHard
         { "晴", ["光亮", "舒适"] },            // Clear
         { "雪", ["寒冷"] },
 
         // 5. Relationships (Restored)
         { "Friend", ["朋友"] },
         { "Enemy", ["敌人"] },
-        // { "Secret", ["秘密", "关系"] },
 
         // 6. Social Misc (Restored)
         { "Gossip", ["交谈"] },
@@ -463,19 +447,12 @@ public static class CoreTagMapper
         { "spark jailbreak", ["背叛"] },
         { "AnimalChat", ["驯兽", "互动"] },
         { "animal chat", ["驯兽", "互动"] },
-        { "animal chat", ["驯兽", "互动", "善意"] },
         { "Nuzzle", ["宠物", "善意", "开心", "羁绊"] },
         { "release to the wild", ["善意"] },
 
         // Additional BattleLog
         { "Hit", ["攻击"] },
         { "Attack", ["攻击"] },
-        { "Attacked", ["攻击"] },
-        // "Shot", "Miss", "Deflect", "Bite", "Scratch" are covered in lowercase in Section C, 
-        // but Map is Case-Insensitive keys? No, StringComparer.OrdinalIgnoreCase.
-        // So "Miss" matches "miss". But keys must be unique.
-        // "hit", "missed", "deflected" in Section C are distinct/verb forms.
-        // We will add the Nouns/Adj forms from old file if unique.
         { "Kill", ["攻击", "死亡"] },
         { "Destroy", ["攻击", "破坏"] },
         { "Defend", ["战斗"] },
@@ -484,11 +461,10 @@ public static class CoreTagMapper
         // Mined Thoughts (English Keys only, CN keys handled in Section B)
         { "butchered humanlike", ["恐惧", "尸体", "恶心"] },
         { "butchered up", ["恐惧", "尸体", "恶心"] },
-        // { "banished", ["放逐", "离别"] },
         { "witnessed death", ["死亡", "悲伤"] },
         { "witnessed ally's death", ["死亡", "悲伤"] },
         { "witnessed family", ["死亡", "悲伤", "家人"] },
-        { "observed corpse", ["尸体", "恐惧"] },
+        { "ObservedLaying", ["尸体", "恐惧"] }, // Partial match safety
         { "observed rotting corpse", ["尸体", "恐惧", "恶心"] },
         { "botched my surgery", ["手术", "事故", "受伤"] },
         
@@ -499,8 +475,7 @@ public static class CoreTagMapper
         { "rebuffed", ["拒绝"] },
         { "failed to romance", ["拒绝"] },
         
-        { "Lovin", ["浪漫", "开心"] },
-        { "got some lovin'", ["浪漫", "开心"] },
+        { "Lovin", ["性爱", "互动", "浪漫", "开心"] },
         { "honeymoon phase", ["浪漫", "幸福"] },
         { "rescued", ["获救", "幸福", "善意"] },
         { "defeated", ["胜利", "荣耀", "战斗"] },
@@ -508,6 +483,28 @@ public static class CoreTagMapper
         { "catharsis", ["开心", "平静"] },
         { "soaked", ["潮湿", "不适"] },
         { "soaking wet", ["潮湿", "不适"] },
+
+        // Moved from Step 3b (Logic integration)
+        { "Died", ["悲伤", "死亡"] },
+        { "Death", ["悲伤", "死亡"] },
+        { "Lost", ["悲伤"] },
+        { "Killed", ["悲伤", "死亡"] },
+        { "Beat", ["愤怒", "冲突"] },
+        { "Fight", ["愤怒", "冲突"] },
+        { "Harmed", ["愤怒", "冲突"] },
+        { "Betray", ["背叛", "愤怒"] },
+        { "Fear", ["恐惧"] },
+        { "Phobia", ["恐惧"] },
+        { "Nightmare", ["恐惧"] },
+        { "Terrified", ["恐惧"] },
+        { "Worry", ["焦虑"] },
+        { "Anxious", ["焦虑"] },
+        { "Lonely", ["压力"] },
+        { "Isolation", ["压力"] },
+        { "Prison", ["压力", "囚犯"] },
+        { "Confined", ["压力", "囚犯"] },
+        { "Hospital", ["生病"] },
+        { "Sick", ["生病"] },
 
         // Work
         { "Research", ["科研"] },
@@ -526,9 +523,6 @@ public static class CoreTagMapper
         { "Hunt", ["攻击", "生存"] },
         { "Tame", ["驯兽"] },
         { "Train", ["驯兽", "学习"] },
-        { "TrainAttempt", ["驯兽", "学习", "交谈"] }, // DefName
-        { "train attempt", ["驯兽", "学习", "交谈"] }, // Label
-        { "尝试训练", ["驯兽", "学习", "交谈"] },
         { "Cook", ["制作", "生存"] },
         { "Butcher", ["尸体"] },
         { "Clean", ["劳动", "肮脏"] },
@@ -618,7 +612,7 @@ public static class CoreTagMapper
             // Pain (Dynamic)
             float pain = p.health.hediffSet.PainTotal;
             if (pain > 0.1f) tags.Add("疼痛");
-            if (pain > 0.8f) { tags.Add("绝望"); tags.Add("昏迷"); } // Extreme pain (Shock)
+            if (pain > 0.8f) { tags.Add("严重"); } // Extreme pain (Shock)
 
             // Consciousness / Capacities
             if (!p.health.capacities.CapableOf(PawnCapacityDefOf.Consciousness))
@@ -654,7 +648,6 @@ public static class CoreTagMapper
                      {
                          if (hediff.CurStage.lifeThreatening) { 
                               tags.Add("危险"); 
-                              tags.Add("绝望"); 
                          }
                      }
                      
@@ -668,7 +661,6 @@ public static class CoreTagMapper
                 
                 if (hediff.def.countsAsAddedPartOrImplant) tags.Add("仿生");
                 if (hediff.def.IsAddiction) tags.Add("成瘾");
-                if (hediff.def.defName.Contains("Toxic") || hediff.def.defName.Contains("Poison")) tags.Add("中毒");
             }
         }
 
@@ -676,21 +668,11 @@ public static class CoreTagMapper
         if (p.InMentalState)
         {
             tags.Add("精神崩溃");
-            var ms = p.MentalStateDef;
-            AddTagsFromDef(ms, tags); // Use Def for generic keywords
+            AddTagsFromDef(p.MentalStateDef, tags); // Use Def for generic keywords
 
             // Emotional mapping based on state type
-            if (ms.IsAggro) { tags.Add("愤怒"); tags.Add("战斗"); }
-            if (ms.IsExtreme) { tags.Add("绝望"); } // Extreme break
-            
-            string msName = ms.defName;
-            if (msName.Contains("Sad") || msName.Contains("Cry") || msName.Contains("Grief")) tags.Add("悲伤");
-            if (msName.Contains("Panic") || msName.Contains("Flee") || msName.Contains("Terrified")) { tags.Add("恐惧"); }
-            if (msName.Contains("Confused") || msName.Contains("Wander")) tags.Add("无助");
-            if (msName.Contains("Binge")) { tags.Add("暴食"); tags.Add("成瘾"); }
-            if (msName.Contains("Insult")) { tags.Add("羞辱"); tags.Add("愤怒"); }
-            if (msName.Contains("Fire")) { tags.Add("火焰"); tags.Add("危险"); }
-            if (msName.Contains("Jail")) { tags.Add("冲突"); }
+            if (p.MentalStateDef.IsAggro) { tags.Add("愤怒"); tags.Add("战斗"); }
+            if (p.MentalStateDef.IsExtreme) { tags.Add("绝望"); } // Extreme break
         }
 
         // 3. Thoughts (Memories & Situational)
@@ -703,7 +685,6 @@ public static class CoreTagMapper
             float curMood = p.needs.mood.CurLevel;
             float breakMinor = p.mindState.mentalBreaker.BreakThresholdMinor;
             float breakMajor = p.mindState.mentalBreaker.BreakThresholdMajor;
-            // float breakExtreme = p.mindState.mentalBreaker.BreakThresholdExtreme; // Optional
 
             if (curMood < breakMajor) { tags.Add("绝望"); tags.Add("严重"); } // High risk
             else if (curMood < breakMinor) { tags.Add("压力"); tags.Add("焦虑"); } // Moderate risk
@@ -713,34 +694,7 @@ public static class CoreTagMapper
             foreach (var thought in thoughts)
             {
                 AddTagsFromDef(thought.def, tags); // Use Basic Keywords
-                
-                // 3b. Keyword Analysis (Differentiate Negative Emotions)
-                string tName = thought.def.defName;
-
-                // Grief / Loss
-                if (tName.Contains("Died") || tName.Contains("Death") || tName.Contains("Lost") || tName.Contains("Killed")) 
-                {
-                    tags.Add("悲伤"); 
-                    tags.Add("死亡");
-                    if (tName.Contains("My") || tName.Contains("Kin") || tName.Contains("Family")) tags.Add("家人");
-                    if (tName.Contains("Bond")) tags.Add("爱人");
-                }
-
-                // Anger / Conflict
-                if (tName.Contains("Insult") || tName.Contains("Slight")) { tags.Add("羞辱"); tags.Add("愤怒"); }
-                if (tName.Contains("Harmed") || tName.Contains("Beat") || tName.Contains("Fight") || tName.Contains("Attacked")) { tags.Add("愤怒"); tags.Add("冲突"); }
-                if (tName.Contains("Betray")) { tags.Add("背叛"); tags.Add("愤怒"); }
-
-                // Fear / Anxiety
-                if (tName.Contains("Fear") || tName.Contains("Phobia") || tName.Contains("Nightmare") || tName.Contains("Terrified")) tags.Add("恐惧");
-                if (tName.Contains("Worry") || tName.Contains("Anxious")) tags.Add("焦虑");
-
-                // Loneliness
-                if (tName.Contains("Lonely") || tName.Contains("Isolation") || tName.Contains("Prison")) tags.Add("压力");
-                
-                // Specific Situational
-                if (tName.Contains("Prisoner") || tName.Contains("Confined")) { tags.Add("囚犯"); tags.Add("压力"); }
-                if (tName.Contains("Hospital") || tName.Contains("Sick")) tags.Add("生病");
+ 
                 // 3c. Opinion / Social Stats (Dynamic based on involved pawn)
                 if (thought is Thought_Memory tm && tm.otherPawn != null)
                 {
@@ -750,15 +704,6 @@ public static class CoreTagMapper
                     else if (opinion <= -50) { tags.Add("仇人"); tags.Add("敌人"); }
                     else if (opinion <= -20) { tags.Add("敌人"); }
                 }
-            }
-
-            // Observations (Corpses)
-            if (_observedLayingCorpseDef == null)
-                _observedLayingCorpseDef = DefDatabase<ThoughtDef>.GetNamed("ObservedLayingCorpse", false);
-            
-            if (_observedLayingCorpseDef != null && p.needs.mood.thoughts.memories.Memories.Any(m => m.def == _observedLayingCorpseDef))
-            {
-                 tags.Add("尸体"); tags.Add("恐惧");
             }
         }
 
@@ -772,16 +717,13 @@ public static class CoreTagMapper
             if (p.CurJob.def == JobDefOf.PredatorHunt) { tags.Add("战斗"); }
             if (p.CurJob.def == JobDefOf.PrisonerAttemptRecruit) { tags.Add("招募"); tags.Add("互动"); }
             if (p.CurJob.def == JobDefOf.Tame) { tags.Add("驯兽"); }
-            if (p.CurJob.def == JobDefOf.Lovin) { tags.Add("性爱"); tags.Add("互动"); }
         }
 
         // 5. Relations/Status
         if (p.IsSlave) tags.Add("奴隶");
         if (p.IsPrisoner) tags.Add("囚犯");
-        if (p.IsPrisoner) tags.Add("囚犯");
         if (p.RaceProps.IsMechanoid) tags.Add("机械");
 
-        // Static Relations (Direct check)
         // Static Relations (Context-Aware: Only if nearby)
         if (p.relations != null && nearbyPawns != null)
         {
@@ -797,9 +739,6 @@ public static class CoreTagMapper
                 {
                     if (rel.otherPawn != null && rel.otherPawn.RaceProps.Animal) tags.Add("宠物");
                 }
-                
-                // Psychic Bond (Biotech)
-                if (rel.def.defName == "PsychicBond") { tags.Add("心灵纽带"); tags.Add("爱人"); }
 
                 // Family (Granular)
                 if (rel.def.defName == "Parent") { tags.Add("家人"); }
