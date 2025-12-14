@@ -53,19 +53,18 @@ public static class Bubbler_Add
         bool isChitchat = interactionDef == InteractionDefOf.Chitchat ||
                           interactionDef == InteractionDefOf.DeepTalk;
 
-        // if in danger then stop chitchat
-        if (isChitchat
-            && (initiator.IsInDanger()
-                || initiator.GetHostilePawnNearBy() != null
-                || !PawnSelector.GetNearByTalkablePawns(initiator).Contains(recipient)))
+        // [MOD] 移除針對 Chitchat 的 Danger 與 Hostile 檢查
+        // 僅保留基本檢查：確保接收者在可對話範圍內且符合對話條件 (PawnSelector 邏輯)
+        if (isChitchat && !PawnSelector.GetNearByTalkablePawns(initiator).Contains(recipient))
         {
             return false;
         }
 
         PawnState pawnState = Cache.Get(initiator);
 
-        // chitchat is ignored if talkRequest exists
-        if (pawnState == null || (isChitchat && pawnState.TalkRequests.Count > 0))
+        // [MOD] 移除 pawnState.TalkRequests.Count > 0 的檢查
+        // 允許 Chitchat 進入佇列，不論當前是否有其他請求
+        if (pawnState == null)
             return false;
 
         // Otherwise, block normal bubble and generate talk

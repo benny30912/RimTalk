@@ -26,8 +26,10 @@ public static class PromptService
         {
             var pawn = pawns[i];
             if (pawn.IsPlayer()) continue;
-            InfoLevel infoLevel = Settings.Get().Context.EnableContextOptimization 
-                                  || i != 0 ? InfoLevel.Short : InfoLevel.Normal;
+            // [MOD] 邏輯修正：除非開啟優化，否則一律使用 Normal
+            // 原本邏輯會強迫非發話人 (i != 0) 使用 Short，現在加入 EnableContextOptimization 判斷
+            InfoLevel infoLevel = Settings.Get().Context.EnableContextOptimization
+                                  && i != 0 ? InfoLevel.Short : InfoLevel.Normal;
             var pawnContext = CreatePawnContext(pawn, infoLevel);
 
             Cache.Get(pawn).Context = pawnContext;
