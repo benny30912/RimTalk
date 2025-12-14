@@ -1,4 +1,4 @@
-namespace RimTalk.Data;
+﻿namespace RimTalk.Data;
 
 public interface IJsonData
 {

@@ -1,4 +1,4 @@
-using RimTalk.Client.Gemini;
+﻿using RimTalk.Client.Gemini;
 using RimTalk.Client.OpenAI;
 using RimTalk.Client.Player2;
 using System.Threading.Tasks;

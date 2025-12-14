@@ -1,4 +1,4 @@
-using RimTalk.Data;
+﻿using RimTalk.Data;
 using Verse;
 
 namespace RimTalk;

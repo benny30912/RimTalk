@@ -1,4 +1,4 @@
-using HarmonyLib;
+﻿using HarmonyLib;
 using RimTalk.UI;
 using RimWorld;
 using UnityEngine;

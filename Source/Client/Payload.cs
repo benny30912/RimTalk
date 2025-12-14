@@ -1,4 +1,4 @@
-namespace RimTalk.Client;
+﻿namespace RimTalk.Client;
 
 public class Payload(string request, string response, int tokenCount)
 {

@@ -1,4 +1,4 @@
-namespace RimTalk.Source.Data;
+﻿namespace RimTalk.Source.Data;
 
 public enum TalkType
 {

@@ -1,4 +1,4 @@
-namespace RimTalk.Util;
+﻿namespace RimTalk.Util;
 
 public static class Describer
 {

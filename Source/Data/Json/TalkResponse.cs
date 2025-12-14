@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using System;
 using System.Runtime.Serialization;
 using RimTalk.Source.Data;

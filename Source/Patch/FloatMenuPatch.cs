@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using HarmonyLib;
 using RimTalk.UI;
 using RimTalk.Util;

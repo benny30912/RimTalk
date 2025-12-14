@@ -1,0 +1,22 @@
+# 告訴編輯器這是最上層設定，不用再往上層資料夾找了
+root = true
+
+# --- 全域預設設定 (適用所有檔案) ---
+[*]
+charset = utf-8                 # 預設使用標準 UTF-8
+indent_style = space            # 預設用空白縮排
+indent_size = 4                 # 預設縮排 4 格
+end_of_line = crlf              # Windows 換行符號 (\r\n)
+insert_final_newline = true     # 存檔時自動在最後一行加空行
+trim_trailing_whitespace = true # 存檔時自動刪除行尾多餘空白
+
+# --- C# 檔案特化設定 ---
+[*.cs]
+# 關鍵！強制 C# 檔案使用帶簽名的 UTF-8
+# 這能讓 Visual Studio 正確識別中文註解，不會變亂碼
+charset = utf-8-bom
+
+# --- 特殊格式檔案微調 ---
+[*.{json,xml,yml,yaml,md}]
+indent_size = 2                 # 這些檔案通常習慣縮排 2 格
+charset = utf-8                 # 確保這些檔案「不要」有 BOM (有些工具讀 JSON 會被 BOM 卡死)

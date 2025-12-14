@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Text;
 using RimTalk.Util;
 using UnityEngine.Networking;

@@ -1,4 +1,4 @@
-namespace RimTalk;
+﻿namespace RimTalk;
 
 public enum AIProvider
 {

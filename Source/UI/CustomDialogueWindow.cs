@@ -1,4 +1,4 @@
-using RimTalk.Service;
+﻿using RimTalk.Service;
 using RimTalk.Util;
 using RimWorld;
 using UnityEngine;

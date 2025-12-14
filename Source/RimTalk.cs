@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using RimTalk.Client;
 using RimTalk.Data;
 using RimTalk.Error;

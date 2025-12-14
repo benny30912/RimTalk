@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using RimTalk.Service;
 using RimTalk.Util;
 using RimWorld;

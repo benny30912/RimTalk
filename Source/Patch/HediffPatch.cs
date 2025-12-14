@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using HarmonyLib;
 using RimTalk.Data;
 using RimTalk.Source.Data;
