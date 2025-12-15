@@ -102,10 +102,17 @@ public static class TalkService
             var playerDict = allInvolvedPawns.ToDictionary(p => p.LabelShort, p => p);
             var receivedResponses = new List<TalkResponse>();
 
+            // ★ 修改點：使用 BuildMemoryBlockFromHistory
+            // 這會回傳經過清洗的 List<(Role, string)>
+            var memoryBlock = MemoryService.BuildMemoryBlockFromHistory(initiator);
+
+            // 將本次的請求 (Prompt) 加入到列表末尾 (這次是不清洗的，因為包含當前指令)
+            // 注意：ChatStreaming 內部會再加一次 request.Prompt，所以這裡只要準備好 History 即可
+            // 如果 AIService.ChatStreaming 是設計為 "History + Prompt"，那麼我們傳入 memoryBlock 作為 History 即可
             // Call the streaming chat service. The callback is executed as each piece of dialogue is parsed.
             await AIService.ChatStreaming(
                 talkRequest,
-                TalkHistory.GetMessageHistory(initiator),
+                memoryBlock, //傳入清洗過的歷史
                 playerDict,
                 (pawn, talkResponse) =>
                 {

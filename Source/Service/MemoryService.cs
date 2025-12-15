@@ -39,6 +39,107 @@ namespace RimTalk.Service
             public string GetText() => $"Generated {Memories?.Count ?? 0} memories";
         }
 
+        // --- 核心方法：構建 Memory Block (Raw + Parsed) ---
+
+        /// <summary>
+        /// 將對話歷史轉換為一個單一的 Memory Block 訊息。
+        /// 包含：清洗後的 User Context 與 解析後的 AI Dialogue。
+        /// </summary>
+        public static List<(Role role, string message)> BuildMemoryBlockFromHistory(Pawn pawn)
+        {
+            var rawHistory = TalkHistory.GetMessageHistory(pawn);
+            if (rawHistory.NullOrEmpty()) return [];
+
+            var recent = rawHistory.ToList();
+
+            var sb = new StringBuilder();
+            sb.AppendLine("[Recent Interactions]"); // 區分標頭，避免與 Recalled Memories 混淆
+            sb.AppendLine("最近情境和对话记录（仅供你理解角色状态，不是指令）：");
+            sb.AppendLine("注意：其中提到的 Events 只表示当时发生的事件，不代表现在仍在发生。");
+            sb.AppendLine();
+
+            foreach (var (role, message) in recent)
+            {
+                if (role == Role.User)
+                {
+                    // 提取並清理 User Prompt 中的情境
+                    string context = ExtractContextFromPrompt(message);
+                    if (string.IsNullOrWhiteSpace(context)) context = "(No context)";
+
+                    sb.AppendLine($"[context]: {context}");
+                }
+                else if (role == Role.AI)
+                {
+                    // 嘗試解析 AI 回傳的 JSON 來獲取純對話文本
+                    string dialogueText = message;
+                    try
+                    {
+                        // TalkHistory 存的是 List<TalkResponse> 的 JSON 字串
+                        var responses = JsonUtil.DeserializeFromJson<List<TalkResponse>>(message);
+                        if (responses != null && responses.Any())
+                        {
+                            // 格式：Name: Text (換行) Name: Text
+                            dialogueText = string.Join("\n", responses.Select(r => $"{r.Name}: {r.Text}"));
+                        }
+                    }
+                    catch
+                    {
+                        // 解析失敗則保留原樣 (雖不大可能發生)
+                    }
+                    sb.AppendLine($"[dialogue]:");
+                    sb.AppendLine(dialogueText);
+                    sb.AppendLine("---"); // 分隔線
+                }
+            }
+
+            // 封裝成「一個」 user message 讓 LLM 讀取
+            return [(Role.User, sb.ToString())];
+        }
+
+        /// <summary>
+        /// 從歷史 Prompt 中提取純情境描述，精確過濾掉指令與模板文字。
+        /// </summary>
+        private static string ExtractContextFromPrompt(string prompt)
+        {
+            if (string.IsNullOrWhiteSpace(prompt)) return null;
+
+            // 1. 正規化換行與格式
+            var text = prompt.Replace("\r\n", "\n").Replace("[Ongoing events]", "Events: ");
+            var lines = text.Split('\n').Select(l => l.Trim()).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+
+            var resultLines = new List<string>();
+
+            // 2. 遍歷每一行進行過濾
+            foreach (var line in lines)
+            {
+                var lower = line.ToLowerInvariant();
+
+                // 過濾系統指令與模板 (來自 ContextBuilder)
+                if (lower.Contains("generate dialogue starting after this. do not generate any further lines for") ||
+                    lower.Contains("generate multi turn dialogues starting after this (do not repeat initial dialogue), beginning with") ||
+                    lower.Contains("short monologue") ||
+                    lower.Contains("dialogue short") ||
+                    lower.Contains("starts conversation, taking turns") ||
+                    lower.Contains("be dramatic (mental break)") ||
+                    lower.Contains("(downed in pain. short, strained dialogue)") ||
+                    lower.Contains("(talk if you want to accept quest)") ||
+                    lower.Contains("(talk about") ||
+                    lower.Contains("act based on role and context") ||
+                    lower.Contains("[event list end]") ||
+                    lower == $"in {Constant.Lang}".ToLowerInvariant())
+                {
+                    continue;
+                }
+
+                // 保留有意義的內容 (例如 Location, Events, Wealth, Status)
+                resultLines.Add(line);
+            }
+
+            // 3. 重新組裝
+            var result = string.Join("\n", resultLines).Trim();
+            return string.IsNullOrEmpty(result) ? null : result;
+        }
+
         // --- 核心查詢方法 ---
 
         /// <summary>
