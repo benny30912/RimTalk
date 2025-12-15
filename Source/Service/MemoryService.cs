@@ -274,15 +274,23 @@ namespace RimTalk.Service
             var comp = Find.World?.GetComponent<RimTalkWorldComponent>();
             if (comp == null || pawn == null) return false;
 
+            PawnMemoryData data;
+
+            // 1. 鎖定字典僅用於「查找或建立」
             lock (comp.PawnMemories)
             {
                 // 獲取或建立 PawnMemoryData
-                if (!comp.PawnMemories.TryGetValue(pawn.thingIDNumber, out var data))
+                if (!comp.PawnMemories.TryGetValue(pawn.thingIDNumber, out data))
                 {
                     data = new PawnMemoryData { Pawn = pawn };
                     comp.PawnMemories[pawn.thingIDNumber] = data;
                 }
+            }
 
+            // 2. 鎖定資料物件用於「修改列表」
+            // 這樣就與 TalkHistory.TriggerStmToMtmSummary 的 lock(data) 互斥了
+            lock (data)
+            {
                 // 加入 STM
                 data.ShortTermMemories.Add(record);
                 data.NewShortMemoriesSinceSummary++;

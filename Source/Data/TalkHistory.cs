@@ -19,7 +19,8 @@ public static class TalkHistory
 
     private static readonly ConcurrentDictionary<int, List<(Role role, string message)>> MessageHistory = new();
     private static readonly ConcurrentDictionary<Guid, int> SpokenTickCache = new() { [Guid.Empty] = 0 };
-    private static readonly ConcurrentBag<Guid> IgnoredCache = [];
+    // 1. 移除 IgnoredCache 的 readonly (因為需要重新 new)
+    private static ConcurrentBag<Guid> IgnoredCache = []; // 加回 volatile 更好，但 lock 也夠用
 
     // 任務取消 Token 與主線程隊列
     private static CancellationTokenSource _cts = new();
@@ -76,7 +77,17 @@ public static class TalkHistory
     private static void TriggerStmToMtmSummary(Pawn pawn)
     {
         var comp = WorldComp;
-        if (comp == null || !comp.PawnMemories.TryGetValue(pawn.thingIDNumber, out var data)) return;
+        if (comp == null) return;
+
+        PawnMemoryData data;
+
+        // 1. 安全地獲取 data
+        lock (comp.PawnMemories)
+        {
+            if (!comp.PawnMemories.TryGetValue(pawn.thingIDNumber, out data)) return;
+        }
+
+        // 2. 鎖定 data 進行快照 (與 AddMemory 互斥)
         lock (data)
         {
             // 建立快照
@@ -312,14 +323,33 @@ public static class TalkHistory
         }
     }
 
-    public static void Clear()
+    // 修改 Clear 方法簽名與邏輯
+    public static void Clear(bool keepSavedData = false)
     {
+        // 1. 先停止所有異步任務，減少競爭
         _cts.Cancel();
         _cts = new CancellationTokenSource();
         while (_mainThreadActionQueue.TryDequeue(out _)) { }
 
+        // 2. 清理 UI 暫存與快取
         MessageHistory.Clear();
-        // clearing spokenCache may block child talks waiting to display
-        WorldComp?.PawnMemories.Clear();
+        SpokenTickCache.Clear();
+        // ConcurrentBag 無 Clear 方法，且為了安全直接換新的
+        IgnoredCache = [];
+
+        // 僅在非保留模式下清除 WorldComponent
+        if (!keepSavedData)
+        {
+            var comp = WorldComp;
+            if (comp != null)
+            {
+                // 3. 加鎖清除 (防止背景剛好在寫入)
+                // 注意：這裡鎖的是 PawnMemories (Dictionary)，與 AddMemory 的第一層鎖對應
+                lock (comp.PawnMemories)
+                {
+                    comp.PawnMemories.Clear();
+                }
+            }
+        }
     }
 }

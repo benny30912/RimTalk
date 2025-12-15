@@ -17,16 +17,19 @@ public class RimTalk : GameComponent
     public override void StartedNewGame()
     {
         base.StartedNewGame();
-        Reset();
+        // 新遊戲：徹底重置
+        Reset(soft: false, keepSavedData: false);
     }
 
     public override void LoadedGame()
     {
         base.LoadedGame();
-        Reset();
+        // 讀檔：保留 WorldData (記憶)
+        Reset(soft: false, keepSavedData: true);
     }
 
-    public static void Reset(bool soft = false)
+    // 增加 keepSavedData 參數
+    public static void Reset(bool soft = false, bool keepSavedData = false)
     {
         var settings = Settings.Get();
         if (settings != null)
@@ -38,7 +41,10 @@ public class RimTalk : GameComponent
         TickManagerPatch.Reset();
         AIClientFactory.Clear();
         AIService.Clear();
-        TalkHistory.Clear();
+
+        // 傳遞參數給 TalkHistory
+        TalkHistory.Clear(keepSavedData);
+
         PatchThoughtHandlerGetDistinctMoodThoughtGroups.Clear();
         Cache.GetAll().ToList().ForEach(pawnState => pawnState.IgnoreAllTalkResponses());
         Cache.InitializePlayerPawn();
