@@ -25,7 +25,8 @@ public partial class Settings : Mod
         Basic,
         AIInstruction,
         Context,
-        EventFilter
+        EventFilter,
+        CommonKnowledge // [NEW] 更新 Enum 加入 CommonKnowledge
     }
     public enum ButtonDisplayMode
     {
@@ -171,12 +172,14 @@ public partial class Settings : Mod
 
     private void DrawTabButtons(Rect rect)
     {
-        float tabWidth = rect.width / 4f;
+        float tabWidth = rect.width / 5f; // [MOD] 調整寬度除以 5
 
         Rect basicTabRect = new Rect(rect.x, rect.y, tabWidth, 30f);
         Rect instructionTabRect = new Rect(rect.x + tabWidth, rect.y, tabWidth, 30f);
         Rect contextTabRect = new Rect(rect.x + tabWidth * 2, rect.y, tabWidth, 30f);
         Rect filterTabRect = new Rect(rect.x + tabWidth * 3, rect.y, tabWidth, 30f);
+        // [NEW] 新增按鈕區域
+        Rect ckTabRect = new Rect(rect.x + tabWidth * 4, rect.y, tabWidth, 30f);
 
         // Basic Settings Tab
         GUI.color = _currentTab == SettingsTab.Basic ? Color.white : Color.gray;
@@ -210,6 +213,13 @@ public partial class Settings : Mod
             }
         }
 
+        // [NEW] 繪製常識庫按鈕
+        GUI.color = _currentTab == SettingsTab.CommonKnowledge ? Color.white : Color.gray;
+        if (Widgets.ButtonText(ckTabRect, "RimTalk.Settings.CommonKnowledge".Translate()))
+        {
+            _currentTab = SettingsTab.CommonKnowledge;
+        }
+
         GUI.color = Color.white;
     }
         
@@ -221,6 +231,13 @@ public partial class Settings : Mod
 
         // Draw content area below tabs
         Rect contentRect = new Rect(inRect.x, inRect.y + 40f, inRect.width, inRect.height - 40f);
+
+        // [NEW] CommonKnowledge 使用獨立高度控制，不進入 Listing_Standard 計算
+        if (_currentTab == SettingsTab.CommonKnowledge)
+        {
+            DrawCommonKnowledgeSettings(contentRect);
+            return;
+        }
 
         // --- Dynamic height calculation (off-screen) ---
         GUI.BeginGroup(new Rect(-9999, -9999, 1, 1)); // Draw off-screen

@@ -37,6 +37,9 @@ public class RimTalkSettings : ModSettings
     public int DisableAiAtSpeed = 0;
     public Settings.ButtonDisplayMode ButtonDisplay = Settings.ButtonDisplayMode.Tab;
 
+    // [NEW] 新增：記憶重要性權重，用於長期記憶剔除計算
+    public float MemoryImportanceWeight = 3.0f;
+
     public ContextSettings Context = new();
 
     // Debug mode settings
@@ -175,7 +178,10 @@ public class RimTalkSettings : ModSettings
         Scribe_Values.Look(ref AllowBabiesToTalk, "allowBabiesToTalk", true);
         Scribe_Values.Look(ref AllowNonHumanToTalk, "allowNonHumanToTalk", true);
         Scribe_Values.Look(ref ApplyMoodAndSocialEffects, "applyMoodAndSocialEffects", false);
-        
+
+        // [NEW] 儲存權重
+        Scribe_Values.Look(ref MemoryImportanceWeight, "memoryImportanceWeight", 3.0f);
+
         Scribe_Deep.Look(ref Context, "context");
 
         // Debug window settings

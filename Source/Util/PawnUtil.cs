@@ -193,7 +193,7 @@ public static class PawnUtil
                 AddJobTargetsToRelevantPawns(nearby.CurJob, relevantPawns);
         }
 
-        // [MOD] 最終防線：強制移除 mainPawn，確保絕對不自我修飾
+        // [NEW] 最終防線：強制移除 mainPawn，確保絕對不自我修飾
         relevantPawns.Remove(mainPawn);
 
         return relevantPawns;
@@ -247,7 +247,7 @@ public static class PawnUtil
     {
         // 過濾邏輯封裝在此：排除 context 中的人 + 排除 notable 的人
         var validPawns = nearbyPawns
-            .Where(p => !relevantPawns.Contains(p)) // [MOD] 過濾掉已經是 relevantPawns 的人，避免重複顯示
+            .Where(p => !relevantPawns.Contains(p)) // [NEW] 過濾掉已經是 relevantPawns 的人，避免重複顯示
             .Where(p => excludePawns == null || !excludePawns.Contains(p)) // 使用傳入的排除清單
             .ToList();
 

@@ -17,12 +17,20 @@ public class RimTalkWorldComponent(World world) : WorldComponent(world)
     // 運行時快速存取 (Key: Pawn.thingIDNumber)
     // 這是全域唯一的記憶儲存點
     public Dictionary<int, PawnMemoryData> PawnMemories = new();
+
+    // [NEW] 全域常識庫 (Common Knowledge)
+    // 儲存適用於所有角色的共享知識
+    public List<MemoryRecord> CommonKnowledgeStore = [];
+
     // 序列化用的列表 (因為 Scribe 不支援直接儲存複雜物件的 Dictionary)
     private List<PawnMemoryData> _memoryDataList = [];
 
     public override void ExposeData()
     {
         base.ExposeData();
+
+        // [NEW] 儲存常識庫
+        Scribe_Collections.Look(ref CommonKnowledgeStore, "commonKnowledgeStore", LookMode.Deep);
 
         // [儲存前] 將 Dictionary 轉為 List
         if (Scribe.mode == LoadSaveMode.Saving)
@@ -44,6 +52,9 @@ public class RimTalkWorldComponent(World world) : WorldComponent(world)
                     PawnMemories[data.Pawn.thingIDNumber] = data;
                 }
             }
+
+            // [NEW] 確保常識庫不為 null
+            CommonKnowledgeStore ??= [];
         }
 
         try 

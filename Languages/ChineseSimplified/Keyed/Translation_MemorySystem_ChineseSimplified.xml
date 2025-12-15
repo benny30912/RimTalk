@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<LanguageData>
+	<!-- Common Knowledge Settings Tab -->
+	<RimTalk.Settings.CommonKnowledge>常识库</RimTalk.Settings.CommonKnowledge>
+	<!-- Common Knowledge Management UI -->
+	<RimTalk.Settings.CKStoredInSave>常识库资料储存于存档中，请先载入游戏以进行检视或编辑。</RimTalk.Settings.CKStoredInSave>
+	<RimTalk.Settings.CKNewEntry>新增条目</RimTalk.Settings.CKNewEntry>
+	<RimTalk.Settings.CKEditEntry>编辑条目</RimTalk.Settings.CKEditEntry>
+	<RimTalk.Settings.CKKeywords>关键词 (使用逗号 , 分隔)：</RimTalk.Settings.CKKeywords>
+	<RimTalk.Settings.CKContent>内容：</RimTalk.Settings.CKContent>
+	<RimTalk.Settings.CKAdd>新增</RimTalk.Settings.CKAdd>
+	<RimTalk.Settings.CKUpdate>更新</RimTalk.Settings.CKUpdate>
+	<RimTalk.Settings.CKCancelClear>取消/清除</RimTalk.Settings.CKCancelClear>
+	<!-- Weight Settings (若未来要在 UI 显示) -->
+	<RimTalk.Settings.MemoryImportanceWeight>重要性权重</RimTalk.Settings.MemoryImportanceWeight>
+	<RimTalk.Settings.MemoryImportanceWeightDesc>决定重要性(Importance)在记忆检索与保留时的影响程度。</RimTalk.Settings.MemoryImportanceWeightDesc>
+</LanguageData>
