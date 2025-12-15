@@ -147,9 +147,33 @@ public static class TalkService
     {
         if (!responses.Any()) return;
         string serializedResponses = JsonUtil.SerializeToJson(responses);
+
+        // 2. 嘗試從回應列表中提取 Metadata
+        // 通常位於最後一個回應，或合併所有回應的 Metadata
+        var lastResponse = responses.LastOrDefault();
+        string summary = lastResponse?.Summary;
+        List<string> keywords = lastResponse?.Keywords ?? [];
+        int importance = lastResponse?.Importance ?? 1;
+        // 若 LLM 未回傳 Summary (例如舊的 Prompt)，則提供一個預設值或讓 MemoryService 後續補救
+        if (string.IsNullOrWhiteSpace(summary))
+        {
+            // 這裡可以選擇不生成 STM，或是生成一個僅包含 Raw Text 提示的 STM
+            summary = "(No summary provided by AI)";
+        }
+        // 3. 建立 STM MemoryRecord
+        var memoryRecord = new MemoryRecord
+        {
+            Summary = summary,
+            Keywords = keywords,
+            Importance = UnityEngine.Mathf.Clamp(importance, 1, 5),
+            CreatedTick = GenTicks.TicksGame,
+            AccessCount = 0
+        };
+
         foreach (var pawn in pawns)
         {
             TalkHistory.AddMessageHistory(pawn, prompt, serializedResponses);
+            TalkHistory.AddTalkResult(pawn, memoryRecord);
         }
     }
 

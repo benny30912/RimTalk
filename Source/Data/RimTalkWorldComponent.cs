@@ -14,9 +14,37 @@ public class RimTalkWorldComponent(World world) : WorldComponent(world)
     public Dictionary<string, string> RimTalkInteractionTexts = new();
     private Queue<string> _keyInsertionOrder = new();
 
+    // 運行時快速存取 (Key: Pawn.thingIDNumber)
+    // 這是全域唯一的記憶儲存點
+    public Dictionary<int, PawnMemoryData> PawnMemories = new();
+    // 序列化用的列表 (因為 Scribe 不支援直接儲存複雜物件的 Dictionary)
+    private List<PawnMemoryData> _memoryDataList = [];
+
     public override void ExposeData()
     {
         base.ExposeData();
+
+        // [儲存前] 將 Dictionary 轉為 List
+        if (Scribe.mode == LoadSaveMode.Saving)
+        {
+            // 注意：這裡假設 PawnMemories.Values 內無 null
+            _memoryDataList = new List<PawnMemoryData>(PawnMemories.Values);
+        }
+        // 這會保存所有的 Short/Medium/Long Term Memories
+        Scribe_Collections.Look(ref _memoryDataList, "pawnMemories", LookMode.Deep);
+        // [讀取後] 重建 Dictionary
+        if (Scribe.mode == LoadSaveMode.PostLoadInit)
+        {
+            _memoryDataList ??= [];
+            PawnMemories.Clear();
+            foreach (var data in _memoryDataList)
+            {
+                if (data.Pawn != null)
+                {
+                    PawnMemories[data.Pawn.thingIDNumber] = data;
+                }
+            }
+        }
 
         try 
         {

@@ -25,6 +25,16 @@ public class TalkRequest
         CreatedTick = GenTicks.TicksGame;
     }
 
+    // 2. [新增] 記憶系統用的建構子 (強制指定 CreatedTick)
+    public TalkRequest(string prompt, Pawn initiator, int createdTick)
+    {
+        TalkType = TalkType.Other;
+        Prompt = prompt;
+        Initiator = initiator;
+        Recipient = null;
+        CreatedTick = createdTick;
+    }
+
     public bool IsExpired()
     {
         int duration = 10;

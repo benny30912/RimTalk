@@ -34,6 +34,14 @@ public static class AIClientFactory
         return _instance;
     }
 
+    // ★ 新增：獲取記憶處理專用的 Client
+    public static async Task<IAIClient> GetMemoryClientAsync()
+    {
+        // 目前記憶處理使用與主對話相同的配置
+        // 若未來需要獨立模型 (如更便宜的模型)，可在此修改邏輯
+        return await GetAIClientAsync();
+    }
+
     /// <summary>
     /// Creates appropriate AI client instance based on provider configuration
     /// Player2 uses async factory method for local app detection

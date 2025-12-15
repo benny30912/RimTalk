@@ -31,8 +31,14 @@ public static class Constant
     private const string JsonInstruction = """
                                            Output JSONL.
                                            Required keys: "name", "text".
+                                               
+                                           [Metadata Rules]
+                                           For the LAST object in the array only, you MUST include:
+                                           - "summary": A 3rd-person summary of this interaction (Short Term Memory).
+                                           - "keywords": A list of 2-3 key tags.
+                                           - "importance": Integer score 1-5.
                                            """;
-    
+
     private const string SocialInstruction = """
                                            Optional keys (Include only if social interaction occurs):
                                            "act": Insult, Slight, Chat, Kind
