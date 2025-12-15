@@ -178,9 +178,25 @@ public static class ContextBuilder
                 .Take(3);
         }
 
-        var healthInfo = string.Join(",", hediffs
-            .GroupBy(h => h.def)
-            .Select(g => $"{g.Key.label}({string.Join(",", g.Select(h => h.Part?.Label ?? ""))})"));
+        var hediffGroups = hediffs
+            .GroupBy(h => new { h.def, IsPermanent = h is Hediff_Injury inj && inj.IsPermanent() })
+            .Select(g =>
+            {
+                var sample = g.First();
+                // 使用 LabelCap 獲取完整名稱（包含階段）
+                // 注意：這裡取 First 的 LabelCap 代表這組傷口會共用一個描述，這在 Def 分組下是可接受的權衡
+                string label = sample.LabelCap;
+                // 收集部位名稱，過濾掉空的
+                var partsList = g.Select(h => h.Part?.Label)
+                                 .Where(p => !string.IsNullOrEmpty(p))
+                                 .Distinct()
+                                 .ToList();
+                if (partsList.Count == 0)
+                    return label; // 全身性或無部位的 Hediff
+                string parts = string.Join(", ", partsList);
+                return $"{label}({parts})";
+            });
+        var healthInfo = string.Join(", ", hediffGroups);
 
         if (!string.IsNullOrEmpty(healthInfo))
             return $"Health: {healthInfo}";
@@ -220,7 +236,7 @@ public static class ContextBuilder
             : allThoughts.Keys.Select(t => ContextHelper.Sanitize(t.LabelCap));
 
         if (thoughts.Any())
-            return $"Memory: {string.Join(", ", thoughts)}";
+            return $"Thoughts: {string.Join(", ", thoughts)}"; // Memory 改為 Thoughts
         return null;
     }
 
@@ -308,13 +324,13 @@ public static class ContextBuilder
             var locationStatus = ContextHelper.GetPawnLocationStatus(mainPawn);
             if (!string.IsNullOrEmpty(locationStatus))
             {
-                var temperature = Mathf.RoundToInt(mainPawn.Position.GetTemperature(mainPawn.Map));
+                var temperature = mainPawn.Position.GetTemperature(mainPawn.Map).ToString("0.0");
                 var room = mainPawn.GetRoom();
-                var roomRole = room is { PsychologicallyOutdoors: false } ? room.Role?.label ?? "Room" : "";
-
+                // 若沒有roomRole就留空；若是非心理上的戶外（即室內），嘗試獲取房間名
+                var roomRole = room is { PsychologicallyOutdoors: false } ? room.Role?.label ?? "" : "";
                 sb.Append(string.IsNullOrEmpty(roomRole)
-                    ? $"\nLocation: {locationStatus};{temperature}C"
-                    : $"\nLocation: {locationStatus};{temperature}C;{roomRole}");
+                    ? $"\nLocation: {locationStatus}({temperature}°C)" // 若無房間名 (e.g. 室外或未定義房間)，顯示狀態 (室內/室外)
+                    : $"\nLocation: {roomRole}({temperature}°C)");     // 若有房間名，優先顯示
             }
         }
     }

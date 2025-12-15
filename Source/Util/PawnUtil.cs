@@ -88,7 +88,16 @@ public static class PawnUtil
         if (pawn.IsVisitor())
             return includeFaction && pawn.Faction != null ? $"Visitor Group({pawn.Faction.Name})" : "Visitor";
         if (pawn.IsQuestLodger()) return "Lodger";
-        if (pawn.IsFreeColonist) return pawn.GetMapRole() == MapRole.Invading ? "Invader" : "Colonist";
+        if (pawn.IsFreeColonist)
+        {
+            string role = pawn.GetMapRole() == MapRole.Invading ? "Invader" : "Colonist";
+            // 檢查是否加入不滿 15 天 (900,000 Ticks)
+            if (pawn.records.GetValue(RecordDefOf.TimeAsColonistOrColonyAnimal) < 900000)
+            {
+                role += "(New Member)";
+            }
+            return role;
+        }
         return null;
     }
 
@@ -132,21 +141,32 @@ public static class PawnUtil
         if (pawn.IsInDanger())
             isInDanger = true;
 
+        bool hasAnyNearbyLog = false;
+
         // Nearby pawns in danger
         if (nearbyPawns != null && nearbyPawns.Any())
         {
-            var nearbyInDanger = GetNearbyPawnsInDanger(pawn, nearbyPawns, relevantPawns, useOptimization, settings.Context.MaxPawnContextCount);
+            // 1. 使用 Tuple 接收回傳值 (Deconstruction)
+            var (notablePawns, nearbyInDanger) = GetNearbyPawnsInDanger(pawn, nearbyPawns, relevantPawns, useOptimization, settings.Context.MaxPawnContextCount);
             if (nearbyInDanger.Any())
             {
                 lines.Add("People in condition nearby: " + string.Join("; ", nearbyInDanger));
                 isInDanger = true;
+                hasAnyNearbyLog = true;
             }
 
-            // All nearby pawns list
-            string nearbyList = GetNearbyPawnsList(nearbyPawns, relevantPawns, useOptimization, settings.Context.MaxPawnContextCount);
-            lines.Add("Nearby: " + nearbyList);
+            // 2. 傳入 notablePawns 進行排除
+            string nearbyList = GetNearbyPawnsList(nearbyPawns, relevantPawns, useOptimization, settings.Context.MaxPawnContextCount, excludePawns: notablePawns);
+
+            if (nearbyList != "none")
+            {
+                lines.Add("Nearby: " + nearbyList);
+                hasAnyNearbyLog = true;
+            }
         }
-        else
+
+        // 判斷 None
+        if (!hasAnyNearbyLog)
         {
             lines.Add("Nearby people: none");
         }
@@ -159,7 +179,8 @@ public static class PawnUtil
 
     private static HashSet<Pawn> CollectRelevantPawns(Pawn mainPawn, List<Pawn> nearbyPawns)
     {
-        var relevantPawns = new HashSet<Pawn> { mainPawn };
+        // [MOD] 初始為空，不包含 mainPawn，避免自我裝飾
+        var relevantPawns = new HashSet<Pawn>();
 
         if (mainPawn.CurJob != null)
             AddJobTargetsToRelevantPawns(mainPawn.CurJob, relevantPawns);
@@ -171,6 +192,9 @@ public static class PawnUtil
             foreach (var nearby in nearbyPawns.Where(p => p.CurJob != null))
                 AddJobTargetsToRelevantPawns(nearby.CurJob, relevantPawns);
         }
+
+        // [MOD] 最終防線：強制移除 mainPawn，確保絕對不自我修飾
+        relevantPawns.Remove(mainPawn);
 
         return relevantPawns;
     }
@@ -195,12 +219,17 @@ public static class PawnUtil
         return DecorateText(activity, relevantPawns);
     }
 
-    private static List<string> GetNearbyPawnsInDanger(Pawn mainPawn, List<Pawn> nearbyPawns, 
+    // 增加回傳篩選結果
+    private static (List<Pawn>, List<string>) GetNearbyPawnsInDanger(Pawn mainPawn, List<Pawn> nearbyPawns,
         HashSet<Pawn> relevantPawns, bool useOptimization, int maxCount)
     {
-        return nearbyPawns
+        // 這裡維持邏輯封裝：先篩選出 Pawn
+        var identifiedPawns = nearbyPawns
             .Where(p => p.Faction == mainPawn.Faction && p.IsInDanger(true))
             .Take(maxCount - 1)
+            .ToList();
+
+        var descriptions = identifiedPawns
             .Select(p =>
             {
                 string label = GetPawnLabel(p, relevantPawns, useOptimization);
@@ -208,15 +237,24 @@ public static class PawnUtil
                 return $"{label} in {activity.Replace("\n", "; ")}";
             })
             .ToList();
+
+        return (identifiedPawns, descriptions);
     }
 
-    private static string GetNearbyPawnsList(List<Pawn> nearbyPawns, HashSet<Pawn> relevantPawns, 
-        bool useOptimization, int maxCount)
+    // 增加 excludePawns 參數
+    private static string GetNearbyPawnsList(List<Pawn> nearbyPawns, HashSet<Pawn> relevantPawns,
+        bool useOptimization, int maxCount, List<Pawn> excludePawns = null)
     {
-        if (!nearbyPawns.Any())
+        // 過濾邏輯封裝在此：排除 context 中的人 + 排除 notable 的人
+        var validPawns = nearbyPawns
+            .Where(p => !relevantPawns.Contains(p)) // [MOD] 過濾掉已經是 relevantPawns 的人，避免重複顯示
+            .Where(p => excludePawns == null || !excludePawns.Contains(p)) // 使用傳入的排除清單
+            .ToList();
+
+        if (!validPawns.Any())
             return "none";
 
-        var pawnDescriptions = nearbyPawns
+        var pawnDescriptions = validPawns
             .Select(p =>
             {
                 string label = GetPawnLabel(p, relevantPawns, useOptimization);
@@ -241,13 +279,13 @@ public static class PawnUtil
     {
         if (pawn.IsVisitor())
         {
-            lines.Add("Visiting user colony");
+            lines.Add("Visiting colony"); // 改: "Visiting colony"
             return;
         }
 
         if (pawn.IsFreeColonist && pawn.GetMapRole() == MapRole.Invading)
         {
-            lines.Add("You are away from colony, attacking to capture enemy settlement");
+            lines.Add("Away from home, assaulting enemy settlement"); // "Away from home" 點出地點，"Assaulting" 描述動作，不提及目的(capture)，留給 AI 發揮
             return;
         }
 
@@ -257,13 +295,13 @@ public static class PawnUtil
             {
                 var lord = pawn.GetLord()?.LordJob;
                 if (lord is LordJob_StageThenAttack || lord is LordJob_Siege)
-                    lines.Add("waiting to invade user colony");
+                    lines.Add("Staging for colony assault"); // 正在集結/圍攻
                 else
-                    lines.Add("invading user colony");
+                    lines.Add("Assaulting colony"); // 正在進攻
             }
             else
             {
-                lines.Add("Fighting to protect your home from being captured");
+                lines.Add("Defending settlement"); // 改: "Defending settlement"
             }
             return;
         }
@@ -274,12 +312,13 @@ public static class PawnUtil
         {
             float distance = pawn.Position.DistanceTo(nearestHostile.Position);
 
+            // 改用 Combat 前綴，讓 LLM 知道這是戰鬥狀態，微調用詞
             if (distance <= 10f)
-                lines.Add("Threat: Engaging in battle!");
+                lines.Add("Combat: Engaging in battle!");
             else if (distance <= 20f)
-                lines.Add("Threat: Hostiles are dangerously close!");
+                lines.Add("Threat: Hostiles in close range!");
             else
-                lines.Add("Alert: hostiles in the area");
+                lines.Add("Alert: Hostiles spotted in area");
             
             isInDanger = true;
         }
@@ -448,11 +487,10 @@ public static class PawnUtil
                 if (target == (LocalTargetInfo)(Thing)null)
                     continue;
 
-                if (target.HasThing && target.Thing is Pawn pawn && relevantPawns.Add(pawn))
+                if (target.HasThing && target.Thing is Pawn pawn)
                 {
-                    // Recursively add targets from this pawn's job
-                    if (pawn.CurJob != null)
-                        AddJobTargetsToRelevantPawns(pawn.CurJob, relevantPawns);
+                    relevantPawns.Add(pawn);
+                    // [MOD] 移除遞迴呼叫以提升效能並避免潛在循環
                 }
             }
             catch

@@ -32,14 +32,17 @@ public static class ContextHelper
 
     public static string GetDecoratedName(Pawn pawn)
     {
+        // 針對非人類（如機器人、動物）
         if (!pawn.RaceProps.Humanlike)
-            return $"{pawn.LabelShort}(Age:{pawn.ageTracker.AgeBiologicalYears};Race:{pawn.def.LabelCap})";
-        
+            return $"{pawn.LabelShort}(Age: {pawn.ageTracker.AgeBiologicalYears}, Race: {pawn.def.LabelCap})";
+
+        // 針對人類或亞人種
         var race = ModsConfig.BiotechActive && pawn.genes?.Xenotype != null
             ? pawn.genes.Xenotype.LabelCap
             : pawn.def.LabelCap;
 
-        return $"{pawn.LabelShort}(Age:{pawn.ageTracker.AgeBiologicalYears};{pawn.gender.GetLabel()};ID:{pawn.GetRole(true)};{race})";
+        // 調整格式：加入性別、角色標籤，並用逗號分隔
+        return $"{pawn.LabelShort}(Age: {pawn.ageTracker.AgeBiologicalYears}, Gender: {pawn.gender.GetLabel()}, Role: {pawn.GetRole(true)}, Race: {race})";
     }
 
     public static bool IsWall(Thing thing)
