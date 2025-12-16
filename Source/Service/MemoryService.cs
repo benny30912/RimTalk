@@ -708,51 +708,160 @@ namespace RimTalk.Service
             }
         }
 
+        // [New] 輔助類別：用於排序
+        private class ScoredMemory
+        {
+            public MemoryRecord Memory;
+            public float Score;
+        }
+
         // [NEW] GetRelevantMemories (分離記憶與常識檢索)
         // 回傳 Tuple: (個人記憶列表, 常識列表)
         /// <summary>
-        /// 根據上下文檢索相關記憶 (Short + Medium + Long + Common Knowledge)。
+        /// 根據上下文檢索相關記憶 (Short + Medium + Long + Common Knowledge)。 (導入 TF-IDF、時間衰減與動態閾值)
         /// </summary>
         public static (List<MemoryRecord> memories, List<MemoryRecord> knowledge) GetRelevantMemories(string context, Pawn pawn)
         {
             if (string.IsNullOrWhiteSpace(context)) return ([], []);
 
+            // 1. 準備資料來源
             var comp = Find.World?.GetComponent<RimTalkWorldComponent>();
-            // 獲取個人記憶資料
-            PawnMemoryData data = null;
-            comp?.PawnMemories.TryGetValue(pawn.thingIDNumber, out data);
+            var allMemories = new List<MemoryRecord>();
 
-            var contextLower = context.ToLowerInvariant();
-            // 讀取設定上限 (若無 MaxMemoryCount 則暫用 5)
-            int limit = 5;
-
-            // --- A. 個人記憶檢索 ---
-            var memoryCandidates = new List<MemoryRecord>();
-            // 1. 收集所有候選記憶 (個人: STM/MTM/LTM)
-            if (data != null)
+            if (comp != null && pawn != null)
             {
-                memoryCandidates.AddRange(data.ShortTermMemories);
-                memoryCandidates.AddRange(data.MediumTermMemories);
-                memoryCandidates.AddRange(data.LongTermMemories);
+                lock (comp.PawnMemories) // 讀取鎖
+                {
+                    if (comp.PawnMemories.TryGetValue(pawn.thingIDNumber, out var data))
+                    {
+                        lock (data)
+                        {
+                            // 收集所有層級記憶作為候選
+                            allMemories.AddRange(data.ShortTermMemories);
+                            allMemories.AddRange(data.MediumTermMemories);
+                            allMemories.AddRange(data.LongTermMemories);
+                        }
+                    }
+                }
             }
 
-            var relevantMemories = memoryCandidates
-                .Where(m => m.Keywords != null && m.Keywords.Any(k => contextLower.Contains(k.ToLowerInvariant())))
-                .OrderByDescending(m => m.Importance) // 優先看重要性
-                .ThenBy(m => m.AccessCount)         // 再看活躍度
-                .Take(limit)
-                .ToList();
+            // 2. 設定參數
+            int memoryLimit = 5;
+            int knowledgeLimit = 10;
 
-            // 更新活躍度
-            foreach (var mem in relevantMemories) mem.AccessCount++;
+            // 權重 (若 Settings 中無 KeywordWeight，可暫用 2.0f)
+            float weightKeyword = 2.0f; // Settings.Get().KeywordWeight;
+            float weightImportance = Settings.Get().MemoryImportanceWeight;
+            const float weightAccess = 0.5f;
+            const float timeDecayHalfLifeDays = 60f; // 1年半衰期 (60天遊戲天數)
+            int currentTick = GenTicks.TicksGame; // 使用 GenTicks 較安全
+            const float gracePeriodDays = 15f; // 新手保護期 15 天
+            const float standardLength = 5.0f; // 用於正規化關鍵字權重
 
-            // --- B. 常識庫檢索 ---
-            var knowledgeCandidates = comp?.CommonKnowledgeStore ?? [];
+            // 3. 預計算 TF-IDF (詞頻)
+            var keywordCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            int totalDocs = allMemories.Count;
 
-            var relevantKnowledge = knowledgeCandidates
-                .Where(k => k.Keywords != null && k.Keywords.Any(key => contextLower.Contains(key.ToLowerInvariant())))
-                // 常識庫可能不需要 AccessCount 排序，或者簡單取前幾條
-                .Take(limit)
+            foreach (var m in allMemories)
+            {
+                if (m.Keywords == null) continue;
+                foreach (var k in m.Keywords)
+                {
+                    if (!keywordCounts.ContainsKey(k)) keywordCounts[k] = 0;
+                    keywordCounts[k]++;
+                }
+            }
+
+            // 4. 計算分數
+            var scoredMemories = new List<ScoredMemory>();
+            foreach (var mem in allMemories)
+            {
+                if (mem.Keywords.NullOrEmpty()) continue;
+                float rarityScoreSum = 0f;
+                int matchCount = 0;
+                foreach (var k in mem.Keywords)
+                {
+                    // 使用 IndexOf 避免不必要的 String Alloc
+                    if (context.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        matchCount++;
+                        int count = keywordCounts.TryGetValue(k, out int c) ? c : 0;
+                        // IDF: Log(Total / (Count + 1)) -> 稀有詞分數高
+                        float rarity = (float)Math.Log((double)totalDocs / (count + 1));
+                        rarityScoreSum += rarity;
+                    }
+                }
+                if (matchCount == 0) continue; // 必須至少命中一個
+                // 修正係數：關鍵字少的記憶，單個命中的價值較高
+                float lengthMultiplier = standardLength / Math.Max(mem.Keywords.Count, 1);
+                // 時間衰減 (含階梯保底)
+                float elapsedDays = (currentTick - mem.CreatedTick) / 60000f;
+                // 計算有效衰減天數(從保護期後才開始衰減)：若在保護期內則為 0，超過則減去保護期
+                // 例如：第 10 天 -> max(0, 10-15) = 0 -> exp(0) = 1.0 (不衰減)
+                // 例如：第 75 天 -> max(0, 75-15) = 60 -> exp(-60/60) = 0.36 (衰減)
+                float effectiveDecayDays = Math.Max(0, elapsedDays - gracePeriodDays);
+
+                float rawDecay = (float)Math.Exp(-effectiveDecayDays / timeDecayHalfLifeDays);
+
+                // 保底邏輯：Importance 越高，衰減下限越高
+                float minFloor = mem.Importance switch
+                {
+                    >= 5 => 0.5f, // 刻骨銘心：永不低於 50%
+                    4 => 0.3f,    // 重大：永不低於 30%
+                    _ => 0f       // 普通：可衰減至 0
+                };
+
+                // 新手保護期 (15天內不衰減)
+                if (elapsedDays < 15f) rawDecay = 1.0f;
+                float timeDecayFactor = Math.Max(rawDecay, minFloor);
+                // 最終公式
+                // Score = (關鍵字稀有度 * 修正 * W_Key) + (重要性 * W_Imp * 時間係數) - (提及次數罰分)
+                float score = (rarityScoreSum * lengthMultiplier * weightKeyword)
+                            + (mem.Importance * weightImportance * timeDecayFactor)
+                            - (mem.AccessCount * weightAccess);
+                scoredMemories.Add(new ScoredMemory { Memory = mem, Score = score });
+            }
+
+            // 5. 排序與選取
+            var relevantMemories = new List<MemoryRecord>();
+            if (scoredMemories.Any())
+            {
+                // 先按分數排，同分按 AccessCount (越少越優先)
+                var sorted = scoredMemories
+                    .OrderByDescending(x => x.Score)
+                    .ThenBy(x => x.Memory.AccessCount)
+                    .ToList();
+                // 動態閾值：只選取分數 >= 最高分 50% 的記憶
+                float maxScore = sorted[0].Score;
+                float threshold = maxScore * 0.5f;
+                relevantMemories = sorted
+                    .Where(x => x.Score >= threshold)
+                    .Take(memoryLimit)
+                    .Select(x => x.Memory)
+                    .ToList();
+                // 更新 AccessCount
+                foreach (var m in relevantMemories) m.AccessCount++;
+            }
+
+            // 6. 常識庫檢索 (優化匹配邏輯)
+            var allKnowledge = comp?.CommonKnowledgeStore ?? [];
+            var scoredKnowledge = new List<(MemoryRecord Data, int MatchCount)>();
+            foreach (var k in allKnowledge)
+            {
+                if (k.Keywords.NullOrEmpty()) continue;
+                int count = 0;
+                foreach (var key in k.Keywords)
+                {
+                    if (context.IndexOf(key, StringComparison.OrdinalIgnoreCase) >= 0)
+                        count++;
+                }
+                if (count > 0) scoredKnowledge.Add((k, count));
+            }
+
+            var relevantKnowledge = scoredKnowledge
+                .OrderByDescending(x => x.MatchCount)
+                .Take(knowledgeLimit)
+                .Select(x => x.Data)
                 .ToList();
 
             return (relevantMemories, relevantKnowledge);
@@ -841,6 +950,51 @@ namespace RimTalk.Service
                     ltm.Remove(candidates[i]);
                 }
             }
+        }
+
+        /// <summary>
+        /// 將遊戲 Tick 轉換為相對時間描述 (例如 "3天前", "1季前")。
+        /// </summary>
+        private static string GetTimeAgo(int createdTick)
+        {
+            if (createdTick <= 0) return "RimTalk.TimeAgo.Unknown".Translate();
+
+            int diff = GenTicks.TicksGame - createdTick;
+            if (diff < 0) diff = 0; // 防呆
+
+            float hours = diff / 2500f; // 1 hour = 2500 ticks
+
+            if (hours < 1f) return "RimTalk.TimeAgo.JustNow".Translate();
+            if (hours < 24f) return "RimTalk.TimeAgo.HoursAgo".Translate((int)hours);
+
+            float days = hours / 24f; // 1 day = 24 hours
+
+            if (days < 15f) return "RimTalk.TimeAgo.DaysAgo".Translate((int)days);
+
+            float seasons = days / 15f; // 1 season = 15 days
+
+            if (seasons < 4.0f) return "RimTalk.TimeAgo.SeasonsAgo".Translate((int)seasons); // "{0}季前"
+
+            float years = seasons / 4f; // 1 year = 4 seasons
+
+            return "RimTalk.TimeAgo.YearsAgo".Translate((int)years);
+        }
+
+        /// <summary>
+        /// [NEW] 格式化個人回憶字串，供 BuildContext 使用
+        /// </summary>
+        public static string FormatRecalledMemories(List<MemoryRecord> memories)
+        {
+            if (memories.NullOrEmpty()) return "";
+            var sb = new StringBuilder();
+            sb.AppendLine("Recalled Memories:"); // 可翻譯
+            foreach (var m in memories)
+            {
+                string timeAgo = GetTimeAgo(m.CreatedTick);
+                // - [3天前] Summary
+                sb.AppendLine($"- [{timeAgo}] {m.Summary}");
+            }
+            return sb.ToString();
         }
     }
 }

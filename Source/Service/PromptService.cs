@@ -1,8 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using RimTalk.Data;
+using RimTalk.Util;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.Remoting.Messaging;
 using System.Text;
 using System.Text.RegularExpressions;
-using RimTalk.Data;
-using RimTalk.Util;
 using Verse;
 using Verse.AI.Group;
 using Cache = RimTalk.Data.Cache;
@@ -17,10 +19,18 @@ public static class PromptService
 {
     public enum InfoLevel { Short, Normal, Full }
 
-    public static string BuildContext(List<Pawn> pawns)
+    // 注意：需要 TalkRequest 來獲取 Prompt 內容
+    public static string BuildContext(TalkRequest request, List<Pawn> pawns)
     {
-        var context = new StringBuilder();
-        context.AppendLine(Constant.Instruction).AppendLine();
+        // [REMOVED] 移除這行，先不寫入 System Instruction
+        var pawnContexts = new StringBuilder();
+        var allKnowledge = new HashSet<string>();
+
+        // 1. 準備搜索上下文
+        var eventTags = ""; //CoreTagMapper.GetTextTags(request.Prompt ?? ""); // CoreTagMapper 還沒準備好
+        // ★ 關鍵策略：直接使用已經被 DecoratePrompt + Event+ Patch 處理過的 Prompt 作為檢索源
+        // 這包含了：指令 + 環境描述 + Ongoing Events
+        string distinctContext = (request.Prompt ?? "") + "\n" + string.Join(", ", eventTags);
 
         for (int i = 0; i < pawns.Count; i++)
         {
@@ -30,13 +40,46 @@ public static class PromptService
             // 原本邏輯會強迫非發話人 (i != 0) 使用 Short，現在加入 EnableContextOptimization 判斷
             InfoLevel infoLevel = Settings.Get().Context.EnableContextOptimization
                                   && i != 0 ? InfoLevel.Short : InfoLevel.Normal;
-            var pawnContext = CreatePawnContext(pawn, infoLevel);
+            // 生成 Pawn 描述 (包含佔位符)
+            var pawnText = CreatePawnContext(pawn, infoLevel);
 
-            Cache.Get(pawn).Context = pawnContext;
-            context.AppendLine($"[P{i + 1}]").AppendLine(pawnContext);
+            // 2. 檢索記憶與常識
+            string searchContext = pawnText + "\n" + distinctContext; // pawnDynamicContext 還沒準備好
+            var (memories, knowledge) = MemoryService.GetRelevantMemories(searchContext, pawn);
+
+            // 3. 注入個人記憶到 Pawn Context (取代佔位符)
+            string memoryBlock = "";
+            if (!memories.NullOrEmpty())
+            {
+                memoryBlock = MemoryService.FormatRecalledMemories(memories);
+            }
+            
+            // 用 MemoryBlock 取代佔位符，如果 MemoryBlock 為空，就相當於刪除佔位符
+            pawnText = pawnText.Replace("[[MEMORY_INJECTION_POINT]]", memoryBlock.TrimEnd());
+
+            // 4. 收集常識 (不注入 Pawn Context)
+            if (!knowledge.NullOrEmpty())
+            {
+                foreach (var k in knowledge)
+                    if (!string.IsNullOrEmpty(k.Summary)) allKnowledge.Add(k.Summary);
+            }
+
+            Cache.Get(pawn).Context = pawnText;
+
+            pawnContexts.AppendLine()
+                   .AppendLine($"[Person {i + 1}]")
+                   .AppendLine(pawnText);
         }
 
-        return context.ToString();
+        var fullContext = new StringBuilder();
+
+        // 5. [關鍵修正] 在這裡動態生成包含常識的 System Instruction，並放在最前面
+        fullContext.AppendLine(Constant.GetInstruction(allKnowledge.ToList())).AppendLine();
+
+        // 6. 接上各個角色的 Context
+        fullContext.Append(pawnContexts);
+
+        return fullContext.ToString();
     }
 
     /// <summary>Creates the basic pawn backstory section.</summary>
@@ -106,7 +149,10 @@ public static class PromptService
         }
 
         AppendIfNotEmpty(sb, ContextBuilder.GetRelationsContext(pawn, infoLevel));
-        
+
+        // ★ [插入點] 在 Relations 之後，Equipment 之前
+        sb.AppendLine("[[MEMORY_INJECTION_POINT]]");
+
         if (infoLevel != InfoLevel.Short)
             AppendIfNotEmpty(sb, ContextBuilder.GetEquipmentContext(pawn, infoLevel));
 

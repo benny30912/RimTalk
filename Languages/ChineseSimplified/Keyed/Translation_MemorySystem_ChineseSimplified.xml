@@ -21,4 +21,11 @@
   <RimTalk.MemoryService.MediumMemoryCreated>{0} 的对话已归纳为中期记忆。</RimTalk.MemoryService.MediumMemoryCreated>
   <RimTalk.MemoryService.LongMemoryCreated>{0} 的中期记忆已沉淀为长期记忆。</RimTalk.MemoryService.LongMemoryCreated>
   <RimTalk.TalkHistory.TaskGiveUp>任务 {0} 已放弃 (尝试次数: {1})</RimTalk.TalkHistory.TaskGiveUp>
+  <!-- Memory Injection (相對時間) -->
+  <RimTalk.TimeAgo.Unknown>未知时间</RimTalk.TimeAgo.Unknown>
+  <RimTalk.TimeAgo.JustNow>刚刚</RimTalk.TimeAgo.JustNow>
+  <RimTalk.TimeAgo.HoursAgo>{0}小时前</RimTalk.TimeAgo.HoursAgo>
+  <RimTalk.TimeAgo.DaysAgo>{0}天前</RimTalk.TimeAgo.DaysAgo>
+  <RimTalk.TimeAgo.SeasonsAgo>{0}季前</RimTalk.TimeAgo.SeasonsAgo>
+  <RimTalk.TimeAgo.YearsAgo>{0}年前</RimTalk.TimeAgo.YearsAgo>
 </LanguageData>

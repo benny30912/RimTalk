@@ -1,4 +1,5 @@
-﻿using Verse;
+﻿using System.Collections.Generic;
+using Verse;
 
 namespace RimTalk.Data;
 
@@ -45,18 +46,20 @@ public static class Constant
                                            "target": targetName
                                            """;
 
-    // Get the current instruction from settings or fallback to default, always append JSON instruction
-    public static string Instruction
+    // [New] 支援注入常識的指令生成方法
+    public static string GetInstruction(List<string> knowledge)
     {
-        get
+        var settings = Settings.Get();
+        var baseInstruction = string.IsNullOrWhiteSpace(settings.CustomInstruction)
+            ? DefaultInstruction
+            : settings.CustomInstruction;
+        string knowledgeBlock = "";
+        if (!knowledge.NullOrEmpty())
         {
-            var settings = Settings.Get();
-            var baseInstruction = string.IsNullOrWhiteSpace(settings.CustomInstruction)
-                ? DefaultInstruction
-                : settings.CustomInstruction;
-        
-            return baseInstruction + "\n" + JsonInstruction + (settings.ApplyMoodAndSocialEffects ? "\n" + SocialInstruction : "");
+            // 將常識注入到 Base Instruction 和 JSON 格式之間
+            knowledgeBlock = "\n[Relevant Knowledge]\n" + string.Join("\n", knowledge) + "\n";
         }
+        return baseInstruction + knowledgeBlock + "\n" + JsonInstruction + (settings.ApplyMoodAndSocialEffects ? "\n" + SocialInstruction : "");
     }
 
     public const string Prompt =
