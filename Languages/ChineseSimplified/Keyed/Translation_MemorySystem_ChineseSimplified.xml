@@ -17,4 +17,8 @@
   <!-- Memory Service Errors -->
   <RimTalk.MemoryService.SummarizeFailed>记忆总结失败：{0}</RimTalk.MemoryService.SummarizeFailed>
   <RimTalk.MemoryService.ConsolidateFailed>记忆归档失败：{0}</RimTalk.MemoryService.ConsolidateFailed>
+  <!-- Memory Service Tasks -->
+  <RimTalk.MemoryService.MediumMemoryCreated>{0} 的对话已归纳为中期记忆。</RimTalk.MemoryService.MediumMemoryCreated>
+  <RimTalk.MemoryService.LongMemoryCreated>{0} 的中期记忆已沉淀为长期记忆。</RimTalk.MemoryService.LongMemoryCreated>
+  <RimTalk.TalkHistory.TaskGiveUp>任务 {0} 已放弃 (尝试次数: {1})</RimTalk.TalkHistory.TaskGiveUp>
 </LanguageData>

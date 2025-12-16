@@ -180,7 +180,7 @@ public static class TalkService
         foreach (var pawn in pawns)
         {
             TalkHistory.AddMessageHistory(pawn, prompt, serializedResponses);
-            TalkHistory.AddTalkResult(pawn, memoryRecord);
+            MemoryService.OnShortMemoriesGenerated(pawn, memoryRecord);
         }
     }
 

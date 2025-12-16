@@ -42,9 +42,6 @@ public class RimTalk : GameComponent
         AIClientFactory.Clear();
         AIService.Clear();
 
-        // 傳遞參數給 TalkHistory
-        TalkHistory.Clear(keepSavedData);
-
         PatchThoughtHandlerGetDistinctMoodThoughtGroups.Clear();
         Cache.GetAll().ToList().ForEach(pawnState => pawnState.IgnoreAllTalkResponses());
         Cache.InitializePlayerPawn();
@@ -56,5 +53,7 @@ public class RimTalk : GameComponent
         Stats.Reset();
         TalkRequestPool.Clear();
         ApiHistory.Clear();
+        TalkHistory.Clear();
+        MemoryService.Clear(keepSavedData); // [NEW] 單獨呼叫
     }
 }

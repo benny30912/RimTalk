@@ -4,10 +4,12 @@ using RimTalk.Error;
 using RimTalk.Util;
 using RimWorld;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using Verse;
@@ -17,6 +19,315 @@ namespace RimTalk.Service
 {
     public static class MemoryService
     {
+        // --- 任務管理狀態 (Moved from TalkHistory) ---
+        private static CancellationTokenSource _cts = new();
+        private static readonly ConcurrentQueue<Action> _mainThreadActionQueue = new();
+        
+        // 閾值定義
+        public const int MaxShortMemories = 30;
+        public const int MaxMediumMemories = 200;
+        public const int MaxLongMemories = 100;
+
+        private static RimTalkWorldComponent WorldComp => Find.World?.GetComponent<RimTalkWorldComponent>();
+
+        // --- 生命週期與更新 ---
+
+        /// <summary>
+        /// [NEW] 主執行緒更新，處理異步任務的回調。
+        /// 應由 GameComponent 呼叫。
+        /// </summary>
+        public static void Update()
+        {
+            while (_mainThreadActionQueue.TryDequeue(out var action))
+            {
+                try { action(); }
+                catch (Exception ex) { Logger.Error($"MemoryService main thread action error: {ex}"); }
+            }
+        }
+
+        /// <summary>
+        /// [NEW] 清理記憶系統狀態 (包含取消正在進行的總結任務)。
+        /// </summary>
+        public static void Clear(bool keepSavedData = false)
+        {
+            // 1. 停止異步任務
+            _cts.Cancel();
+            _cts = new CancellationTokenSource();
+            while (_mainThreadActionQueue.TryDequeue(out _)) { }
+
+            // 2. 清除資料 (若不保留)
+            if (!keepSavedData)
+            {
+                var comp = WorldComp;
+                if (comp != null)
+                {
+                    lock (comp.PawnMemories)
+                    {
+                        comp.PawnMemories.Clear();
+                    }
+                    // CommonKnowledgeStore 視需求也可以在這裡清空，目前保留
+                }
+            }
+        }
+
+        // --- 流程編排 (Orchestration - Moved from TalkHistory) ---
+
+        /// <summary>
+        /// [NEW] 處理新生成的 STM。這是外部對話系統將記憶交給 MemoryService 的入口。
+        /// </summary>
+        public static void OnShortMemoriesGenerated(Pawn pawn, MemoryRecord memory)
+        {
+            // 1. 加入 STM 並檢查是否達到總結閾值
+            bool thresholdReached = AddMemoryInternal(pawn, memory);
+
+            if (thresholdReached)
+            {
+                // 2. 觸發異步總結任務
+                TriggerStmToMtmSummary(pawn);
+            }
+        }
+
+        private static void TriggerStmToMtmSummary(Pawn pawn)
+        {
+            var comp = WorldComp;
+            if (comp == null) return;
+
+            PawnMemoryData data;
+            // 1. 安全地獲取 data
+            lock (comp.PawnMemories)
+            {
+                if (!comp.PawnMemories.TryGetValue(pawn.thingIDNumber, out data)) return;
+            }
+
+            // 2. 鎖定 data 進行快照
+            lock (data)
+            {
+                var stmSnapshot = data.ShortTermMemories.ToList();
+                int countToRestore = data.NewShortMemoriesSinceSummary;
+                data.NewShortMemoriesSinceSummary = 0;
+                int currentTick = GenTicks.TicksGame;
+
+                RunRetryableTask(
+                    taskName: $"STM->MTM for {pawn.LabelShort}",
+                    action: () => SummarizeToMediumAsync(stmSnapshot, pawn, currentTick),
+                    onSuccess: (newMemories) =>
+                    {
+                        if (!newMemories.NullOrEmpty())
+                        {
+                            OnMediumMemoriesGenerated(pawn, newMemories);
+                            // [FIX] 成功總結後，進行 STM 維護
+                            // 刪除最舊的記憶直到數量回到 MaxShortMemories
+                            // 這通常會移除剛才被 Snapshot 的那些記憶
+                            var c = WorldComp;
+                            if (c != null && c.PawnMemories.TryGetValue(pawn.thingIDNumber, out var d))
+                            {
+                                lock (d)
+                                {
+                                    while (d.ShortTermMemories.Count > MaxShortMemories)
+                                    {
+                                        d.ShortTermMemories.RemoveAt(0);
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    onFailureOrCancel: (isCancelled) =>
+                    {
+                        if (!isCancelled)
+                        {
+                            // 失敗回滾：加回計數器
+                             var c = WorldComp; // Re-fetch to be safe inside lambda
+                             if (c != null && c.PawnMemories.TryGetValue(pawn.thingIDNumber, out var d))
+                             {
+                                 d.NewShortMemoriesSinceSummary += countToRestore;
+                             }
+                        }
+                    },
+                    token: _cts.Token
+                );
+            }
+        }
+
+        private static void OnMediumMemoriesGenerated(Pawn pawn, List<MemoryRecord> newMemories)
+        {
+            var comp = WorldComp;
+            if (comp == null || !comp.PawnMemories.TryGetValue(pawn.thingIDNumber, out var data)) return;
+            
+            lock (data)
+            {
+                data.MediumTermMemories ??= [];
+                data.MediumTermMemories.AddRange(newMemories);
+                data.NewMediumMemoriesSinceArchival += newMemories.Count;
+
+                Messages.Message("RimTalk.MemoryService.MediumMemoryCreated".Translate(pawn.LabelShort), pawn, MessageTypeDefOf.NeutralEvent, false);
+
+                // 鏈式觸發：檢查 MTM -> LTM
+                if (data.NewMediumMemoriesSinceArchival >= MaxMediumMemories)
+                {
+                    TriggerMtmToLtmConsolidation(pawn, data);
+                }
+
+                // [REMOVED] 移除原先的 "MaxMediumMemories" 強制維護
+                // 改為在 MTM -> LTM 成功後才進行淘汰
+            }
+        }
+
+        private static void TriggerMtmToLtmConsolidation(Pawn pawn, PawnMemoryData data)
+        {
+            var mtmSnapshot = data.MediumTermMemories.ToList();
+            int countToRestore = data.NewMediumMemoriesSinceArchival;
+            data.NewMediumMemoriesSinceArchival = 0;
+            int currentTick = GenTicks.TicksGame;
+
+            RunRetryableTask(
+                taskName: $"MTM->LTM for {pawn.LabelShort}",
+                action: () => ConsolidateToLongAsync(mtmSnapshot, pawn, currentTick),
+                onSuccess: (longMemories) =>
+                {
+                    if (!longMemories.NullOrEmpty())
+                    {
+                        OnLongMemoriesGenerated(pawn, longMemories, currentTick);
+                        // [FIX] 成功歸檔後，進行 MTM 維護
+                        // 刪除已歸檔的 MTM，保留上限內的最新記憶
+                        var c = WorldComp;
+                        if (c != null && c.PawnMemories.TryGetValue(pawn.thingIDNumber, out var d))
+                        {
+                            lock (d)
+                            {
+                                while (d.MediumTermMemories.Count > MaxMediumMemories)
+                                {
+                                    d.MediumTermMemories.RemoveAt(0);
+                                }
+                            }
+                        }
+                    } 
+                },
+                onFailureOrCancel: (isCancelled) =>
+                {
+                    if (!isCancelled)
+                    {
+                         var c = WorldComp;
+                         if (c != null && c.PawnMemories.TryGetValue(pawn.thingIDNumber, out var d))
+                         {
+                             d.NewMediumMemoriesSinceArchival += countToRestore;
+                         }
+                    }
+                },
+                token: _cts.Token
+            );
+        }
+
+        private static void OnLongMemoriesGenerated(Pawn pawn, List<MemoryRecord> newMemories, int currentTick)
+        {
+            var comp = WorldComp;
+            if (comp == null || !comp.PawnMemories.TryGetValue(pawn.thingIDNumber, out var data)) return;
+            
+            lock (data)
+            {
+                data.LongTermMemories ??= [];
+                data.LongTermMemories.AddRange(newMemories);
+                
+                // 執行權重剔除
+                PruneLongTermMemories(data.LongTermMemories, MaxLongMemories, currentTick);
+
+                Messages.Message("RimTalk.MemoryService.LongMemoryCreated".Translate(pawn.LabelShort), pawn, MessageTypeDefOf.NeutralEvent, false);
+            }
+        }
+        // --- 核心業務邏輯 (Core Logic) ---
+
+        /// <summary>
+        /// [Internal] 實際執行加入 STM 的動作。
+        /// </summary>
+        private static bool AddMemoryInternal(Pawn pawn, MemoryRecord record)
+        {
+            var comp = WorldComp;
+            if (comp == null || pawn == null) return false;
+
+            PawnMemoryData data;
+            lock (comp.PawnMemories)
+            {
+                if (!comp.PawnMemories.TryGetValue(pawn.thingIDNumber, out data))
+                {
+                    data = new PawnMemoryData { Pawn = pawn };
+                    comp.PawnMemories[pawn.thingIDNumber] = data;
+                }
+            }
+
+            lock (data)
+            {
+                data.ShortTermMemories.Add(record);
+                data.NewShortMemoriesSinceSummary++;
+                return data.NewShortMemoriesSinceSummary >= MaxShortMemories;
+            }
+        }
+
+        // [Moved & Refactored] 通用的異步重試執行器
+        private static void RunRetryableTask<T>(
+            string taskName,
+            Func<Task<T>> action,
+            Action<T> onSuccess,
+            Action<bool> onFailureOrCancel,
+            CancellationToken token)
+        {
+            Task.Run(async () =>
+            {
+                int maxRetries = 5;
+                int attempt = 0;
+
+                while (attempt < maxRetries && !token.IsCancellationRequested)
+                {
+                    if (Current.Game == null) return;
+
+                    try
+                    {
+                        var result = await action();
+                        bool isValid = result != null;
+                        if (result is System.Collections.ICollection collection && collection.Count == 0)
+                            isValid = false;
+
+                        if (isValid)
+                        {
+                            if (Current.Game != null)
+                                _mainThreadActionQueue.Enqueue(() => onSuccess(result));
+                            return;
+                        }
+                        else
+                        {
+                           Logger.Warning($"Task {taskName} failed (attempt {attempt + 1}/{maxRetries}). Retrying...");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error($"Exception in task {taskName}: {ex.Message}");
+                    }
+
+                    attempt++;
+                    if (attempt < maxRetries)
+                    {
+                        // Exponential backoff or simple delay
+                        int delay = 1000 * 30; 
+                        try { await Task.Delay(delay, token); } catch (TaskCanceledException) { break; }
+                    }
+                }
+
+                if (Current.Game == null) return;
+
+                bool isCancelled = token.IsCancellationRequested;
+                _mainThreadActionQueue.Enqueue(() => onFailureOrCancel(isCancelled));
+
+                if (!isCancelled)
+                {
+                     // 使用簡體中文翻譯鍵
+                     Messages.Message(
+                        "RimTalk.TalkHistory.TaskGiveUp".Translate(taskName, maxRetries),
+                        MessageTypeDefOf.NeutralEvent,
+                        false
+                    );
+                }
+
+            }, token);
+        }
+
         // --- DTO: 用於解析 LLM 回傳的 JSON ---
 
         [DataContract]
@@ -174,7 +485,6 @@ namespace RimTalk.Service
         }
 
         // --- STM -> MTM: 將短期摘要合併為中期記憶 ---
-
         /// <summary>
         /// 將一系列 ShortTermMemories (已是摘要) 進一步歸納為 MediumTermMemories。
         /// </summary>
@@ -386,7 +696,7 @@ namespace RimTalk.Service
             }
 
             // 2. 鎖定資料物件用於「修改列表」
-            // 這樣就與 TalkHistory.TriggerStmToMtmSummary 的 lock(data) 互斥了
+            // 這樣就與 TriggerStmToMtmSummary 的 lock(data) 互斥了
             lock (data)
             {
                 // 加入 STM
@@ -394,7 +704,7 @@ namespace RimTalk.Service
                 data.NewShortMemoriesSinceSummary++;
 
                 // 檢查是否達到總結閾值 (30條)
-                return data.NewShortMemoriesSinceSummary >= TalkHistory.MaxShortMemories;
+                return data.NewShortMemoriesSinceSummary >= MaxShortMemories;
             }
         }
 
