@@ -14,4 +14,7 @@
 	<!-- Weight Settings (若未来要在 UI 显示) -->
 	<RimTalk.Settings.MemoryImportanceWeight>重要性权重</RimTalk.Settings.MemoryImportanceWeight>
 	<RimTalk.Settings.MemoryImportanceWeightDesc>决定重要性(Importance)在记忆检索与保留时的影响程度。</RimTalk.Settings.MemoryImportanceWeightDesc>
+  <!-- Memory Service Errors -->
+  <RimTalk.MemoryService.SummarizeFailed>记忆总结失败：{0}</RimTalk.MemoryService.SummarizeFailed>
+  <RimTalk.MemoryService.ConsolidateFailed>记忆归档失败：{0}</RimTalk.MemoryService.ConsolidateFailed>
 </LanguageData>

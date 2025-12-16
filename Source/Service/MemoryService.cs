@@ -180,17 +180,13 @@ namespace RimTalk.Service
         /// </summary>
         /// <param name="stmList">短期記憶列表</param>
         /// <param name="pawn">記憶主體</param>
-        /// <param name="fallbackTick">若無法計算時間時的備案時間</param>
-        public static async Task<List<MemoryRecord>> SummarizeToMediumAsync(List<MemoryRecord> stmList, Pawn pawn, int fallbackTick)
+        /// <param name="currentTick">若無法計算時間時的備案時間</param>
+        public static async Task<List<MemoryRecord>> SummarizeToMediumAsync(List<MemoryRecord> stmList, Pawn pawn, int currentTick)
         {
             if (stmList.NullOrEmpty()) return [];
 
             // 1. 格式化 STM 為帶編號的文本 (ID 僅供本次 Prompt 使用)
-            string stmContext = FormatMemoriesWithIds(stmList, out long minTick, out long maxTick);
-
-            // 計算這批 STM 的平均時間，作為 fallback
-            int averageTick = (int)((minTick + maxTick) / 2);
-            if (averageTick <= 0) averageTick = fallbackTick;
+            string stmContext = FormatMemoriesWithIds(stmList);
 
             // 2. 建構 Prompt
             // 這裡的挑戰是：輸入已經是 Summary 了，AI 需要做的是 "Meta-Summarization"
@@ -232,7 +228,7 @@ namespace RimTalk.Service
 
             try
             {
-                var request = new TalkRequest(prompt, pawn, averageTick);
+                var request = new TalkRequest(prompt, pawn, currentTick);
                 var result = await QueryMemory<MemoryListDto>(request);
 
                 if (result?.Memories == null) return [];
@@ -243,20 +239,7 @@ namespace RimTalk.Service
                     .Select(m =>
                     {
                         // 計算加權時間：根據 source_ids 找回原始 STM 的時間做平均
-                        int calculatedTick = averageTick;
-                        if (m.SourceIds != null && m.SourceIds.Any())
-                        {
-                            var validTicks = new List<long>();
-                            foreach (var id in m.SourceIds)
-                            {
-                                int index = id - 1; // ID 轉 Index
-                                if (index >= 0 && index < stmList.Count)
-                                {
-                                    validTicks.Add(stmList[index].CreatedTick);
-                                }
-                            }
-                            if (validTicks.Any()) calculatedTick = (int)validTicks.Average();
-                        }
+                        var (calculatedTick, avgAccess) = CalculateMergedMetadata(m.SourceIds, stmList, currentTick);
 
                         return new MemoryRecord
                         {
@@ -264,7 +247,7 @@ namespace RimTalk.Service
                             Keywords = m.Keywords ?? [],
                             Importance = Mathf.Clamp(m.Importance, 1, 5),
                             CreatedTick = calculatedTick,
-                            AccessCount = 0
+                            AccessCount = avgAccess // 新增：繼承活躍度
                         };
                     }).ToList();
             }
@@ -276,7 +259,6 @@ namespace RimTalk.Service
         }
 
         // --- MTM -> LTM: 將中期記憶轉化為長期傳記 ---
-
         /// <summary>
         /// 將累積的中期記憶合併為高層次的長期記憶 (傳記式)。
         /// </summary>
@@ -285,7 +267,7 @@ namespace RimTalk.Service
             if (mtmList.NullOrEmpty()) return [];
 
             // 1. 格式化
-            string memoryText = FormatMemoriesWithIds(mtmList, out _, out _);
+            string mtmContext = FormatMemoriesWithIds(mtmList);
 
             // 2. 建構 Prompt
             string prompt =
@@ -293,7 +275,7 @@ namespace RimTalk.Service
                   将以下 {{pawn.LabelShort}} 的中期记忆片段（Medium Term Memories）合并为 3-6 个高层次的传记式摘要。
                   
                   记忆片段：
-                  {{memoryText}}
+                  {{mtmContext}}
         
                   任务：
                   1. 多维度归纳：找出这段时期的主要生活基调（如生存挑战、人际关系变化、职业发展）。
@@ -326,26 +308,7 @@ namespace RimTalk.Service
                     .Select(m =>
                     {
                         // 計算權重平均時間與 AccessCount
-                        int calculatedTick = currentTick;
-                        List<int> accessCounts = new();
-
-                        if (m.SourceIds != null && m.SourceIds.Any())
-                        {
-                            var validTicks = new List<long>();
-                            foreach (var id in m.SourceIds)
-                            {
-                                int index = id - 1;
-                                if (index >= 0 && index < mtmList.Count)
-                                {
-                                    var source = mtmList[index];
-                                    validTicks.Add(source.CreatedTick);
-                                    accessCounts.Add(source.AccessCount);
-                                }
-                            }
-                            if (validTicks.Any()) calculatedTick = (int)validTicks.Average();
-                        }
-
-                        int avgAccess = accessCounts.Any() ? (int)accessCounts.Average() : 0;
+                        var (calculatedTick, avgAccess) = CalculateMergedMetadata(m.SourceIds, mtmList, currentTick);
 
                         return new MemoryRecord
                         {
@@ -362,6 +325,40 @@ namespace RimTalk.Service
                 Messages.Message("RimTalk.MemoryService.ConsolidateFailed".Translate(ex.Message), MessageTypeDefOf.NegativeEvent, false);
                 return [];
             }
+        }
+
+        /// <summary>
+        /// 統一計算合併後的記憶元數據 (時間與活躍度)。
+        /// </summary>
+        /// <param name="sourceIds">來源 ID 列表</param>
+        /// <param name="sources">原始記憶來源列表</param>
+        /// <param name="fallbackTick">備用時間 (通常是當前時間)</param>
+        /// <returns>(加權平均時間, 平均活躍度)</returns>
+        private static (int Tick, int AccessCount) CalculateMergedMetadata(List<int> sourceIds, List<MemoryRecord> sources, int fallbackTick)
+        {
+            if (sourceIds == null || !sourceIds.Any() || sources.NullOrEmpty())
+            {
+                return (fallbackTick, 0);
+            }
+
+            var validTicks = new List<long>();
+            var validAccess = new List<int>();
+
+            foreach (var id in sourceIds)
+            {
+                int index = id - 1; // ID 轉換為 Index (Prompt 中 ID 從 1 開始)
+                if (index >= 0 && index < sources.Count)
+                {
+                    var record = sources[index];
+                    validTicks.Add(record.CreatedTick);
+                    validAccess.Add(record.AccessCount);
+                }
+            }
+
+            int avgTick = validTicks.Any() ? (int)validTicks.Average() : fallbackTick;
+            int avgAccess = validAccess.Any() ? (int)validAccess.Average() : 0;
+
+            return (avgTick, avgAccess);
         }
 
         // --- 記憶管理與檢索 ---
@@ -401,31 +398,54 @@ namespace RimTalk.Service
             }
         }
 
+        // [NEW] GetRelevantMemories (分離記憶與常識檢索)
+        // 回傳 Tuple: (個人記憶列表, 常識列表)
         /// <summary>
-        /// 根據上下文檢索相關記憶 (Short + Medium + Long)。
+        /// 根據上下文檢索相關記憶 (Short + Medium + Long + Common Knowledge)。
         /// </summary>
-        public static List<MemoryRecord> GetRelevantMemories(string context, Pawn pawn)
+        public static (List<MemoryRecord> memories, List<MemoryRecord> knowledge) GetRelevantMemories(string context, Pawn pawn)
         {
-            // 簡化的檢索邏輯，整合所有層級記憶
-            if (string.IsNullOrWhiteSpace(context)) return [];
+            if (string.IsNullOrWhiteSpace(context)) return ([], []);
 
             var comp = Find.World?.GetComponent<RimTalkWorldComponent>();
-            if (comp == null || !comp.PawnMemories.TryGetValue(pawn.thingIDNumber, out var data))
-                return [];
+            // 獲取個人記憶資料
+            PawnMemoryData data = null;
+            comp?.PawnMemories.TryGetValue(pawn.thingIDNumber, out data);
 
-            var allMemories = new List<MemoryRecord>();
-            // 注意：這裡假設 STM 也是有價值的，如果只想檢索已歸檔記憶，可移除 STM
-            allMemories.AddRange(data.ShortTermMemories);
-            allMemories.AddRange(data.MediumTermMemories);
-            allMemories.AddRange(data.LongTermMemories);
+            var contextLower = context.ToLowerInvariant();
+            // 讀取設定上限 (若無 MaxMemoryCount 則暫用 5)
+            int limit = 5;
 
-            // 這裡省略了複雜的 TF-IDF 與時間衰減計算代碼 (與 Legacy 相同)
-            // 實作時請直接參考 legacy 的 GetRelevantMemories 邏輯，
-            // 唯一的差別是將來源從 data.Medium/Long 改為上述的 allMemories
-            // 或是依據您的需求決定是否包含 STM。
+            // --- A. 個人記憶檢索 ---
+            var memoryCandidates = new List<MemoryRecord>();
+            // 1. 收集所有候選記憶 (個人: STM/MTM/LTM)
+            if (data != null)
+            {
+                memoryCandidates.AddRange(data.ShortTermMemories);
+                memoryCandidates.AddRange(data.MediumTermMemories);
+                memoryCandidates.AddRange(data.LongTermMemories);
+            }
 
-            // 範例：簡單實作，僅供參考架構
-            return allMemories.Take(5).ToList();
+            var relevantMemories = memoryCandidates
+                .Where(m => m.Keywords != null && m.Keywords.Any(k => contextLower.Contains(k.ToLowerInvariant())))
+                .OrderByDescending(m => m.Importance) // 優先看重要性
+                .ThenBy(m => m.AccessCount)         // 再看活躍度
+                .Take(limit)
+                .ToList();
+
+            // 更新活躍度
+            foreach (var mem in relevantMemories) mem.AccessCount++;
+
+            // --- B. 常識庫檢索 ---
+            var knowledgeCandidates = comp?.CommonKnowledgeStore ?? [];
+
+            var relevantKnowledge = knowledgeCandidates
+                .Where(k => k.Keywords != null && k.Keywords.Any(key => contextLower.Contains(key.ToLowerInvariant())))
+                // 常識庫可能不需要 AccessCount 排序，或者簡單取前幾條
+                .Take(limit)
+                .ToList();
+
+            return (relevantMemories, relevantKnowledge);
         }
 
         // --- 輔助方法 ---
@@ -433,21 +453,16 @@ namespace RimTalk.Service
         /// <summary>
         /// 將 MemoryRecord 列表格式化為帶 ID 與時間的字串。
         /// </summary>
-        private static string FormatMemoriesWithIds(List<MemoryRecord> memories, out long minTick, out long maxTick)
+        private static string FormatMemoriesWithIds(List<MemoryRecord> memories)
         {
-            var sb = new StringBuilder();
-            minTick = long.MaxValue;
-            maxTick = long.MinValue;
-
             if (memories.NullOrEmpty()) return "";
 
-            long baseTick = memories.Min(m => m.CreatedTick);
+            var sb = new StringBuilder();
+            long baseTick = memories.Min(m => m.CreatedTick); // 用於計算相對天數
 
             for (int i = 0; i < memories.Count; i++)
             {
                 var m = memories[i];
-                if (m.CreatedTick < minTick) minTick = m.CreatedTick;
-                if (m.CreatedTick > maxTick) maxTick = m.CreatedTick;
 
                 // 計算相對天數
                 int dayIndex = (int)((m.CreatedTick - baseTick) / 60000);
@@ -460,17 +475,62 @@ namespace RimTalk.Service
             return sb.ToString();
         }
 
-        // 用於從外部獲取所有關鍵詞 (Legacy 邏輯)
+        // 用於從外部獲取所有關鍵詞 (保持標籤一致性)
+        // [NEW] 實作 GetAllExistingKeywords (適配個人記憶與常識庫)
         public static string GetAllExistingKeywords(Pawn pawn)
         {
-            // 實作邏輯同 Legacy，遍歷 MTM 與 LTM 收集關鍵詞
-            return "None"; // 簡化展示
+            var keywords = new HashSet<string>();
+            var comp = Find.World?.GetComponent<RimTalkWorldComponent>();
+
+            if (comp == null) return "None";
+
+            // 1. 從個人記憶收集 (STM + MTM + LTM)
+            if (comp.PawnMemories.TryGetValue(pawn.thingIDNumber, out var data))
+            {
+                foreach (var m in data.ShortTermMemories) keywords.AddRange(m.Keywords);
+                foreach (var m in data.MediumTermMemories) keywords.AddRange(m.Keywords);
+                foreach (var m in data.LongTermMemories) keywords.AddRange(m.Keywords);
+            }
+
+            // 2. 從常識庫收集
+            if (comp.CommonKnowledgeStore != null)
+            {
+                foreach (var k in comp.CommonKnowledgeStore) keywords.AddRange(k.Keywords);
+            }
+
+            if (keywords.Count == 0) return "None";
+
+            // 限制數量避免 Prompt 過長
+            return string.Join(", ", keywords.Take(1000));
         }
 
-        // 用於 LTM 的維護 (Legacy 邏輯)
+        // 用於 LTM 的維護：根據權重剔除多餘記憶
+        // [NEW] 實作 PruneLongTermMemories (基於權重剔除)
         public static void PruneLongTermMemories(List<MemoryRecord> ltm, int maxCount, int currentTick)
         {
-            // 實作邏輯同 Legacy，根據權重移除記憶
+            if (ltm.Count <= maxCount) return;
+
+            // 讀取設定中的權重
+            float weightImportance = Settings.Get().MemoryImportanceWeight;
+
+            int removeCount = ltm.Count - maxCount;
+
+            // 計算分數並排序：分數低的優先被刪除
+            // 分數 = 活躍度 + (重要性 * 權重) + (高重要性保底)
+            var candidates = ltm.OrderBy(m =>
+            {
+                // Importance >= 5給予極高保底分，極難被刪除
+                float baseScore = m.Importance >= 5 ? 10000f : 0f;
+                return baseScore + m.AccessCount + (m.Importance * weightImportance);
+            }).ToList();
+
+            for (int i = 0; i < removeCount; i++)
+            {
+                if (i < candidates.Count)
+                {
+                    ltm.Remove(candidates[i]);
+                }
+            }
         }
     }
 }
