@@ -1,8 +1,9 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using RimTalk.Service;
 using RimTalk.Util;
 using RimWorld.Planet;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using Verse;
 
 namespace RimTalk.Data;
@@ -25,18 +26,39 @@ public class RimTalkWorldComponent(World world) : WorldComponent(world)
     // 序列化用的列表 (因為 Scribe 不支援直接儲存複雜物件的 Dictionary)
     private List<PawnMemoryData> _memoryDataList = [];
 
+    // [OPT] 優化：每 5 秒檢查一次主執行緒佇列，避免每 Tick 空轉
+    private const float MainThreadQueueCheckInterval = 5f;
+
+    public override void WorldComponentTick()
+    {
+        base.WorldComponentTick();
+
+        // 使用 GenTicks.TicksGame 替代 Counter.Tick
+        if (GenTicks.TicksGame % CommonUtil.GetTicksForDuration(MainThreadQueueCheckInterval) == 0)
+        {
+            // 驅動 MemoryService 的主執行緒任務佇列
+            MemoryService.Update();
+        }
+    }
+
     public override void ExposeData()
     {
         base.ExposeData();
 
+        // Check for null before saving
+        CommonKnowledgeStore ??= [];
         // [NEW] 儲存常識庫
         Scribe_Collections.Look(ref CommonKnowledgeStore, "commonKnowledgeStore", LookMode.Deep);
 
         // [儲存前] 將 Dictionary 轉為 List
         if (Scribe.mode == LoadSaveMode.Saving)
         {
+            // 確保 PawnMemories 不為 null
+            PawnMemories ??= [];
             // 注意：這裡假設 PawnMemories.Values 內無 null
             _memoryDataList = new List<PawnMemoryData>(PawnMemories.Values);
+            // 移除 null 的項目 (雖不應發生，但以防萬一)
+            _memoryDataList.RemoveAll(x => x == null);
         }
         // 這會保存所有的 Short/Medium/Long Term Memories
         Scribe_Collections.Look(ref _memoryDataList, "pawnMemories", LookMode.Deep);
@@ -44,6 +66,7 @@ public class RimTalkWorldComponent(World world) : WorldComponent(world)
         if (Scribe.mode == LoadSaveMode.PostLoadInit)
         {
             _memoryDataList ??= [];
+            PawnMemories ??= []; // Ensure Dictionary is init
             PawnMemories.Clear();
             foreach (var data in _memoryDataList)
             {
