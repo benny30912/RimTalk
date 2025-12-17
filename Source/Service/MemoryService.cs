@@ -1039,5 +1039,50 @@ namespace RimTalk.Service
             }
             return sb.ToString();
         }
+
+        /// <summary>
+        /// [NEW] 編輯記憶內容
+        /// </summary>
+        public static void EditMemory(Pawn pawn, MemoryRecord memory, string newSummary, List<string> newKeywords, int newImportance)
+        {
+            if (pawn == null || memory == null) return;
+            var comp = Find.World?.GetComponent<RimTalkWorldComponent>();
+            if (comp == null) return;
+            lock (comp.PawnMemories)
+            {
+                // 但為了線程安全，我們在 lock 範圍內修改它的屬性
+
+                // 直接修改屬性
+                lock (memory) // 額外鎖定記憶物件本身，防止讀取時發生撕裂 (雖然字串引用替換是原子的)
+                {
+                    memory.Summary = newSummary;
+                    memory.Keywords = newKeywords;
+                    memory.Importance = Mathf.Clamp(newImportance, 1, 5);
+                }
+            }
+        }
+
+        /// <summary>
+        /// [NEW] 刪除記憶
+        /// </summary>
+        public static void DeleteMemory(Pawn pawn, MemoryRecord memory)
+        {
+            if (pawn == null || memory == null) return;
+            var comp = Find.World?.GetComponent<RimTalkWorldComponent>();
+            if (comp == null) return;
+            lock (comp.PawnMemories)
+            {
+                if (comp.PawnMemories.TryGetValue(pawn.thingIDNumber, out var data))
+                {
+                    lock (data)
+                    {
+                        // 嘗試從三個列表中移除 (因為我們不知道它在哪一層)
+                        if (data.ShortTermMemories?.Remove(memory) == true) return;
+                        if (data.MediumTermMemories?.Remove(memory) == true) return;
+                        if (data.LongTermMemories?.Remove(memory) == true) return;
+                    }
+                }
+            }
+        }
     }
 }

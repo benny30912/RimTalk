@@ -597,7 +597,7 @@ public static class CoreTagMapper
     /// <summary>
     /// Analyzes the Pawn's current state to extract Abstract Abstract Tags.
     /// </summary>
-    public static List<string> GetAbstractTags(Pawn p, List<Pawn> nearbyPawns = null)
+    public static List<string> GetAbstractTags(Pawn p)
     {
         var tags = new HashSet<string>();
         if (p == null) return [];
@@ -726,13 +726,10 @@ public static class CoreTagMapper
         if (p.RaceProps.IsMechanoid) tags.Add("机械");
 
         // Static Relations (Context-Aware: Only if nearby)
-        if (p.relations != null && nearbyPawns != null)
+        if (p.relations != null)
         {
             foreach (var rel in p.relations.DirectRelations)
             {
-                // Only consider relations with pawns currently nearby (Context)
-                if (!nearbyPawns.Contains(rel.otherPawn)) continue;
-
                 AddTagsFromDef(rel.def, tags); // Base keywords
 
                 // Distinguish Bonds

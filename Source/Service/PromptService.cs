@@ -2,7 +2,6 @@
 using RimTalk.Util;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.Remoting.Messaging;
 using System.Text;
 using System.Text.RegularExpressions;
 using Verse;
@@ -27,7 +26,7 @@ public static class PromptService
         var allKnowledge = new HashSet<string>();
 
         // 1. 準備搜索上下文
-        var eventTags = CoreTagMapper.GetTextTags(request.Prompt ?? ""); // CoreTagMapper 還沒準備好
+        var eventTags = CoreTagMapper.GetTextTags(request.Prompt ?? ""); // [MOD] 啟用 CoreTagMapper
         // ★ 關鍵策略：直接使用已經被 DecoratePrompt + Event+ Patch 處理過的 Prompt 作為檢索源
         // 這包含了：指令 + 環境描述 + Ongoing Events
         string distinctContext = (request.Prompt ?? "") + "\n" + string.Join(", ", eventTags);
@@ -41,10 +40,10 @@ public static class PromptService
             InfoLevel infoLevel = Settings.Get().Context.EnableContextOptimization
                                   && i != 0 ? InfoLevel.Short : InfoLevel.Normal;
             // 生成 Pawn 描述 (包含佔位符)
-            var pawnText = CreatePawnContext(pawn, infoLevel);
+            var (pawnText, pawnDynamicContext) = CreatePawnContext(pawn, infoLevel);
 
             // 2. 檢索記憶與常識
-            string searchContext = pawnText + "\n" + distinctContext; // pawnDynamicContext 還沒準備好
+            string searchContext = pawnDynamicContext + "\n" + distinctContext; // Pawn 自身的動態狀態 (pawnDynamicContext) + 當前對話事件 (distinctContext)
             var (memories, knowledge) = MemoryService.GetRelevantMemories(searchContext, pawn);
 
             // 3. 注入個人記憶到 Pawn Context (取代佔位符)
@@ -117,13 +116,20 @@ public static class PromptService
     }
 
     /// <summary>Creates the full pawn context.</summary>
-    public static string CreatePawnContext(Pawn pawn, InfoLevel infoLevel = InfoLevel.Normal)
+    // [MOD] 修改回傳簽名，新增 dynamicContext
+    private static (string text, string dynamicContext) CreatePawnContext(Pawn pawn, InfoLevel infoLevel = InfoLevel.Normal)
     {
         var sb = new StringBuilder();
+        var dynamicSb = new StringBuilder(); // [NEW] 用於收集動態上下文
+
         sb.Append(CreatePawnBackstory(pawn, infoLevel));
 
         // Each section can be patched independently
-        AppendIfNotEmpty(sb, ContextBuilder.GetHealthContext(pawn, infoLevel));
+
+        // Health
+        string health = ContextBuilder.GetHealthContext(pawn, infoLevel);
+        AppendIfNotEmpty(sb, health);
+        AppendIfNotEmpty(dynamicSb, health);
 
         var personality = Cache.Get(pawn).Personality;
         if (personality != null)
@@ -131,10 +137,18 @@ public static class PromptService
 
         // Stop here for invaders
         if (pawn.IsEnemy())
-            return sb.ToString();
+            return (sb.ToString(), dynamicSb.ToString());
 
-        AppendIfNotEmpty(sb, ContextBuilder.GetMoodContext(pawn, infoLevel));
-        AppendIfNotEmpty(sb, ContextBuilder.GetThoughtsContext(pawn, infoLevel));
+        // Mood
+        string mood = ContextBuilder.GetMoodContext(pawn, infoLevel);
+        AppendIfNotEmpty(sb, mood);
+        AppendIfNotEmpty(dynamicSb, mood);
+
+        // Thoughts
+        string thoughts = ContextBuilder.GetThoughtsContext(pawn, infoLevel);
+        AppendIfNotEmpty(sb, thoughts);
+        AppendIfNotEmpty(dynamicSb, thoughts);
+
         AppendIfNotEmpty(sb, ContextBuilder.GetPrisonerSlaveContext(pawn, infoLevel));
         
         // Visitor activity
@@ -148,7 +162,10 @@ public static class PromptService
             }
         }
 
-        AppendIfNotEmpty(sb, ContextBuilder.GetRelationsContext(pawn, infoLevel));
+        // Relations
+        string relations = ContextBuilder.GetRelationsContext(pawn, infoLevel);
+        AppendIfNotEmpty(sb, relations);
+        AppendIfNotEmpty(dynamicSb, relations);
 
         // ★ [插入點] 在 Relations 之後，Equipment 之前
         sb.AppendLine("[[MEMORY_INJECTION_POINT]]");
@@ -156,7 +173,17 @@ public static class PromptService
         if (infoLevel != InfoLevel.Short)
             AppendIfNotEmpty(sb, ContextBuilder.GetEquipmentContext(pawn, infoLevel));
 
-        return sb.ToString();
+        // --- [New] 核心修改：注入 Abstract Tags ---
+        // 使用 CoreTagMapper 分析 Pawn 狀態，生成抽象標籤 (如 "疼痛", "生病", "絕望")
+        // 這些標籤專門用於增強檢索，不需要顯示在給 LLM 的 Prompt 中 (除非你想)
+        var abstractTags = CoreTagMapper.GetAbstractTags(pawn);
+        if (abstractTags.Any())
+        {
+            string tagsLine = $"{string.Join(", ", abstractTags)}";
+            dynamicSb.AppendLine(tagsLine);
+        }
+
+        return (sb.ToString(), dynamicSb.ToString());
     }
 
     /// <summary>Decorates the prompt with dialogue type, time, weather, location, and environment.</summary>
@@ -196,8 +223,11 @@ public static class PromptService
             sb.Append($"\nin {Constant.Lang}");
 
         talkRequest.Prompt = sb.ToString();
+
+        // 當此方法結束時，RimTalk Event+ 的 Postfix 會自動執行
+        // 並將 Ongoing Events 追加到 talkRequest.Prompt 的尾端
     }
-    
+
     private static void AppendIfNotEmpty(StringBuilder sb, string text)
     {
         if (!string.IsNullOrEmpty(text))

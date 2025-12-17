@@ -150,40 +150,48 @@ namespace RimTalk.UI
             if (isEditing)
             {
                 // -- 編輯模式 --
-                float editHeight = 280f;
+                // 1. 計算動態高度
+                // 摘要編輯框高度建議給大一點，例如 100f
+                float summaryEditHeight = 100f;
+                // 其他元件高度估算:
+                // Header(24) + SummaryBox(100) + KeywordsLabel(24) + KeywordsBox(24) + ImportanceLabel(24) + Slider(24) + Buttons(30) + Gaps(~20)
+                // Total ~ 250f - 300f
+                float editHeight = 300f;
                 Rect editRect = listing.GetRect(editHeight);
                 Widgets.DrawBoxSolid(editRect, new Color(0.2f, 0.2f, 0.25f, 0.5f));
+                Widgets.DrawBox(editRect, 1); // 加個邊框
                 Listing_Standard editListing = new Listing_Standard();
-                editListing.Begin(editRect.ContractedBy(5f));
+                editListing.Begin(editRect.ContractedBy(8f)); // 給予適當 Padding
                 // 編輯摘要
                 editListing.Label("Content:");
-                Rect textRect = editListing.GetRect(80f);
+                Rect textRect = editListing.GetRect(summaryEditHeight);
                 _editBufferSummary = Widgets.TextArea(textRect, _editBufferSummary);
+                editListing.Gap(6f);
                 // 編輯關鍵字
                 editListing.Label("Keywords (comma separated):");
                 _editBufferKeywords = editListing.TextEntry(_editBufferKeywords);
+                editListing.Gap(6f);
                 // 編輯重要性
                 editListing.Label($"Importance: {_editBufferImportance}");
                 _editBufferImportance = (int)editListing.Slider(_editBufferImportance, 1, 5);
-                editListing.Gap(10f);
+                editListing.Gap(12f);
                 // 按鈕列
-                Rect btnRect = editListing.GetRect(24f);
+                Rect btnRect = editListing.GetRect(30f);
                 float btnWidth = 80f;
                 // [Save]
-                if (Widgets.ButtonText(new Rect(btnRect.x, btnRect.y, btnWidth, 24f), "RimTalk.UI.Save".Translate()))
+                if (Widgets.ButtonText(new Rect(btnRect.x, btnRect.y, btnWidth, 30f), "RimTalk.UI.Save".Translate()))
                 {
-                    mem.Summary = _editBufferSummary;
-                    // 分割並清理關鍵字
-                    mem.Keywords = _editBufferKeywords
+                    // [MOD] 使用 MemoryService.EditMemory
+                    var newKeywords = _editBufferKeywords
                         .Split(new[] { ',', '，' }, System.StringSplitOptions.RemoveEmptyEntries)
                         .Select(s => s.Trim())
                         .Where(s => !string.IsNullOrEmpty(s))
                         .ToList();
-                    mem.Importance = _editBufferImportance;
+                    MemoryService.EditMemory(_pawn, mem, _editBufferSummary, newKeywords, _editBufferImportance);
                     _editingItem = null; // 結束編輯
                 }
                 // [Cancel]
-                if (Widgets.ButtonText(new Rect(btnRect.x + btnWidth + 10f, btnRect.y, btnWidth, 24f), "RimTalk.UI.Cancel".Translate()))
+                if (Widgets.ButtonText(new Rect(btnRect.x + btnWidth + 10f, btnRect.y, btnWidth, 30f), "RimTalk.UI.Cancel".Translate()))
                 {
                     _editingItem = null;
                 }
@@ -209,8 +217,10 @@ namespace RimTalk.UI
                 // [Delete]
                 if (Widgets.ButtonText(new Rect(btnX, rect.y + 2, 60f, 20f), "RimTalk.UI.Delete".Translate()))
                 {
-                    list.RemoveAt(index);
-                    return; // 刪除後直接返回，避免繼續繪製
+                    // [MOD] 使用 MemoryService.DeleteMemory
+                    MemoryService.DeleteMemory(_pawn, mem);
+                    // [REMOVED] 不再直接操作 list
+                    return;  // 刪除後直接返回，避免繼續繪製
                 }
                 btnX -= 65f;
                 // [Edit]
@@ -237,7 +247,8 @@ namespace RimTalk.UI
             {
                 if (_editingItem == mem)
                 {
-                    totalHeight += 280f + 5f;
+                    // [MOD] 必須與 DrawMemoryRecord 中的 editHeight 保持一致
+                    totalHeight += 300f + 5f;
                 }
                 else
                 {

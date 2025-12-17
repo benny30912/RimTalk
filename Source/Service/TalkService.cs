@@ -76,14 +76,32 @@ public static class TalkService
             return false;
 
         // Build the context and decorate the prompt with current status information.
-        string context = PromptService.BuildContext(pawns);
-        AIService.UpdateContext(context);
+        // 1. 先裝飾 Prompt (注入時間、天氣、事件標籤)
+        // 注意：無需呼叫 GetEnvironmentContext，DecoratePrompt 內部已處理
         PromptService.DecoratePrompt(talkRequest, pawns, status);
+        //此時 talkRequest.Prompt 已經包含了 Ongoing Events！
+
+        // 2. 再構建 Context (現在可以讀取 talkRequest.Prompt 中的 Tag 來檢索記憶了)
+        // 注意：需確認 PromptService.BuildContext 支援 (TalkRequest, List<Pawn>) 簽名
+        string context = PromptService.BuildContext(talkRequest, pawns);
+        AIService.UpdateContext(context);
 
         var allInvolvedPawns = pawns.Union(nearbyPawns).Distinct().ToList();
 
+        // [CHANGE] 執行緒安全強化
+        // 預先在主執行緒建立 Name->Pawn 映射，避免在 Task.Run 中存取 Pawn.LabelShort
+        var playerDict = new Dictionary<string, Pawn>();
+        foreach (var p in allInvolvedPawns)
+        {
+            if (p?.LabelShort != null)
+            {
+                playerDict[p.LabelShort] = p;
+            }
+        }
+
         // Offload the AI request and processing to a background thread to avoid blocking the game's main thread.
-        Task.Run(() => GenerateAndProcessTalkAsync(talkRequest, allInvolvedPawns));
+        // [MOD] Pass pre-built playerDict instead of list of pawns
+        Task.Run(() => GenerateAndProcessTalkAsync(talkRequest, playerDict, allInvolvedPawns));
 
         return true;
     }
@@ -91,7 +109,8 @@ public static class TalkService
     /// <summary>
     /// Handles the asynchronous AI streaming and processes the responses.
     /// </summary>
-    private static async Task GenerateAndProcessTalkAsync(TalkRequest talkRequest, List<Pawn> allInvolvedPawns)
+    // [MOD] 接收 Dictionary<string, Pawn> playerDict
+    private static async Task GenerateAndProcessTalkAsync(TalkRequest talkRequest, Dictionary<string, Pawn> playerDict, List<Pawn> allInvolvedPawns)
     {
         var initiator = talkRequest.Initiator;
         try
@@ -99,7 +118,7 @@ public static class TalkService
             Cache.Get(initiator).IsGeneratingTalk = true;
 
             // Create a dictionary for quick pawn lookup by name during streaming.
-            var playerDict = allInvolvedPawns.ToDictionary(p => p.LabelShort, p => p);
+            // [REMOVED] 移除這行 (它在異步線程存取 Unity API，不安全)
             var receivedResponses = new List<TalkResponse>();
 
             // ★ 修改點：使用 BuildMemoryBlockFromHistory
@@ -119,7 +138,17 @@ public static class TalkService
                     Logger.Debug($"Streamed: {talkResponse}");
 
                     PawnState pawnState = Cache.Get(pawn);
-                    talkResponse.Name = pawnState.Pawn.LabelShort;
+                    // [Refined Logic] 
+                    // 若 talkResponse.Name 為空，從 playerDict 反查名字 (Thread-Safe)
+                    // 這比直接存取 pawn.LabelShort (Unity API) 安全
+                    if (string.IsNullOrEmpty(talkResponse.Name) && pawn != null)
+                    {
+                        var match = playerDict.FirstOrDefault(x => x.Value == pawn);
+                        if (!string.IsNullOrEmpty(match.Key))
+                        {
+                            talkResponse.Name = match.Key;
+                        }
+                    }
 
                     // Link replies to the previous message in the conversation.
                     if (receivedResponses.Any())
@@ -129,8 +158,12 @@ public static class TalkService
 
                     receivedResponses.Add(talkResponse);
 
+                    // [CHANGE] 關鍵：寫入佇列時加鎖
                     // Enqueue the received talk for the pawn to display later.
-                    pawnState.TalkResponses.Add(talkResponse);
+                    lock (pawnState.TalkResponses)
+                    {
+                        pawnState.TalkResponses.Add(talkResponse);
+                    }
                 }
             );
 
@@ -155,7 +188,7 @@ public static class TalkService
         if (!responses.Any()) return;
         string serializedResponses = JsonUtil.SerializeToJson(responses);
 
-        // 2. 嘗試從回應列表中提取 Metadata
+        // 嘗試從回應列表中提取 Metadata
         // 通常位於最後一個回應，或合併所有回應的 Metadata
         var lastResponse = responses.LastOrDefault();
         string summary = lastResponse?.Summary;
@@ -167,7 +200,7 @@ public static class TalkService
             // 這裡可以選擇不生成 STM，或是生成一個僅包含 Raw Text 提示的 STM
             summary = "(No summary provided by AI)";
         }
-        // 3. 建立 STM MemoryRecord
+        // 建立 STM MemoryRecord
         var memoryRecord = new MemoryRecord
         {
             Summary = summary,
@@ -192,19 +225,32 @@ public static class TalkService
         foreach (Pawn pawn in Cache.Keys)
         {
             PawnState pawnState = Cache.Get(pawn);
-            if (pawnState == null || pawnState.TalkResponses.Empty()) continue;
 
-            var talk = pawnState.TalkResponses.First();
-            if (talk == null)
+            TalkResponse talk = null;
+
+            // [CHANGE] 讀取時加鎖
+            lock (pawnState.TalkResponses)
             {
-                pawnState.TalkResponses.RemoveAt(0);
-                continue;
+                if (pawnState.TalkResponses.Any())
+                {
+                    talk = pawnState.TalkResponses.First();
+                    // [Corrected] 保留原有的防呆邏輯
+                    if (talk == null)
+                    {
+                        pawnState.TalkResponses.RemoveAt(0);
+                    }
+                }
             }
+            if (talk == null) continue;
 
             // Skip this talk if its parent was ignored or the pawn is currently unable to speak.
             if (TalkHistory.IsTalkIgnored(talk.ParentTalkId) || !pawnState.CanDisplayTalk())
             {
-                pawnState.IgnoreTalkResponse();
+                // [CHANGE] 移除時加鎖
+                lock (pawnState.TalkResponses)
+                {
+                    pawnState.IgnoreTalkResponse();
+                }
                 continue;
             }
 
@@ -217,9 +263,12 @@ public static class TalkService
             if (pawn.IsInDanger())
             {
                 replyInterval = 2;
-                pawnState.IgnoreAllTalkResponses([TalkType.Urgent, TalkType.User]);
+                // [CHANGE] 清除時加鎖
+                lock (pawnState.TalkResponses)
+                {
+                    pawnState.IgnoreAllTalkResponses([TalkType.Urgent, TalkType.User]);
+                }
             }
-
             // Enforce a delay for replies to make conversations feel more natural.
             int parentTalkTick = TalkHistory.GetSpokenTick(talk.ParentTalkId);
             if (parentTalkTick == -1 || !CommonUtil.HasPassed(parentTalkTick, replyInterval)) continue;
@@ -249,19 +298,23 @@ public static class TalkService
     /// </summary>
     private static TalkResponse ConsumeTalk(PawnState pawnState)
     {
-        // Failsafe check
-        if (pawnState.TalkResponses.Empty()) 
-            return new TalkResponse(TalkType.Other, null!, "");
-        
-        var talkResponse = pawnState.TalkResponses.First();
-        pawnState.TalkResponses.Remove(talkResponse);
-        TalkHistory.AddSpoken(talkResponse.Id);
-        var apiLog = ApiHistory.GetApiLog(talkResponse.Id);
-        if (apiLog != null)
-            apiLog.SpokenTick = GenTicks.TicksGame;
+        // [CHANGE] 移除時加鎖
+        lock (pawnState.TalkResponses)
+        {
+            // Failsafe check
+            if (pawnState.TalkResponses.Empty())
+                return new TalkResponse(TalkType.Other, null!, ""); // 依據原方法簽名調整
 
-        Overlay.NotifyLogUpdated();
-        return talkResponse;
+            var talkResponse = pawnState.TalkResponses.First();
+            pawnState.TalkResponses.Remove(talkResponse);
+            TalkHistory.AddSpoken(talkResponse.Id);
+            var apiLog = ApiHistory.GetApiLog(talkResponse.Id);
+            if (apiLog != null)
+                apiLog.SpokenTick = GenTicks.TicksGame;
+
+            Overlay.NotifyLogUpdated();
+            return talkResponse;
+        }
     }
 
     private static void CreateInteraction(Pawn pawn, TalkResponse talk)
@@ -290,6 +343,13 @@ public static class TalkService
 
     private static bool AnyPawnHasPendingResponses()
     {
-        return Cache.GetAll().Any(pawnState => pawnState.TalkResponses.Count > 0);
+        return Cache.GetAll().Any(pawnState =>
+        {
+            // [CHANGE] 檢查時加鎖
+            lock (pawnState.TalkResponses)
+            {
+                return pawnState.TalkResponses.Count > 0;
+            }
+        });
     }
 }
