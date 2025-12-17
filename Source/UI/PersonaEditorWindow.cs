@@ -29,7 +29,7 @@ public class PersonaEditorWindow : Window
         preventCameraMotion = false;
     }
 
-    public override Vector2 InitialSize => new Vector2(520f, 440f);
+    public override Vector2 InitialSize => new Vector2(520f, 460f); // 稍微增加高度以容納新按鈕
 
     public override void DoWindowContents(Rect inRect)
     {
@@ -121,14 +121,17 @@ public class PersonaEditorWindow : Window
         float spacing = 10f;
         float buttonY = sliderRowRect.yMax + 15f;
 
-        // Center the button group (4 buttons total)
-        float totalWidth = (buttonWidth * 4f) + (spacing * 3f);
+        // Center the button group (5 buttons total now)
+        float totalWidth = (buttonWidth * 5f) + (spacing * 4f); // [MODIFY] 4->5
         float startX = inRect.center.x - (totalWidth / 2f);
 
         Rect saveButton = new Rect(startX, buttonY, buttonWidth, buttonHeight);
         Rect smartGenButton = new Rect(saveButton.xMax + spacing, buttonY, buttonWidth, buttonHeight);
         Rect rollGenButton = new Rect(smartGenButton.xMax + spacing, buttonY, buttonWidth, buttonHeight);
         Rect clearButton = new Rect(rollGenButton.xMax + spacing, buttonY, buttonWidth, buttonHeight);
+
+        // [NEW] 記憶瀏覽器按鈕
+        Rect memoryButton = new Rect(clearButton.xMax + spacing, buttonY, buttonWidth, buttonHeight);
 
         if (Widgets.ButtonText(saveButton, "RimTalk.PersonaEditor.Save".Translate()))
         {
@@ -168,6 +171,12 @@ public class PersonaEditorWindow : Window
         if (Widgets.ButtonText(clearButton, "RimTalk.PersonaEditor.Clear".Translate()))
         {
             _editingPersonality = "";
+        }
+
+        // [NEW] 新增按鈕邏輯
+        if (Widgets.ButtonText(memoryButton, "RimTalk.PersonaEditor.ViewMemories".Translate()))
+        {
+            Find.WindowStack.Add(new MemoryBrowserWindow(_pawn));
         }
     }
 

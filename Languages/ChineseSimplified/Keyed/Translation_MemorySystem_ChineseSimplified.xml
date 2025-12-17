@@ -2,18 +2,21 @@
 <LanguageData>
 	<!-- Common Knowledge Settings Tab -->
 	<RimTalk.Settings.CommonKnowledge>常识库</RimTalk.Settings.CommonKnowledge>
-	<!-- Common Knowledge Management UI -->
-	<RimTalk.Settings.CKStoredInSave>常识库资料储存于存档中，请先载入游戏以进行检视或编辑。</RimTalk.Settings.CKStoredInSave>
-	<RimTalk.Settings.CKNewEntry>新增条目</RimTalk.Settings.CKNewEntry>
-	<RimTalk.Settings.CKEditEntry>编辑条目</RimTalk.Settings.CKEditEntry>
-	<RimTalk.Settings.CKKeywords>关键词 (使用逗号 , 分隔)：</RimTalk.Settings.CKKeywords>
-	<RimTalk.Settings.CKContent>内容：</RimTalk.Settings.CKContent>
-	<RimTalk.Settings.CKAdd>新增</RimTalk.Settings.CKAdd>
-	<RimTalk.Settings.CKUpdate>更新</RimTalk.Settings.CKUpdate>
-	<RimTalk.Settings.CKCancelClear>取消/清除</RimTalk.Settings.CKCancelClear>
+  <!-- Common Knowledge Settings -->
+  <RimTalk.Settings.CKStoredInSave>常识库存储于存档中，请加载存档后进行操作</RimTalk.Settings.CKStoredInSave>
+  <RimTalk.Settings.CKNewEntry>新增常识</RimTalk.Settings.CKNewEntry>
+  <RimTalk.Settings.CKEditEntry>编辑常识</RimTalk.Settings.CKEditEntry>
+  <RimTalk.Settings.CKKeywords>关键词 (逗号分隔)</RimTalk.Settings.CKKeywords>
+  <RimTalk.Settings.CKContent>内容摘要</RimTalk.Settings.CKContent>
+  <RimTalk.Settings.CKAdd>新增</RimTalk.Settings.CKAdd>
+  <RimTalk.Settings.CKUpdate>更新</RimTalk.Settings.CKUpdate>
+  <RimTalk.Settings.CKCancelClear>取消 / 清空选择</RimTalk.Settings.CKCancelClear>
+  <RimTalk.Settings.CKImportance>重要性</RimTalk.Settings.CKImportance>
 	<!-- Weight Settings (若未来要在 UI 显示) -->
-	<RimTalk.Settings.MemoryImportanceWeight>重要性权重</RimTalk.Settings.MemoryImportanceWeight>
-	<RimTalk.Settings.MemoryImportanceWeightDesc>决定重要性(Importance)在记忆检索与保留时的影响程度。</RimTalk.Settings.MemoryImportanceWeightDesc>
+  <RimTalk.Settings.KeywordWeight>关键字权重: {0}</RimTalk.Settings.KeywordWeight>
+  <RimTalk.Settings.KeywordWeightTooltip>调整在检索记忆时，关键字（如人名、地名、特定名词）匹配的重要性。权重越高，包含关键字的记忆越容易被选中。</RimTalk.Settings.KeywordWeightTooltip>
+  <RimTalk.Settings.MemoryImportanceWeight>重要性权重: {0}</RimTalk.Settings.MemoryImportanceWeight>
+  <RimTalk.Settings.MemoryImportanceWeightTooltip>调整记忆本身重要性分数（由 AI 评估）在检索时的影响力。权重越高，重要性高的记忆（如重大事件）越容易被选中。</RimTalk.Settings.MemoryImportanceWeightTooltip>
   <!-- Memory Service Errors -->
   <RimTalk.MemoryService.SummarizeFailed>记忆总结失败：{0}</RimTalk.MemoryService.SummarizeFailed>
   <RimTalk.MemoryService.ConsolidateFailed>记忆归档失败：{0}</RimTalk.MemoryService.ConsolidateFailed>
@@ -28,4 +31,27 @@
   <RimTalk.TimeAgo.DaysAgo>{0}天前</RimTalk.TimeAgo.DaysAgo>
   <RimTalk.TimeAgo.SeasonsAgo>{0}季前</RimTalk.TimeAgo.SeasonsAgo>
   <RimTalk.TimeAgo.YearsAgo>{0}年前</RimTalk.TimeAgo.YearsAgo>
+  <!-- Memory Browser -->
+  <RimTalk.MemoryBrowser.Title>记忆浏览器 ({0})</RimTalk.MemoryBrowser.Title>
+  <RimTalk.MemoryBrowser.NoData>该角色无记忆数据</RimTalk.MemoryBrowser.NoData>
+  <RimTalk.MemoryBrowser.ShortTerm>短期记忆</RimTalk.MemoryBrowser.ShortTerm>
+  <RimTalk.MemoryBrowser.MediumTerm>中期记忆</RimTalk.MemoryBrowser.MediumTerm>
+  <RimTalk.MemoryBrowser.LongTerm>长期记忆</RimTalk.MemoryBrowser.LongTerm>
+  <RimTalk.MemoryBrowser.NoMemories>暂无记忆记录</RimTalk.MemoryBrowser.NoMemories>
+  <!-- UI Buttons -->
+  <RimTalk.UI.Save>保存</RimTalk.UI.Save>
+  <RimTalk.UI.Cancel>取消</RimTalk.UI.Cancel>
+  <RimTalk.UI.Delete>删除</RimTalk.UI.Delete>
+  <RimTalk.UI.Edit>编辑</RimTalk.UI.Edit>
+  <!-- Persona Editor -->
+  <RimTalk.PersonaEditor.ViewMemories>查看记忆</RimTalk.PersonaEditor.ViewMemories>
+
+  <RimTalk.Settings.IndependentMemoryModel>独立记忆模型</RimTalk.Settings.IndependentMemoryModel>
+  <RimTalk.Settings.MemoryModelDesc_Enabled>已启用。记忆生成（总结/归档）将使用下方独立的 API 配置，避免占用主对话模型并节省成本。</RimTalk.Settings.MemoryModelDesc_Enabled>
+  <RimTalk.Settings.MemoryModelDesc_Disabled>未启用。记忆生成将直接共用主对话的 API 配置。</RimTalk.Settings.MemoryModelDesc_Disabled>
+  <RimTalk.Settings.MemoryApiConfigurations>记忆专用 API 配置列表</RimTalk.Settings.MemoryApiConfigurations>
+  <RimTalk.Settings.MemoryApiConfigurationsDesc>您可以配置多组專用於記憶處理的模型（建議使用如 Gemini Flash 或 Claude Haiku 等低成本模型）。當主要配置失敗時，系統會自動嘗試列表中的下一個。</RimTalk.Settings.MemoryApiConfigurationsDesc>
+
+  <!-- [NEW] Add QuotaExceeded -->
+  <RimTalk.TalkService.QuotaExceeded>API 配额已耗尽</RimTalk.TalkService.QuotaExceeded>
 </LanguageData>

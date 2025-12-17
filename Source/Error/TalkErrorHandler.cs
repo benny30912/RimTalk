@@ -10,7 +10,8 @@ public static class AIErrorHandler
 {
     private static bool _quotaWarningShown;
 
-    public static async Task<T> HandleWithRetry<T>(Func<Task<T>> operation)
+    // [MODIFY] Add optional parameter isMemoryOperation
+    public static async Task<T> HandleWithRetry<T>(Func<Task<T>> operation, bool isMemory = false)
     {
         try
         {
@@ -20,9 +21,14 @@ public static class AIErrorHandler
         catch (Exception ex)
         {
             var settings = Settings.Get();
-            if (CanRetryGeneration(settings))
+            // [MODIFY] Pass isMemoryOperation
+            if (CanRetryGeneration(settings, isMemory))
             {
-                string nextModel = Settings.Get().GetCurrentModel();
+                // [MODIFY] Get correct model name for message
+                string nextModel = isMemory
+                    ? settings.GetActiveMemoryConfig()?.SelectedModel ?? "Unknown"
+                    : settings.GetCurrentModel();
+
                 if (!settings.UseSimpleConfig)
                 {
                     ShowRetryMessage(ex, nextModel);
@@ -46,20 +52,33 @@ public static class AIErrorHandler
         }
     }
 
-    private static bool CanRetryGeneration(RimTalkSettings settings)
+    // [MODIFY] Update logic to rotate correct config
+    private static bool CanRetryGeneration(RimTalkSettings settings, bool isMemory)
     {
         if (settings.UseSimpleConfig)
         {
+            // Simple Config 不支援 Memory Model 輪替 (假設用同一把 Key)
             if (settings.IsUsingFallbackModel) return false;
             settings.IsUsingFallbackModel = true;
             return true;
         }
 
         if (!settings.UseCloudProviders) return false;
-        int originalIndex = settings.CurrentCloudConfigIndex;
-        settings.TryNextConfig();
-        return settings.CurrentCloudConfigIndex != originalIndex;
 
+        if (isMemory && settings.EnableMemoryModel)
+        {
+            // [NEW] Rotate Memory Config
+            int originalIndex = settings.CurrentMemoryConfigIndex;
+            settings.TryNextMemoryConfig();
+            return settings.CurrentMemoryConfigIndex != originalIndex;
+        }
+        else
+        {
+            // Rotate Chat Config
+            int originalIndex = settings.CurrentCloudConfigIndex;
+            settings.TryNextConfig();
+            return settings.CurrentCloudConfigIndex != originalIndex;
+        }
     }
 
     private static void HandleFinalFailure(Exception ex)

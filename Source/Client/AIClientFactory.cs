@@ -14,6 +14,10 @@ public static class AIClientFactory
     private static IAIClient _instance;
     private static AIProvider _currentProvider;
 
+    // ★ 新增：記憶 Client 快取
+    private static IAIClient _memoryInstance;
+    private static AIProvider _currentMemoryProvider;
+
     /// <summary>
     /// Async method for getting AI client - required for Player2 local detection
     /// </summary>
@@ -35,11 +39,34 @@ public static class AIClientFactory
     }
 
     // ★ 新增：獲取記憶處理專用的 Client
+    // [MODIFY] Updated GetMemoryClientAsync
     public static async Task<IAIClient> GetMemoryClientAsync()
     {
-        // 目前記憶處理使用與主對話相同的配置
-        // 若未來需要獨立模型 (如更便宜的模型)，可在此修改邏輯
-        return await GetAIClientAsync();
+        var settings = Settings.Get();
+        ApiConfig config;
+        if (settings.EnableMemoryModel)
+        {
+            config = settings.GetActiveMemoryConfig();
+            // Fallback to main config if memory config is invalid
+            if (config == null) config = settings.GetActiveConfig();
+        }
+        else
+        {
+            config = settings.GetActiveConfig();
+        }
+        if (config == null) return null;
+        // Optimized: Reuse main client if config is identical
+        var activeDialogue = settings.GetActiveConfig();
+        if (config == activeDialogue)
+        {
+            return await GetAIClientAsync();
+        }
+        if (_memoryInstance == null || _currentMemoryProvider != config.Provider)
+        {
+            _memoryInstance = await CreateServiceInstanceAsync(config);
+            _currentMemoryProvider = config.Provider;
+        }
+        return _memoryInstance;
     }
 
     /// <summary>
@@ -72,6 +99,7 @@ public static class AIClientFactory
         }
     }
 
+    // [MODIFY] Updated Clear to clean up memory client
     /// <summary>
     /// Clean up resources and stop background processes
     /// </summary>
@@ -83,5 +111,9 @@ public static class AIClientFactory
         }
         _instance = null;
         _currentProvider = AIProvider.None;
+
+        // [NEW] Clear memory instance
+        _memoryInstance = null;
+        _currentMemoryProvider = AIProvider.None;
     }
 }

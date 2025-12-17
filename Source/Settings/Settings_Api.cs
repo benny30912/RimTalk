@@ -170,6 +170,69 @@ public partial class Settings
         {
             DrawLocalProviderSection(listingStandard, settings);
         }
+
+        // [NEW] Add Memory Settings Section
+        listingStandard.GapLine();
+        DrawMemorySettings(listingStandard, settings);
+    }
+
+    // [NEW] DrawMemorySettings Method
+    private void DrawMemorySettings(Listing_Standard listingStandard, RimTalkSettings settings)
+    {
+        Rect headerRect = listingStandard.GetRect(24f);
+        Rect labelRect = new Rect(headerRect.x, headerRect.y, headerRect.width - 30f, headerRect.height);
+        Rect toggleRect = new Rect(headerRect.xMax - 24f, headerRect.y, 24f, headerRect.height);
+        Widgets.Label(labelRect, "RimTalk.Settings.IndependentMemoryModel".Translate());
+        Widgets.Checkbox(new Vector2(toggleRect.x, toggleRect.y), ref settings.EnableMemoryModel);
+        Text.Font = GameFont.Tiny;
+        GUI.color = Color.gray;
+        Rect descRect = listingStandard.GetRect(Text.LineHeight);
+        string desc = settings.EnableMemoryModel
+            ? "RimTalk.Settings.MemoryModelDesc_Enabled".Translate()
+            : "RimTalk.Settings.MemoryModelDesc_Disabled".Translate();
+        Widgets.Label(descRect, desc);
+        GUI.color = Color.white;
+        Text.Font = GameFont.Small;
+        if (settings.EnableMemoryModel)
+        {
+            listingStandard.Gap(6f);
+
+            // Reusing Cloud Config UI Logic for Memory Configs
+            // Header
+            Rect listHeaderRect = listingStandard.GetRect(24f);
+            Rect addButtonRect = new Rect(listHeaderRect.x + listHeaderRect.width - 65f, listHeaderRect.y, 30f, 24f);
+            Rect removeButtonRect = new Rect(listHeaderRect.x + listHeaderRect.width - 30f, listHeaderRect.y, 30f, 24f);
+            listHeaderRect.width -= 70f;
+            Widgets.Label(listHeaderRect, "RimTalk.Settings.MemoryApiConfigurations".Translate());
+
+            Text.Font = GameFont.Tiny;
+            GUI.color = Color.gray;
+            Rect listDescRect = listingStandard.GetRect(Text.LineHeight * 2);
+            listDescRect.width -= 70f;
+            Widgets.Label(listDescRect, "RimTalk.Settings.MemoryApiConfigurationsDesc".Translate());
+            GUI.color = Color.white;
+            Text.Font = GameFont.Small;
+            
+            if (Widgets.ButtonText(addButtonRect, "+"))
+            {
+                settings.MemoryConfigs.Add(new ApiConfig { Provider = AIProvider.Google });
+            }
+            GUI.enabled = settings.MemoryConfigs.Count > 1;
+            if (Widgets.ButtonText(removeButtonRect, "−"))
+            {
+                if (settings.MemoryConfigs.Count > 1)
+                    settings.MemoryConfigs.RemoveAt(settings.MemoryConfigs.Count - 1);
+            }
+            GUI.enabled = true;
+            listingStandard.Gap(6f);
+            // Draw Rows
+            for (int i = 0; i < settings.MemoryConfigs.Count; i++)
+            {
+                // Reusing DrawCloudConfigRow as the structure is identical
+                DrawCloudConfigRow(listingStandard, settings.MemoryConfigs[i], i, settings.MemoryConfigs);
+                listingStandard.Gap(3f);
+            }
+        }
     }
 
     private void DrawCloudProvidersSection(Listing_Standard listingStandard, RimTalkSettings settings)

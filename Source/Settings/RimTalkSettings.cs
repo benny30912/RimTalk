@@ -10,6 +10,15 @@ public class RimTalkSettings : ModSettings
     public List<ApiConfig> CloudConfigs = [];
     public int CurrentCloudConfigIndex = 0;
     public ApiConfig LocalConfig = new() { Provider = AIProvider.Local };
+
+    // [NEW] Independent Memory Model Settings
+    public bool EnableMemoryModel = false;
+    public List<ApiConfig> MemoryConfigs = [];
+    public int CurrentMemoryConfigIndex = 0;
+
+    // [NEW] Keyword Weight (Missing in current version)
+    public float KeywordWeight = 2.0f;
+
     public bool UseCloudProviders = true;
     public bool UseSimpleConfig = true;
     public string SimpleApiKey = "";
@@ -108,6 +117,23 @@ public class RimTalkSettings : ModSettings
         return null;
     }
 
+    // [NEW] GetActiveMemoryConfig
+    public ApiConfig GetActiveMemoryConfig()
+    {
+        if (!EnableMemoryModel || MemoryConfigs.Count == 0) return null;
+        for (int i = 0; i < MemoryConfigs.Count; i++)
+        {
+            int index = (CurrentMemoryConfigIndex + i) % MemoryConfigs.Count;
+            var config = MemoryConfigs[index];
+            if (config.IsValid())
+            {
+                CurrentMemoryConfigIndex = index;
+                return config;
+            }
+        }
+        return null;
+    }
+
     /// <summary>
     /// Advances the current cloud configuration index to the next valid configuration.
     /// </summary>
@@ -132,6 +158,25 @@ public class RimTalkSettings : ModSettings
         Write(); // Save in case the original was invalid and we couldn't find a new one.
     }
 
+    // [NEW] TryNextMemoryConfig
+    public void TryNextMemoryConfig()
+    {
+        if (MemoryConfigs.Count <= 1) return;
+        int originalIndex = CurrentMemoryConfigIndex;
+        for (int i = 1; i < MemoryConfigs.Count; i++)
+        {
+            int nextIndex = (originalIndex + i) % MemoryConfigs.Count;
+            var config = MemoryConfigs[nextIndex];
+            if (config.IsValid())
+            {
+                CurrentMemoryConfigIndex = nextIndex;
+                Write();
+                return;
+            }
+        }
+        Write();
+    }
+
     /// <summary>
     /// Gets the currently active Gemini model, handling custom model names.
     /// </summary>
@@ -154,6 +199,11 @@ public class RimTalkSettings : ModSettings
             
         Scribe_Collections.Look(ref CloudConfigs, "cloudConfigs", LookMode.Deep);
         Scribe_Deep.Look(ref LocalConfig, "localConfig");
+
+        // [NEW] Scribe Memory Settings
+        Scribe_Values.Look(ref EnableMemoryModel, "enableMemoryModel", false);
+        Scribe_Collections.Look(ref MemoryConfigs, "memoryConfigs", LookMode.Deep);
+
         Scribe_Values.Look(ref UseCloudProviders, "useCloudProviders", true);
         Scribe_Values.Look(ref UseSimpleConfig, "useSimpleConfig", true);
         Scribe_Values.Look(ref SimpleApiKey, "simpleApiKey", "");
@@ -181,6 +231,7 @@ public class RimTalkSettings : ModSettings
 
         // [NEW] 儲存權重
         Scribe_Values.Look(ref MemoryImportanceWeight, "memoryImportanceWeight", 3.0f);
+        Scribe_Values.Look(ref KeywordWeight, "KeywordWeight", 2.0f);
 
         Scribe_Deep.Look(ref Context, "context");
 
@@ -243,5 +294,9 @@ public class RimTalkSettings : ModSettings
         {
             CloudConfigs.Add(new ApiConfig());
         }
+
+        // [NEW] Ensure initialization
+        if (MemoryConfigs == null) MemoryConfigs = new List<ApiConfig>();
+        if (MemoryConfigs.Count == 0) MemoryConfigs.Add(new ApiConfig { Provider = AIProvider.Google });
     }
 }

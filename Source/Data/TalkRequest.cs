@@ -1,5 +1,4 @@
 ﻿using RimTalk.Patch;
-using RimTalk.Service;
 using RimTalk.Source.Data;
 using RimTalk.Util;
 using Verse;

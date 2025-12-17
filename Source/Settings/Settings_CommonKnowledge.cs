@@ -15,6 +15,7 @@ public partial class Settings
     private string _ckKeywordsBuffer = "";
     private string _ckContentBuffer = "";
     private MemoryRecord _selectedCkData = null; // 改用 MemoryRecord
+    private int _ckImportanceBuffer = 3; // [NEW] Buffer for importance
 
     private void DrawCommonKnowledgeSettings(Rect rect)
     {
@@ -57,10 +58,11 @@ public partial class Settings
             if (i % 2 == 0) Widgets.DrawLightHighlight(rowRect);
             if (data == _selectedCkData) Widgets.DrawHighlightSelected(rowRect);
 
+            // [MODIFY] Update preview text to include Importance and AccessCount
             // 內容預覽
             string keys = string.Join(", ", data.Keywords);
             // 適配 MemoryRecord: Content -> Summary
-            string preview = $"[{keys}] {data.Summary}";
+            string preview = $"[{keys}] (Imp:{data.Importance}) (Access:{data.AccessCount}) {data.Summary}";
 
             Rect textRect = new Rect(rowRect.x + 5f, rowRect.y, rowRect.width - 30f, rowRect.height);
             Text.Anchor = TextAnchor.MiddleLeft;
@@ -73,6 +75,7 @@ public partial class Settings
                 _selectedCkData = data;
                 _ckKeywordsBuffer = string.Join(", ", data.Keywords);
                 _ckContentBuffer = data.Summary;
+                _ckImportanceBuffer = data.Importance; // [NEW] Sync buffer
             }
 
             // 刪除按鈕
@@ -113,6 +116,12 @@ public partial class Settings
         Rect contentAreaRect = rightListing.GetRect(200f);
         _ckContentBuffer = Widgets.TextArea(contentAreaRect, _ckContentBuffer);
 
+        // [NEW] Importance Slider
+        rightListing.Gap();
+        rightListing.Label($"RimTalk.Settings.CKImportance".Translate() + $": {_ckImportanceBuffer}");
+        // 這裡若無翻譯鍵可暫用英文 "Importance"
+        _ckImportanceBuffer = (int)rightListing.Slider(_ckImportanceBuffer, 1, 5);
+
         rightListing.Gap(20f);
 
         string btnLabel = _selectedCkData == null ? "RimTalk.Settings.CKAdd".Translate() : "RimTalk.Settings.CKUpdate".Translate();
@@ -130,10 +139,12 @@ public partial class Settings
                     // Update existing
                     _selectedCkData.Keywords = keys;
                     _selectedCkData.Summary = _ckContentBuffer; // Map to Summary
+                    _selectedCkData.Importance = _ckImportanceBuffer; // [NEW] Update Importance
                     // 清空選擇以便新增下一個
                     _selectedCkData = null;
                     _ckKeywordsBuffer = "";
                     _ckContentBuffer = "";
+                    _ckImportanceBuffer = 3; // Reset
                 }
                 else
                 {
@@ -142,13 +153,14 @@ public partial class Settings
                     {
                         Keywords = keys,
                         Summary = _ckContentBuffer,
-                        Importance = 3, // 預設重要性
+                        Importance = _ckImportanceBuffer, // [MOD] Set Importance
                         CreatedTick = GenTicks.TicksGame
                     };
                     ckList.Add(newData);
                     // 清空
                     _ckKeywordsBuffer = "";
                     _ckContentBuffer = "";
+                    _ckImportanceBuffer = 3; // Reset
                 }
             }
         }

@@ -62,6 +62,29 @@ public partial class Settings
         Widgets.Label(cooldownLabelRect, cooldownLabel);
         settings.TalkInterval = (int)listingStandard.Slider(settings.TalkInterval, 1, 60);
 
+        listingStandard.Gap(6f); // 保持原有的間距
+
+        // [NEW] === 記憶檢索權重設定 (Memory Retrieval Weights) ===
+        // 1. 關鍵字權重 (Keyword Weight)
+        // string format "0.0"確保顯示一位小數
+        var keywordWeightLabel = "RimTalk.Settings.KeywordWeight".Translate(settings.KeywordWeight.ToString("0.0"));
+        var keywordWeightRect = listingStandard.GetRect(Text.CalcHeight(keywordWeightLabel, listingStandard.ColumnWidth));
+        Widgets.Label(keywordWeightRect, keywordWeightLabel);
+        TooltipHandler.TipRegion(keywordWeightRect, "RimTalk.Settings.KeywordWeightTooltip".Translate());
+
+        // 設定範圍 0.0 ~ 20.0
+        settings.KeywordWeight = listingStandard.Slider(settings.KeywordWeight, 0f, 20f);
+
+        listingStandard.Gap(6f);
+        // 2. 記憶重要性權重 (Memory Importance Weight)
+        var memWeightLabel = "RimTalk.Settings.MemoryImportanceWeight".Translate(settings.MemoryImportanceWeight.ToString("0.0"));
+        var memWeightRect = listingStandard.GetRect(Text.CalcHeight(memWeightLabel, listingStandard.ColumnWidth));
+        Widgets.Label(memWeightRect, memWeightLabel);
+        TooltipHandler.TipRegion(memWeightRect, "RimTalk.Settings.MemoryImportanceWeightTooltip".Translate());
+        // 設定範圍 0.0 ~ 20.0
+        settings.MemoryImportanceWeight = listingStandard.Slider(settings.MemoryImportanceWeight, 0f, 20f);
+        // [End NEW] === 結束新增部分 ===
+
         listingStandard.Gap(6f);
 
         // --- Checkboxes in two columns ---

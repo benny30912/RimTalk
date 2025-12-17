@@ -27,7 +27,7 @@ public static class PromptService
         var allKnowledge = new HashSet<string>();
 
         // 1. 準備搜索上下文
-        var eventTags = ""; //CoreTagMapper.GetTextTags(request.Prompt ?? ""); // CoreTagMapper 還沒準備好
+        var eventTags = CoreTagMapper.GetTextTags(request.Prompt ?? ""); // CoreTagMapper 還沒準備好
         // ★ 關鍵策略：直接使用已經被 DecoratePrompt + Event+ Patch 處理過的 Prompt 作為檢索源
         // 這包含了：指令 + 環境描述 + Ongoing Events
         string distinctContext = (request.Prompt ?? "") + "\n" + string.Join(", ", eventTags);

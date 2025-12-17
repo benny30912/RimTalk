@@ -1,10 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using HarmonyLib;
+﻿using HarmonyLib;
 using RimTalk.Data;
 using RimTalk.Source.Data;
 using RimWorld;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Cryptography;
 using Verse;
 
 namespace RimTalk.Patch;
@@ -40,12 +41,12 @@ public static class ThoughtTracker
             return null; 
         }
 
-
+        // 添加 new feeling 的描述
         if (offset > 0)
-            return $"new good feeling: {thought.LabelCap}";
+            return $"new good feeling: {thought.LabelCap}({thought.Description})";
         if (offset < 0)
-            return $"new bad feeling: {thought.LabelCap}";
-        return $"new feeling: {thought.LabelCap}";
+            return $"new bad feeling: {thought.LabelCap}({thought.Description})";
+        return $"new feeling: {thought.LabelCap}({thought.Description})";
     }
 
     public static bool IsThoughtStillActive(Pawn pawn, string thoughtLabel)
