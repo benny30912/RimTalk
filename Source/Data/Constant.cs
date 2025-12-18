@@ -29,16 +29,25 @@ public static class Constant
          Monologue = 1 turn. Conversation = 4-8 short turns
          """;
 
+    // [FIX] 改用獨立的 Metadata 物件，避免在多輪對話中遺漏
     private const string JsonInstruction = """
-                                           Output JSONL.
-                                           Required keys: "name", "text".
-                                               
-                                           [Metadata Rules]
-                                           For the LAST object in the array only, you MUST include:
-                                           - "summary": A 3rd-person summary of this interaction (Short Term Memory).
-                                           - "keywords": A list of 2-3 key tags.
-                                           - "importance": Integer score 1-5.
-                                           """;
+                                            Output JSONL.
+                                            Required keys for dialogue: "name", "text".
+                                       
+                                            [CRITICAL: Memory Summary - SEPARATE OBJECT]
+                                            After ALL dialogue objects, output ONE final object with ONLY these fields:
+                                            {"summary": "...", "keywords": ["...", "..."], "importance": N}
+                                       
+                                            This summary object MUST:
+                                            - Have NO "name" or "text" fields
+                                            - Be the LAST line of your output
+                                            - Summarize the ENTIRE conversation in 3rd person
+                                       
+                                            Example output:
+                                            {"name": "小明", "text": "今天天气真冷。"}
+                                            {"name": "小红", "text": "是啊，要多穿点。"}
+                                            {"summary": "小明和小红讨论了寒冷的天气。", "keywords": ["天气", "寒冷"], "importance": 2}
+                                            """;
 
     private const string SocialInstruction = """
                                            Optional keys (Include only if social interaction occurs):

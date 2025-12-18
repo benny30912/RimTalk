@@ -1,10 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using RimTalk.Client;
+﻿using RimTalk.Client;
 using RimTalk.Data;
 using RimTalk.Error;
 using RimTalk.Util;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace RimTalk.Service;
 
@@ -40,6 +41,24 @@ public static class AIService
                 return await client.GetStreamingChatCompletionAsync<TalkResponse>(_instruction, currentMessages,
                     talkResponse =>
                     {
+                        // [NEW] 檢查是否為 Metadata 專用物件
+                        bool isMetadataOnly = string.IsNullOrEmpty(talkResponse.Name) &&
+                                              !string.IsNullOrEmpty(talkResponse.Summary);
+
+                        if (isMetadataOnly)
+                        {
+                            // Metadata 物件不需要匹配 Pawn，直接傳遞給回調
+                            // 使用一個特殊的 player 值（可以是 players 中的任意一個，或 default）
+                            var firstPlayer = players.Values.FirstOrDefault();
+                            if (firstPlayer != null)
+                            {
+                                talkResponse.TalkType = request.TalkType;
+                                onPlayerResponseReceived?.Invoke(firstPlayer, talkResponse);
+                            }
+                            return;
+                        }
+
+                        // [原有邏輯] 一般對話物件需要匹配 Pawn
                         if (!players.TryGetValue(talkResponse.Name, out var player))
                             return;
 

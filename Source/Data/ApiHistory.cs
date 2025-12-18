@@ -21,13 +21,16 @@ public class ApiLog(string name, string prompt, string response, Payload payload
     public DateTime Timestamp { get; } = timestamp;
     public int ElapsedMs;
     public int SpokenTick { get; set; } = 0;
-    
+
     public static List<string> ExtractContextBlocks(string context)
     {
         var blocks = new List<string>();
         if (string.IsNullOrEmpty(context)) return blocks;
-    
-        string pattern = @"\[P\d+\]\s*(.*?)(?=\[P\d+\]|$)";
+
+        // [MODIFIED] 新 pattern：匹配 [Person 0], [Person 1], [Person 2]... 格式
+        // 原本：@"\[P\d+\]\s*(.*?)(?=\[P\d+\]|$)"
+        // 修改後：@"\[Person \d+\]\s*(.*?)(?=\[Person \d+\]|$)"
+        string pattern = @"\[Person \d+\]\s*(.*?)(?=\[Person \d+\]|$)";
         var matches = Regex.Matches(context, pattern, RegexOptions.Singleline);
 
         foreach (Match match in matches)

@@ -137,6 +137,17 @@ public static class TalkService
                 {
                     Logger.Debug($"Streamed: {talkResponse}");
 
+                    // [NEW] 跳過 Metadata 專用物件，不加入 TalkResponses（它不是真正的對話）
+                    bool isMetadataOnly = string.IsNullOrEmpty(talkResponse.Name) &&
+                                          !string.IsNullOrEmpty(talkResponse.Summary);
+
+                    if (isMetadataOnly)
+                    {
+                        // 只加入 receivedResponses 供後續 AddResponsesToHistory 處理
+                        receivedResponses.Add(talkResponse);
+                        return;
+                    }
+
                     PawnState pawnState = Cache.Get(pawn);
                     // [Refined Logic] 
                     // 若 talkResponse.Name 為空，從 playerDict 反查名字 (Thread-Safe)
@@ -186,14 +197,44 @@ public static class TalkService
     private static void AddResponsesToHistory(List<Pawn> pawns, List<TalkResponse> responses, string prompt)
     {
         if (!responses.Any()) return;
-        string serializedResponses = JsonUtil.SerializeToJson(responses);
 
-        // 嘗試從回應列表中提取 Metadata
-        // 通常位於最後一個回應，或合併所有回應的 Metadata
-        var lastResponse = responses.LastOrDefault();
-        string summary = lastResponse?.Summary;
-        List<string> keywords = lastResponse?.Keywords ?? [];
-        int importance = lastResponse?.Importance ?? 1;
+        // [NEW] 分離對話物件和 Metadata 物件
+        // Metadata 物件的特徵：沒有 name 或 text，但有 summary
+        var metadataResponse = responses.LastOrDefault(r =>
+            string.IsNullOrEmpty(r.Name) &&
+            string.IsNullOrEmpty(r.Text) &&
+            !string.IsNullOrEmpty(r.Summary));
+
+        // 過濾掉 Metadata 物件，只保留真正的對話
+        var dialogueResponses = responses
+            .Where(r => !string.IsNullOrEmpty(r.Name) || !string.IsNullOrEmpty(r.Text))
+            .ToList();
+
+        if (!dialogueResponses.Any()) return;
+
+        string serializedResponses = JsonUtil.SerializeToJson(dialogueResponses);
+
+        // 從 Metadata 物件或最後一個對話物件中提取資訊
+        string summary;
+        List<string> keywords;
+        int importance;
+
+        if (metadataResponse != null)
+        {
+            // 使用獨立的 Metadata 物件
+            summary = metadataResponse?.Summary;
+            keywords = metadataResponse?.Keywords ?? [];
+            importance = metadataResponse?.Importance ?? 1;
+        }
+        else
+        {
+            // Fallback：嘗試從最後一個對話物件取得
+            var lastDialogue = dialogueResponses.LastOrDefault();
+            summary = lastDialogue?.Summary;
+            keywords = lastDialogue?.Keywords ?? [];
+            importance = lastDialogue?.Importance ?? 1;
+        }
+
         // 若 LLM 未回傳 Summary (例如舊的 Prompt)，則提供一個預設值或讓 MemoryService 後續補救
         if (string.IsNullOrWhiteSpace(summary))
         {
