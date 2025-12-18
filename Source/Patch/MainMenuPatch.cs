@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
-using Verse;
+using RimTalk.Data;
 using RimTalk.Service; // 用於 MemoryService
+using Verse;
 
 namespace RimTalk.Patch
 {
@@ -12,6 +13,8 @@ namespace RimTalk.Patch
         {
             // 取消所有記憶相關的異步任務並清空佇列
             MemoryService.Clear(keepSavedData: false);
+            // [NEW] 確保取消所有 Persona 生成任務
+            PersonaService.CancelAllRetries();
         }
     }
 }

@@ -42,6 +42,9 @@ public class RimTalk : GameComponent
         AIClientFactory.Clear();
         AIService.Clear();
 
+        // [NEW] 確保取消所有 Persona 生成任務
+        PersonaService.CancelAllRetries();
+
         PatchThoughtHandlerGetDistinctMoodThoughtGroups.Clear();
         Cache.GetAll().ToList().ForEach(pawnState => pawnState.IgnoreAllTalkResponses());
         Cache.InitializePlayerPawn();

@@ -965,8 +965,12 @@ namespace RimTalk.Service
             return string.Join(", ", keywords.Take(1000));
         }
 
-        // 用於 LTM 的維護：根據權重剔除多餘記憶
-        // [NEW] 實作 PruneLongTermMemories (基於權重剔除)
+        /// <summary>
+        /// 根據權重與時間衰減剔除多餘的長期記憶 (From Legacy)
+        /// </summary>
+        /// <param name="ltm">長期記憶列表</param>
+        /// <param name="maxCount">最大保留數量</param>
+        /// <param name="currentTick">當前遊戲時間</param>
         public static void PruneLongTermMemories(List<MemoryRecord> ltm, int maxCount, int currentTick)
         {
             if (ltm.Count <= maxCount) return;
@@ -974,22 +978,58 @@ namespace RimTalk.Service
             // 讀取設定中的權重
             float weightImportance = Settings.Get().MemoryImportanceWeight;
 
+            float weightAccess = 0.5f;           // 提及次數的權重 (活躍度)
+            float timeDecayHalfLifeDays = 60f;   // 半衰期：60天 (1年權重減半)
+
+            // 寬限期 (Grace Period)：15 天
+            // 剛生成的記憶通常提及數為 0，且時間亦短，給予豁免以免被 "秒殺"
+            float gracePeriodDays = 15f;
+            int gracePeriodTicks = (int)(gracePeriodDays * 60000);
+
             int removeCount = ltm.Count - maxCount;
 
-            // 計算分數並排序：分數低的優先被刪除
-            // 分數 = 活躍度 + (重要性 * 權重) + (高重要性保底)
-            var candidates = ltm.OrderBy(m =>
+            // 定義內部計分函數 (Local Function)
+            float CalculateRetentionScore(MemoryRecord m)
             {
-                // Importance >= 5給予極高保底分，極難被刪除
-                float baseScore = m.Importance >= 5 ? 10000f : 0f;
-                return baseScore + m.AccessCount + (m.Importance * weightImportance);
-            }).ToList();
+                // 1. 新手保護期：給予極大分數 (9999)，確保絕對安全
+                if (currentTick - m.CreatedTick < gracePeriodTicks) return 9999f;
+                // 2. 計算時間衰減 (Time Decay)
+                // 公式：Exp(-elapsedDays / halfLife)
+                float elapsedDays = (currentTick - m.CreatedTick) / 60000f;
+                if (elapsedDays < 0) elapsedDays = 0; // 防呆
+                float effectiveDecayDays = Math.Max(0, elapsedDays - gracePeriodDays);
+                float rawDecay = (float)Math.Exp(-effectiveDecayDays / timeDecayHalfLifeDays);
+                // 3. 階梯式保底機制 (Stepped Floor)
+                // 即使時間久遠，極重要的記憶也不應完全衰減為 0
+                float minFloor = m.Importance switch
+                {
+                    >= 5 => 0.5f, // 刻骨銘心：保留 50% 底限
+                    4 => 0.3f, // 重大事件：保留 30% 底限
+                    _ => 0f    // 普通記憶：可自然衰減至 0
+                };
+                // 取二者最大值作為最終衰減係數
+                float finalDecay = Math.Max(rawDecay, minFloor);
+                // 4. 總分公式
+                // 總分 = (本質價值 * 衰減) + (實用價值 * 衰減)
+                // 這樣即使是常被用到的記憶，如果本身不重要，也會隨時間慢慢變得沒那麼"強勢"
+                return (m.Importance * weightImportance * finalDecay)
+                     + (m.AccessCount * weightAccess * rawDecay); // 這裡其實是用 rawDecay 還是 finalDecay 可自行決定，使用 finalDecay 對老記憶更友善
+            }
 
+            // 計算分數並排序
+            var candidates = ltm
+                .Select(m => new { Memory = m, Score = CalculateRetentionScore(m) })
+                .OrderBy(x => x.Score) // 分數低的排前面 (準備被刪除)
+                .ToList();
+            // 執行移除
             for (int i = 0; i < removeCount; i++)
             {
                 if (i < candidates.Count)
                 {
-                    ltm.Remove(candidates[i]);
+                    // [SAFETY] 如果連最低分的候選者都處於保護期 (9999分)，代表所有記憶都還很新
+                    // 此時停止刪除，暫時允許超過上限 (超額部分會在過期後被修正)
+                    if (candidates[i].Score >= 9900f) break;
+                    ltm.Remove(candidates[i].Memory);
                 }
             }
         }
