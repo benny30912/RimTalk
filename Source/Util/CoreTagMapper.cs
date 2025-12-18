@@ -121,7 +121,6 @@ public static class CoreTagMapper
         { "Sad", ["悲伤"] },
         { "Cry", ["悲伤"] }, // Restored logic moved to map
         { "Grief", ["悲伤"] }, // Restored logic moved to map
-        { "Terrified", ["恐惧"] }, // Restored logic moved to map
         { "Pyromania", ["火焰", "危险"] },
         
         // Relationships / Opinions / Bonds (DefNames)
@@ -299,7 +298,6 @@ public static class CoreTagMapper
         { "结婚", ["婚姻", "仪式", "幸福", "浪漫"] },
         { "典礼", ["仪式"] },
         { "演讲", ["聚会", "仪式"] },
-        { "发狂", ["精神崩溃"] },
         { "迷茫", ["无助"] },
         
         // ==========================================
@@ -327,7 +325,6 @@ public static class CoreTagMapper
         { "gained the ability to speak", ["觉醒", "超自然"] },
         
         // BattleLog (Fallback Templates)
-        { "hit", ["攻击"] },
         { "missed", ["战斗"] },
         { "deflected", ["战斗"] },
         { "shot", ["攻击"] },
