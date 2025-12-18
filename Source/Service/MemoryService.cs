@@ -6,6 +6,7 @@ using RimWorld;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.Tracing;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
@@ -25,8 +26,8 @@ namespace RimTalk.Service
         
         // 閾值定義
         public const int MaxShortMemories = 30;
-        public const int MaxMediumMemories = 200;
-        public const int MaxLongMemories = 100;
+        public const int MaxMediumMemories = 60;
+        public const int MaxLongMemories = 40;
 
         private static RimTalkWorldComponent WorldComp => Find.World?.GetComponent<RimTalkWorldComponent>();
 
@@ -514,39 +515,47 @@ namespace RimTalk.Service
             // 這裡的挑戰是：輸入已經是 Summary 了，AI 需要做的是 "Meta-Summarization"
             string prompt =
                 $$"""
-                 分析以下 {{pawn.LabelShort}} 近期的对话摘要片段（Short Term Memories）。
-                 
-                 片段列表：
-                 {{stmContext}}
-         
-                 任务：
-                 将这些零散的对话摘要归纳为若干條更完整的“事件记忆”（Medium Term Memories）。
-                 
-                 1. 'summary' (简体中文)：
-                     - 将相关的片段合并描述。例如将 "A問候B"、"A與B談論天氣"、"A邀請B吃飯" 合併為 "A與B寒暄並共進晚餐"。
-                     - 補充因果關係，使其像一個完整的事件記錄。
-                     - **禁止**使用相對時間（如“剛才”）。
-                 
-                 2. 'keywords'：
-                     - 提取 3-5 個核心標籤（人名、地名、事件性質）。
-                     - **禁止**包含角色本名“{{pawn.LabelShort}}”。
-                 
-                 3. 'importance' (1-5)：
-                     - 根據事件的實際影響力評分。
-                     - 參考原則：閒聊(1-2)、交易/工作(2-3)、衝突/受傷(3-4)、死亡/災難(5)。
-                 
-                 4. 'source_ids'：
-                     - **必須**列出該條記憶是由原本列表中的哪些 ID 合併而來的。
-                     - 例如：若合併了 ID 1, 2, 3，則填寫 [1, 2, 3]。
-         
-                 输出 JSON：
-                 {
-                   "memories": [
-                     { "summary": "...", "keywords": ["..."], "importance": 3, "source_ids": [1, 2] },
-                     ...
-                   ]
-                 }
-                 """;
+                    分析以下 {{pawn.LabelShort}} 近期的对话摘要片段（Short Term Memories）。
+      
+                    片段列表：
+                    {{stmContext}}
+      
+                    任务：将这些零散片段归纳为**6-8 条**更完整的"事件记忆"（Medium Term Memories）。
+      
+                    1. 'summary' (简体中文)：
+                        - 合并相关片段（如"A問候B"+"A與B談論天氣"→"A与B寒暄"）
+                        - 保留独有细节（绰号、玩笑、承诺、激烈语气）
+                        - 若事件判定为刻骨铭心 (Importance=5)，请保留「闪光灯式」的细节：包括具体的人名（谁造成的）、对话原句（关键的一句话）或具体的受伤部位，不需过度概括。
+                        - **禁止**相对时间（"昨天"等），允许"近期"或"5501年"
+      
+                    2. 'keywords'：
+                        **只能**从该条综述涵盖的原始片段 keywords 中选择 3-5 个：
+                        - Anchor (必选): 1-2 实体名词（人名/物品/地名）
+                        - Link (必选): 1-2 概念/动作
+                        - Optional: 1 情感/状态
+                        **禁止**: 发明新词
+      
+                    3. 'importance' (1-5)：
+                        1=琐碎(闲聊/天气) | 2=普通(工作/轻微不适) | 3=值得记住(友谊/争吵/轻伤)
+                        4=重大(崩溃/战斗/恋爱/重伤) | 5=刻骨铭心(死亡/结婚/残疾)
+                        日常对话≤2，仅危及生命或改变关系的事件≥4
+      
+                    4. 'source_ids'(必填)：
+                        列出合并来源的原始 ID（如 [1, 2, 3]）
+      
+                    输出包含 'memories' 数组的 JSON 对象：
+                    {
+                      "memories": [
+                        { 
+                          "summary": "...", 
+                          "keywords": ["..."], 
+                          "importance": 3,
+                          "source_ids": [1, 2, 5] // 必须列出合并到此条记忆的所有原始片段编号
+                        },
+                        ...
+                      ]
+                    }
+                """;
 
             try
             {
@@ -594,27 +603,39 @@ namespace RimTalk.Service
             // 2. 建構 Prompt
             string prompt =
                 $$"""
-                  将以下 {{pawn.LabelShort}} 的中期记忆片段（Medium Term Memories）合并为 3-6 个高层次的传记式摘要。
+                  将以下 {{pawn.LabelShort}} 的中期记忆片段（Medium Term Memories）合并为**6-8 条**个高层次的传记式摘要。
                   
                   记忆片段：
                   {{mtmContext}}
         
                   任务：
-                  1. 多维度归纳：找出这段时期的主要生活基调（如生存挑战、人际关系变化、职业发展）。
+                  1. 多维度归纳：找出这段时期的主要生活基调（如生存主线、人际长弧、重大危机、平稳发展期）。
                   2. 去芜存菁：忽略琐事，除非它是生活基调的一部分。
                   3. 'summary' (简体中文)：
                      - 以第三人称撰写传记风格的摘要。
                      - 着重描述对角色性格、心境或人际关系的深层影响。
-                     - 允许使用模糊时间（如“5501年春季”）。
-                  4. 'importance'：
+                     - 对于判定为 Importance=5 的记忆，触发「闪光灯记忆」模式：必须保留当时的场景描写、强烈的情绪形容词以及具体的互动对象名字。
+                     - **严禁**使用相对时间（如“三天前”），允许使用模糊时间（如“这段时期”）或绝对时间（如“5501年”）。
+                  4. 'keywords'：
+                     **必须且只能**从该条综述所涵盖的原始片段中选择最核心的 3-5 个 keywords。
+                     严禁发明新的关键词。
+                  5. 'importance'：
                      - 继承原则：若包含高重要性事件(4-5)，合并后的记忆必须继承高分。
                      - 综述原则：若是平凡生活的总述，提升至 3 分。
-                  5. 'source_ids'：
+                  6. 'source_ids'：
                      - **必须**列出该条记忆涵盖了哪些原始片段。
         
-                  输出 JSON：
+                  输出包含 'memories' 数组的 JSON 对象：
                   {
-                    "memories": [ ... ]
+                    "memories": [
+                      { 
+                        "summary": "...", 
+                        "keywords": ["..."], 
+                        "importance": 3,
+                        "source_ids": [1, 2, 5] // 必须列出合并到此条记忆的所有原始片段编号
+                      },
+                      ...
+                    ]
                   }
                 """;
 
@@ -737,9 +758,23 @@ namespace RimTalk.Service
         {
             if (string.IsNullOrWhiteSpace(context)) return ([], []);
 
-            // 1. 準備資料來源
+            // [NEW] 內部獲取 MemoryBlock
+            string memoryBlock = null;
+            List<string> memoryBlockTags = [];
+            var memoryBlockMessages = BuildMemoryBlockFromHistory(pawn);
+            if (memoryBlockMessages.Any())
+            {
+                memoryBlock = memoryBlockMessages[0].message;
+                memoryBlockTags = CoreTagMapper.GetTextTags(memoryBlock);  // [NEW] 直接提取標籤
+            }
+
+            string memoryBlockContext = memoryBlock + "\n" + string.Join(", ", memoryBlockTags);
+
+            // 1. 準備資料來源（分類收集）
             var comp = Find.World?.GetComponent<RimTalkWorldComponent>();
-            var allMemories = new List<MemoryRecord>();
+            var stmList = new List<MemoryRecord>();
+            var mtmList = new List<MemoryRecord>();
+            var ltmList = new List<MemoryRecord>();
 
             if (comp != null && pawn != null)
             {
@@ -751,19 +786,22 @@ namespace RimTalk.Service
                         {
                             // 收集所有層級記憶作為候選
                             // [FIX] Use null-coalescing operator for cleaner null safety
-                            allMemories.AddRange(data.ShortTermMemories ?? []);
-                            allMemories.AddRange(data.MediumTermMemories ?? []);
-                            allMemories.AddRange(data.LongTermMemories ?? []);
+                            stmList = (data.ShortTermMemories ?? []).ToList();
+                            mtmList = (data.MediumTermMemories ?? []).ToList();
+                            ltmList = (data.LongTermMemories ?? []).ToList();
                         }
                     }
                 }
             }
 
             // 2. 設定參數
-            int memoryLimit = 5;
-            int knowledgeLimit = 10;
+            const int memoryLimit = 8;
+            const int stmLimit = 3;
+            const int ltmLimit = 1;
+            const int knowledgeLimit = 10;
 
-            // 權重 (若 Settings 中無 KeywordWeight，可暫用 2.0f)
+            // 權重
+            const float memoryBlockScoreMultiplier = 0.3f; // MemoryBlock 匹配的權重
             float weightKeyword = Settings.Get().KeywordWeight;
             float weightImportance = Settings.Get().MemoryImportanceWeight;
             const float weightAccess = 0.5f;
@@ -772,7 +810,8 @@ namespace RimTalk.Service
             const float gracePeriodDays = 15f; // 新手保護期 15 天
             const float standardLength = 5.0f; // 用於正規化關鍵字權重
 
-            // 3. 預計算 TF-IDF (詞頻)
+            // 3. 合併所有記憶用於 TF-IDF 計算
+            var allMemories = stmList.Concat(mtmList).Concat(ltmList).ToList();
             var keywordCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             int totalDocs = allMemories.Count;
 
@@ -786,37 +825,46 @@ namespace RimTalk.Service
                 }
             }
 
-            // 4. 計算分數
-            var scoredMemories = new List<ScoredMemory>();
-            foreach (var mem in allMemories)
+            // 4. 計分函數
+            float CalculateScore(MemoryRecord mem)
             {
-                if (mem.Keywords.NullOrEmpty()) continue;
+                if (mem.Keywords.NullOrEmpty()) return -1f;
+
                 float rarityScoreSum = 0f;
                 int matchCount = 0;
+                bool hasContextMatch = false;  // [NEW] 追蹤是否有主上下文匹配
+
                 foreach (var k in mem.Keywords)
                 {
                     // 使用 IndexOf 避免不必要的 String Alloc
-                    if (context.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0)
+                    bool matchedInContext = context.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0;
+                    bool matchedInMemoryBlock = !string.IsNullOrEmpty(memoryBlockContext) &&
+                                                memoryBlockContext.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0;
+                    if (matchedInContext)
                     {
+                        hasContextMatch = true;  // [NEW] 標記有主上下文匹配
                         matchCount++;
                         int count = keywordCounts.TryGetValue(k, out int c) ? c : 0;
-                        // IDF: Log(Total / (Count + 1)) -> 稀有詞分數高
+                        float rarity = (float)Math.Log((double)totalDocs / (count + 1));
+                        rarityScoreSum += rarity;
+                    }
+                    else if (matchedInMemoryBlock)
+                    {
+                        // MemoryBlock 匹配也計入（先以 100% 計算，最後再打折）
+                        matchCount++;
+                        int count = keywordCounts.TryGetValue(k, out int c) ? c : 0;
                         float rarity = (float)Math.Log((double)totalDocs / (count + 1));
                         rarityScoreSum += rarity;
                     }
                 }
-                if (matchCount == 0) continue; // 必須至少命中一個
+                if (matchCount == 0) return -1f; // 必須至少命中一個
                 // 修正係數：關鍵字少的記憶，單個命中的價值較高
                 float lengthMultiplier = standardLength / Math.Max(mem.Keywords.Count, 1);
                 // 時間衰減 (含階梯保底)
                 float elapsedDays = (currentTick - mem.CreatedTick) / 60000f;
                 // 計算有效衰減天數(從保護期後才開始衰減)：若在保護期內則為 0，超過則減去保護期
-                // 例如：第 10 天 -> max(0, 10-15) = 0 -> exp(0) = 1.0 (不衰減)
-                // 例如：第 75 天 -> max(0, 75-15) = 60 -> exp(-60/60) = 0.36 (衰減)
                 float effectiveDecayDays = Math.Max(0, elapsedDays - gracePeriodDays);
-
                 float rawDecay = (float)Math.Exp(-effectiveDecayDays / timeDecayHalfLifeDays);
-
                 // 保底邏輯：Importance 越高，衰減下限越高
                 float minFloor = mem.Importance switch
                 {
@@ -824,40 +872,87 @@ namespace RimTalk.Service
                     4 => 0.3f,    // 重大：永不低於 30%
                     _ => 0f       // 普通：可衰減至 0
                 };
-
                 // 新手保護期 (15天內不衰減)
                 if (elapsedDays < 15f) rawDecay = 1.0f;
                 float timeDecayFactor = Math.Max(rawDecay, minFloor);
                 // 最終公式
                 // Score = (關鍵字稀有度 * 修正 * W_Key) + (重要性 * W_Imp * 時間係數) - (提及次數罰分)
-                float score = (rarityScoreSum * lengthMultiplier * weightKeyword)
-                            + (mem.Importance * weightImportance * timeDecayFactor)
-                            - (mem.AccessCount * weightAccess);
-                scoredMemories.Add(new ScoredMemory { Memory = mem, Score = score });
+                float totalScore = (rarityScoreSum * lengthMultiplier * weightKeyword)
+                     + (mem.Importance * weightImportance * timeDecayFactor)
+                     - (mem.AccessCount * weightAccess);
+
+                // [NEW] 如果沒有任何主上下文匹配，總分打 30% 折扣
+                if (!hasContextMatch)
+                {
+                    totalScore *= memoryBlockScoreMultiplier;  // 0.3f
+                }
+                return totalScore;
             }
 
-            // 5. 排序與選取
+            // 5. 分層檢索
             var relevantMemories = new List<MemoryRecord>();
-            if (scoredMemories.Any())
+
+            // === 階段 1：STM（上限 3 條）===
+            var scoredStm = stmList
+                .Select(m => new { Memory = m, Score = CalculateScore(m) })
+                .Where(x => x.Score >= 0)
+                .OrderByDescending(x => x.Score)
+                .ThenBy(x => x.Memory.AccessCount)
+                .ToList();
+            if (scoredStm.Any())
             {
-                // 先按分數排，同分按 AccessCount (越少越優先)
-                var sorted = scoredMemories
+                float stmMaxScore = scoredStm[0].Score;
+                float stmThreshold = stmMaxScore * 0.5f;
+                var selectedStm = scoredStm
+                    .Where(x => x.Score >= stmThreshold)
+                    .Take(stmLimit)
+                    .Select(x => x.Memory)
+                    .ToList();
+                relevantMemories.AddRange(selectedStm);
+            }
+
+            // === 階段 2：LTM（上限 1 條，無門檻）===
+            var scoredLtm = ltmList
+                .Select(m => new { Memory = m, Score = CalculateScore(m) })
+                .Where(x => x.Score >= 0)
+                .OrderByDescending(x => x.Score)
+                .ToList();
+            if (scoredLtm.Any())
+            {
+                var selectedLtm = scoredLtm.Take(ltmLimit).Select(x => x.Memory).ToList();
+                relevantMemories.AddRange(selectedLtm);
+            }
+
+            // === 階段 3：剩餘名額（從所有未選取的記憶中選）===
+            int remainingSlots = memoryLimit - relevantMemories.Count;
+            if (remainingSlots > 0)
+            {
+                // 排除已選取的記憶
+                var alreadySelected = new HashSet<MemoryRecord>(relevantMemories);
+                var remainingCandidates = allMemories
+                    .Where(m => !alreadySelected.Contains(m))
+                    .Select(m => new { Memory = m, Score = CalculateScore(m) })
+                    .Where(x => x.Score >= 0)
                     .OrderByDescending(x => x.Score)
                     .ThenBy(x => x.Memory.AccessCount)
                     .ToList();
-                // 動態閾值：只選取分數 >= 最高分 50% 的記憶
-                float maxScore = sorted[0].Score;
-                float threshold = maxScore * 0.5f;
-                relevantMemories = sorted
-                    .Where(x => x.Score >= threshold)
-                    .Take(memoryLimit)
-                    .Select(x => x.Memory)
-                    .ToList();
-                // 更新 AccessCount
-                foreach (var m in relevantMemories) m.AccessCount++;
+                if (remainingCandidates.Any())
+                {
+                    float remainingMaxScore = remainingCandidates[0].Score;
+                    float remainingThreshold = remainingMaxScore * 0.5f;
+                    var selectedRemaining = remainingCandidates
+                        .Where(x => x.Score >= remainingThreshold)
+                        .Take(remainingSlots)
+                        .Select(x => x.Memory)
+                        .ToList();
+                    relevantMemories.AddRange(selectedRemaining);
+                }
             }
 
-            // 6. 常識庫檢索 (優化匹配邏輯)
+            // 6. 更新 AccessCount
+            foreach (var m in relevantMemories) m.AccessCount++;
+
+            // 7. 常識庫檢索 (優化匹配邏輯)
             // [NEW] 實作評分公式與 AccessCount
             var allKnowledge = comp?.CommonKnowledgeStore ?? [];
             var scoredKnowledge = new List<ScoredMemory>();

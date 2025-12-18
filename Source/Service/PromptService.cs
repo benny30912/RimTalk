@@ -24,6 +24,8 @@ public static class PromptService
         // [REMOVED] 移除這行，先不寫入 System Instruction
         var pawnContexts = new StringBuilder();
         var allKnowledge = new HashSet<string>();
+        string existingKeywords = ""; // [NEW] 儲存關鍵詞字串
+        var initiator = new List<string>(); // [NEW] 收集發話者名稱
 
         // 1. 準備搜索上下文
         var eventTags = CoreTagMapper.GetTextTags(request.Prompt ?? ""); // [MOD] 啟用 CoreTagMapper
@@ -35,6 +37,16 @@ public static class PromptService
         {
             var pawn = pawns[i];
             if (pawn.IsPlayer()) continue;
+
+            // [NEW] 收集發話者名稱（用於排除）
+            initiator.Add(pawn.LabelShort);
+
+            // [NEW] 對第一個 Pawn（主發話者）獲取關鍵詞
+            if (i == 0)
+            {
+                existingKeywords = MemoryService.GetAllExistingKeywords(pawn);
+            }
+
             // [MOD] 邏輯修正：除非開啟優化，否則一律使用 Normal
             // 原本邏輯會強迫非發話人 (i != 0) 使用 Short，現在加入 EnableContextOptimization 判斷
             InfoLevel infoLevel = Settings.Get().Context.EnableContextOptimization
@@ -73,7 +85,11 @@ public static class PromptService
         var fullContext = new StringBuilder();
 
         // 5. [關鍵修正] 在這裡動態生成包含常識的 System Instruction，並放在最前面
-        fullContext.AppendLine(Constant.GetInstruction(allKnowledge.ToList())).AppendLine();
+        fullContext.AppendLine(Constant.GetInstruction(
+            allKnowledge.ToList(),
+            existingKeywords,   // [NEW] 使用 GetAllExistingKeywords 的結果
+            initiator           // [NEW]
+        )).AppendLine();
 
         // 6. 接上各個角色的 Context
         fullContext.Append(pawnContexts);
