@@ -25,7 +25,8 @@ public static class PromptService
         var pawnContexts = new StringBuilder();
         var allKnowledge = new HashSet<string>();
         string existingKeywords = ""; // [NEW] 儲存關鍵詞字串
-        var initiator = new List<string>(); // [NEW] 收集發話者名稱
+        // [MODIFIED] 只排除 Initiator（第一個 Pawn 就是 Initiator）
+        var initiatorName = pawns.FirstOrDefault()?.LabelShort ?? "";
 
         // 1. 準備搜索上下文
         var eventTags = CoreTagMapper.GetTextTags(request.Prompt ?? ""); // [MOD] 啟用 CoreTagMapper
@@ -38,8 +39,7 @@ public static class PromptService
             var pawn = pawns[i];
             if (pawn.IsPlayer()) continue;
 
-            // [NEW] 收集發話者名稱（用於排除）
-            initiator.Add(pawn.LabelShort);
+            // [REMOVED] 不再收集所有 speakerNames
 
             // [NEW] 對第一個 Pawn（主發話者）獲取關鍵詞
             if (i == 0)
@@ -84,11 +84,12 @@ public static class PromptService
 
         var fullContext = new StringBuilder();
 
+        // [MODIFIED] 傳入 initiatorName 而非 speakerNames 列表
         // 5. [關鍵修正] 在這裡動態生成包含常識的 System Instruction，並放在最前面
         fullContext.AppendLine(Constant.GetInstruction(
             allKnowledge.ToList(),
             existingKeywords,   // [NEW] 使用 GetAllExistingKeywords 的結果
-            initiator           // [NEW]
+            initiatorName  // [CHANGED] 改為單一名字
         )).AppendLine();
 
         // 6. 接上各個角色的 Context

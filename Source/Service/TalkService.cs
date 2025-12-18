@@ -214,33 +214,25 @@ public static class TalkService
 
         string serializedResponses = JsonUtil.SerializeToJson(dialogueResponses);
 
-        // 從 Metadata 物件或最後一個對話物件中提取資訊
-        string summary;
-        List<string> keywords;
-        int importance;
+        // [NEW] 檢查是否有有效的 Summary
+        string summary = metadataResponse?.Summary ?? dialogueResponses.LastOrDefault()?.Summary;
 
-        if (metadataResponse != null)
-        {
-            // 使用獨立的 Metadata 物件
-            summary = metadataResponse?.Summary;
-            keywords = metadataResponse?.Keywords ?? [];
-            importance = metadataResponse?.Importance ?? 1;
-        }
-        else
-        {
-            // Fallback：嘗試從最後一個對話物件取得
-            var lastDialogue = dialogueResponses.LastOrDefault();
-            summary = lastDialogue?.Summary;
-            keywords = lastDialogue?.Keywords ?? [];
-            importance = lastDialogue?.Importance ?? 1;
-        }
-
-        // 若 LLM 未回傳 Summary (例如舊的 Prompt)，則提供一個預設值或讓 MemoryService 後續補救
+        // [FIX] 如果沒有有效 Summary，只保存對話歷史，不生成記憶
         if (string.IsNullOrWhiteSpace(summary))
         {
-            // 這裡可以選擇不生成 STM，或是生成一個僅包含 Raw Text 提示的 STM
-            summary = "(No summary provided by AI)";
+            // 只保存對話歷史，不生成 STM
+            foreach (var pawn in pawns)
+            {
+                TalkHistory.AddMessageHistory(pawn, prompt, serializedResponses);
+            }
+            return;  // 直接返回，跳過記憶生成
         }
+
+        // 有有效 Summary，正常生成記憶
+        // 從 Metadata 物件或最後一個對話物件中提取資訊
+        List<string> keywords = metadataResponse?.Keywords ?? dialogueResponses.LastOrDefault()?.Keywords ?? [];
+        int importance = metadataResponse?.Importance ?? dialogueResponses.LastOrDefault()?.Importance ?? 1;
+
         // 建立 STM MemoryRecord
         var memoryRecord = new MemoryRecord
         {

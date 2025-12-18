@@ -34,27 +34,21 @@ public static class Constant
     // 注意：這裡使用 {0}, {1} 作為佔位符，在 GetInstruction 中替換
     // [FIX] 改用獨立的 Metadata 物件，避免在多輪對話中遺漏
     private const string JsonInstructionTemplate = """
-                                                   Output JSONL. Keys: "name", "text".
-                                                   [FINAL OBJECT - REQUIRED]
-                                                   End with ONE metadata object (NO name/text):
-                                                   {{"summary": "...", "keywords": ["..."], "importance": N}}
-                                                   [SUMMARY RULES - 简体中文]
-                                                   - 第三人称生动概括对话，记录独有细节（绰号、玩笑、承诺、语气）
-                                                   - 转述而非复制原话（如"Ray嘲笑Benny是胆小鬼"而非引用原句）
-                                                   - 但若 'importance' 达 4 或 5 级，请保留『闪光灯式』的具体强烈情绪细节。
-                                                   - 捕捉情感氛围，不仅是事实
-                                                   - 禁止相对时间（"昨天"等），允许模糊跨度（"近期"）或绝对时间（"5501年"）
-                                                   [KEYWORDS RULES]
-                                                   Select 3-5 from: [context words] OR [reference tags: {0}]
-                                                   - Anchor (必选): 1-2 实体名词（人名/物品/地名）从context提取
-                                                   - Link (必选): 1-2 概念/动作，优先从tags选
-                                                   - Optional: 1 情感/状态
-                                                   禁止: 创造新词, 包含[{1}]
-                                                   [IMPORTANCE SCALE - Strict]
-                                                   1=琐碎(闲聊/天气) | 2=普通(工作/轻微不适) | 3=值得记住(友谊/争吵/轻伤)
-                                                   4=重大(崩溃/战斗/恋爱/重伤) | 5=刻骨铭心(死亡/结婚/残疾)
-                                                   日常对话通常≤2，仅危及生命或改变关系的事件≥4
-                                                   """;
+                                                    Output JSONL.
+                                                    FORMAT:
+                                                    {{"name":"角色名","text":"对话"}}
+                                                    ...
+                                                    {{"summary":"摘要","keywords":["标签"],"importance":1}}
+                                                    [SUMMARY] 第三人称概括,保留独有细节,禁止相对时间
+                                                    [KEYWORDS] 3-5个,只能从[context]或[tags]选择:{0},禁止包含"{1}",禁止创造新词
+                                                    [IMPORTANCE] 1琐碎|2普通|3值得记住|4重大|5刻骨铭心 (日常=1)
+                                                    [EXAMPLE]
+                                                    INPUT: 青木 monologue about cold weather, complaining
+                                                    OUTPUT:
+                                                    {{"name":"青木","text":"（搓手）这鬼天气冻死人了。"}}
+                                                    {{"name":"青木","text":"（叹气）算了，找点活干暖和暖和。"}}
+                                                    {{"summary":"青木抱怨天气寒冷,决定找些活干取暖。","keywords":["寒冷","抱怨","工作"],"importance":1}}
+                                                    """;
 
     private const string SocialInstruction = """
                                            Optional keys (Include only if social interaction occurs):
@@ -64,7 +58,7 @@ public static class Constant
 
     // [New] 支援注入常識的指令生成方法
     // [NEW] 新增參數：existingKeywords（現有關鍵詞列表字串）、initiator（發話者名稱列表）
-    public static string GetInstruction(List<string> knowledge, string existingKeywords = null, List<string> initiator = null)
+    public static string GetInstruction(List<string> knowledge, string existingKeywords = null, string initiatorName = null)  // [CHANGED] 改為單一字串
     {
         var settings = Settings.Get();
         var baseInstruction = string.IsNullOrWhiteSpace(settings.CustomInstruction)
@@ -80,15 +74,11 @@ public static class Constant
         // [NEW] 處理關鍵詞字串
         string keywordsList = string.IsNullOrEmpty(existingKeywords) ? "(none)" : existingKeywords;
 
-        string initiatorList = initiator.NullOrEmpty()
-        ? ""
-        : string.Join(", ", initiator.Distinct());
-
         // 使用 String.Format 替換佔位符
         // 注意：因為 JSON 中使用了 {{}} 來轉義大括號
-        string JsonInstruction = string.Format(JsonInstructionTemplate, keywordsList, initiatorList);
+        string JsonInstruction = string.Format(JsonInstructionTemplate, keywordsList, string.IsNullOrEmpty(initiatorName) ? "" : initiatorName);
 
-        return baseInstruction + knowledgeBlock + "\n" + JsonInstruction + (settings.ApplyMoodAndSocialEffects ? "\n" + SocialInstruction : "");
+        return baseInstruction + knowledgeBlock + JsonInstruction + (settings.ApplyMoodAndSocialEffects ? "\n" + SocialInstruction : "");
     }
 
     public static readonly string PersonaGenInstruction =
