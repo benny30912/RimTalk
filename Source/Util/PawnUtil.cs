@@ -116,18 +116,24 @@ public static class PawnUtil
         return pawn.ageTracker?.CurLifeStage?.developmentalStage < DevelopmentalStage.Child;
     }
 
-    public static (string, bool) GetPawnStatusFull(this Pawn pawn, List<Pawn> nearbyPawns)
+    public static (string status, bool isInDanger, List<string> activities, List<string> names) GetPawnStatusFull(
+    this Pawn pawn,
+    List<Pawn> nearbyPawns)
     {
         var settings = Settings.Get();
-        
+
         if (pawn == null)
-            return (null, false);
+            return (null, false, new List<string>(), new List<string>());
 
         if (pawn.IsPlayer())
-            return (settings.PlayerName, false);
+            return (settings.PlayerName, false, new List<string>(), new List<string>());
 
         bool isInDanger = false;
         var lines = new List<string>();
+
+        // [NEW] 收集動作句子和人名
+        var collectedActivities = new List<string>();
+        var collectedNames = new List<string>();
 
         // Collect all relevant pawns for context
         var relevantPawns = CollectRelevantPawns(pawn, nearbyPawns);
@@ -138,6 +144,10 @@ public static class PawnUtil
         string pawnActivity = GetPawnActivity(pawn, relevantPawns, useOptimization);
         lines.Add($"{pawnLabel} {pawnActivity}");
 
+        // [NEW] 收集主 Pawn 的動作
+        if (!string.IsNullOrEmpty(pawnActivity))
+            collectedActivities.Add(pawnActivity);
+
         if (pawn.IsInDanger())
             isInDanger = true;
 
@@ -146,26 +156,38 @@ public static class PawnUtil
         // Nearby pawns in danger
         if (nearbyPawns != null && nearbyPawns.Any())
         {
-            // 1. 使用 Tuple 接收回傳值 (Deconstruction)
             var (notablePawns, nearbyInDanger) = GetNearbyPawnsInDanger(pawn, nearbyPawns, relevantPawns, useOptimization, settings.Context.MaxPawnContextCount);
             if (nearbyInDanger.Any())
             {
                 lines.Add("People in condition nearby: " + string.Join("; ", nearbyInDanger));
                 isInDanger = true;
                 hasAnyNearbyLog = true;
+
+                // [NEW] 收集附近危險狀態的人名和動作
+                foreach (var p in notablePawns)
+                {
+                    collectedNames.Add(p.LabelShort);
+                    string activity = GetPawnActivity(p, relevantPawns, useOptimization);
+                    if (!string.IsNullOrEmpty(activity))
+                        collectedActivities.Add(activity);
+                }
             }
 
-            // 2. 傳入 notablePawns 進行排除
             string nearbyList = GetNearbyPawnsList(nearbyPawns, relevantPawns, useOptimization, settings.Context.MaxPawnContextCount, excludePawns: notablePawns);
 
             if (nearbyList != "none")
             {
                 lines.Add("Nearby: " + nearbyList);
                 hasAnyNearbyLog = true;
+
+                // [NEW] 收集附近人名
+                foreach (var np in nearbyPawns.Where(p => !relevantPawns.Contains(p) && (notablePawns == null || !notablePawns.Contains(p))))
+                {
+                    collectedNames.Add(np.LabelShort);
+                }
             }
         }
 
-        // 判斷 None
         if (!hasAnyNearbyLog)
         {
             lines.Add("Nearby people: none");
@@ -174,7 +196,18 @@ public static class PawnUtil
         // Contextual information
         AddContextualInfo(pawn, lines, ref isInDanger);
 
-        return (string.Join("\n", lines), isInDanger);
+        // [NEW] 收集情境資訊
+        foreach (var line in lines)
+        {
+            if (line.StartsWith("Combat:") || line.StartsWith("Threat:") || line.StartsWith("Alert:") ||
+                line.Contains("Visiting") || line.Contains("Assaulting") || line.Contains("Defending") ||
+                line.Contains("staging") || line.Contains("settlement"))
+            {
+                collectedActivities.Add(line);
+            }
+        }
+
+        return (string.Join("\n", lines), isInDanger, collectedActivities, collectedNames);
     }
 
     private static HashSet<Pawn> CollectRelevantPawns(Pawn mainPawn, List<Pawn> nearbyPawns)

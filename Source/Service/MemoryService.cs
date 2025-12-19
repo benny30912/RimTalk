@@ -2,11 +2,11 @@
 using RimTalk.Data;
 using RimTalk.Error;
 using RimTalk.Util;
+using RimTalk.Vector;
 using RimWorld;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics.Tracing;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
@@ -81,9 +81,26 @@ namespace RimTalk.Service
             // 1. 加入 STM 並檢查是否達到總結閾值
             bool thresholdReached = AddMemoryInternal(pawn, memory);
 
+            // [NEW] 2. 背景計算記憶向量
+            if (Vector.VectorService.Instance.IsInitialized && memory.Vector == null)
+            {
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        memory.Vector = Vector.VectorService.Instance.ComputeEmbedding(memory.Summary);
+                        memory.VectorVersion = 1; // 當前版本號
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warning($"[RimTalk] Failed to compute memory vector: {ex.Message}");
+                    }
+                });
+            }
+
             if (thresholdReached)
             {
-                // 2. 觸發異步總結任務
+                // 3. 觸發異步總結任務
                 TriggerStmToMtmSummary(pawn);
             }
         }
@@ -752,152 +769,120 @@ namespace RimTalk.Service
         // [NEW] GetRelevantMemories (分離記憶與常識檢索)
         // 回傳 Tuple: (個人記憶列表, 常識列表)
         /// <summary>
-        /// 根據上下文檢索相關記憶 (Short + Medium + Long + Common Knowledge)。 (導入 TF-IDF、時間衰減與動態閾值)
+        /// 根據 Context 向量池檢索相關記憶（語意向量匹配）。
         /// </summary>
-        public static (List<MemoryRecord> memories, List<MemoryRecord> knowledge) GetRelevantMemories(string context, Pawn pawn)
+        /// <param name="contextVectors">由 ContextVectorBuilder 產生的向量池</param>
+        /// <param name="pawn">記憶主體</param>
+        /// <returns>相關記憶列表</returns>
+        public static List<MemoryRecord> GetRelevantMemoriesBySemantic(
+            List<float[]> contextVectors,
+            Pawn pawn,
+            HashSet<string> contextNames = null)
         {
-            if (string.IsNullOrWhiteSpace(context)) return ([], []);
+            if (contextVectors == null || contextVectors.Count == 0 || pawn == null)
+                return new List<MemoryRecord>();
 
-            // [NEW] 內部獲取 MemoryBlock
-            string memoryBlock = null;
-            List<string> memoryBlockTags = [];
-            var memoryBlockMessages = BuildMemoryBlockFromHistory(pawn);
-            if (memoryBlockMessages.Any())
-            {
-                memoryBlock = memoryBlockMessages[0].message;
-                memoryBlockTags = CoreTagMapper.GetTextTags(memoryBlock);  // [NEW] 直接提取標籤
-            }
+            // 權重參數
+            float W_semantic = Settings.Get().SemanticWeight;           // 語意相似度權重
+            float W_importance = Settings.Get().MemoryImportanceWeight; // 重要度權重（可從 Settings 讀取）
+            const float W_nameBonus = 1f;                               // 人名匹配加分（每人）
+            const float W_access = 0.3f;
+            const float semanticThreshold = 0.3f;
+            const float timeDecayHalfLifeDays = 60f;
+            const float gracePeriodDays = 15f;
+            int currentTick = GenTicks.TicksGame;
 
-            string memoryBlockContext = memoryBlock + "\n" + string.Join(", ", memoryBlockTags);
+            // 檢索參數
+            const int memoryLimit = 8;
+            const int stmLimit = 3;
+            const int ltmLimit = 1;
 
-            // 1. 準備資料來源（分類收集）
-            var comp = Find.World?.GetComponent<RimTalkWorldComponent>();
+            // 1. 準備資料來源
+            var comp = WorldComp;
             var stmList = new List<MemoryRecord>();
             var mtmList = new List<MemoryRecord>();
             var ltmList = new List<MemoryRecord>();
 
-            if (comp != null && pawn != null)
+            if (comp != null)
             {
-                lock (comp.PawnMemories) // 讀取鎖
+                lock (comp.PawnMemories)
                 {
                     if (comp.PawnMemories.TryGetValue(pawn.thingIDNumber, out var data))
                     {
                         lock (data)
                         {
-                            // 收集所有層級記憶作為候選
-                            // [FIX] Use null-coalescing operator for cleaner null safety
-                            stmList = (data.ShortTermMemories ?? []).ToList();
-                            mtmList = (data.MediumTermMemories ?? []).ToList();
-                            ltmList = (data.LongTermMemories ?? []).ToList();
+                            stmList = (data.ShortTermMemories ?? new List<MemoryRecord>()).ToList();
+                            mtmList = (data.MediumTermMemories ?? new List<MemoryRecord>()).ToList();
+                            ltmList = (data.LongTermMemories ?? new List<MemoryRecord>()).ToList();
                         }
                     }
                 }
             }
 
-            // 2. 設定參數
-            const int memoryLimit = 8;
-            const int stmLimit = 3;
-            const int ltmLimit = 1;
-            const int knowledgeLimit = 10;
-
-            // 權重
-            const float memoryBlockScoreMultiplier = 0.3f; // MemoryBlock 匹配的權重
-            float weightKeyword = Settings.Get().KeywordWeight;
-            float weightImportance = Settings.Get().MemoryImportanceWeight;
-            const float weightAccess = 0.5f;
-            const float timeDecayHalfLifeDays = 60f; // 1年半衰期 (60天遊戲天數)
-            int currentTick = GenTicks.TicksGame; // 使用 GenTicks 較安全
-            const float gracePeriodDays = 15f; // 新手保護期 15 天
-            const float standardLength = 5.0f; // 用於正規化關鍵字權重
-
-            // 3. 合併所有記憶用於 TF-IDF 計算
             var allMemories = stmList.Concat(mtmList).Concat(ltmList).ToList();
-            var keywordCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            int totalDocs = allMemories.Count;
+            if (allMemories.Count == 0) return new List<MemoryRecord>();
 
-            foreach (var m in allMemories)
-            {
-                if (m.Keywords == null) continue;
-                foreach (var k in m.Keywords)
-                {
-                    if (!keywordCounts.ContainsKey(k)) keywordCounts[k] = 0;
-                    keywordCounts[k]++;
-                }
-            }
-
-            // 4. 計分函數
+            // 2. 計分函數（Max-Sim）
             float CalculateScore(MemoryRecord mem)
             {
-                if (mem.Keywords.NullOrEmpty()) return -1f;
-
-                float rarityScoreSum = 0f;
-                int matchCount = 0;
-                bool hasContextMatch = false;  // [NEW] 追蹤是否有主上下文匹配
-
-                foreach (var k in mem.Keywords)
+                // 語意相似度（Max-Sim）
+                float semanticScore = 0f;
+                if (mem.Vector != null)
                 {
-                    // 使用 IndexOf 避免不必要的 String Alloc
-                    bool matchedInContext = context.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0;
-                    bool matchedInMemoryBlock = !string.IsNullOrEmpty(memoryBlockContext) &&
-                                                memoryBlockContext.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0;
-                    if (matchedInContext)
+                    foreach (var cv in contextVectors)
                     {
-                        hasContextMatch = true;  // [NEW] 標記有主上下文匹配
-                        matchCount++;
-                        int count = keywordCounts.TryGetValue(k, out int c) ? c : 0;
-                        float rarity = (float)Math.Log((double)totalDocs / (count + 1));
-                        rarityScoreSum += rarity;
+                        if (cv == null) continue;
+                        float sim = Vector.VectorService.CosineSimilarity(cv, mem.Vector);
+                        if (sim > semanticScore) semanticScore = sim;
                     }
-                    else if (matchedInMemoryBlock)
+                    if (semanticScore < semanticThreshold) semanticScore = 0f;
+                }
+
+                // === 人名匹配加分 ===
+                float nameBonus = 0f;
+                if (contextNames != null && !mem.Keywords.NullOrEmpty())
+                {
+                    foreach (var keyword in mem.Keywords)
                     {
-                        // MemoryBlock 匹配也計入（先以 100% 計算，最後再打折）
-                        matchCount++;
-                        int count = keywordCounts.TryGetValue(k, out int c) ? c : 0;
-                        float rarity = (float)Math.Log((double)totalDocs / (count + 1));
-                        rarityScoreSum += rarity;
+                        if (contextNames.Contains(keyword))
+                            nameBonus += W_nameBonus;
                     }
                 }
-                if (matchCount == 0) return -1f; // 必須至少命中一個
-                // 修正係數：關鍵字少的記憶，單個命中的價值較高
-                float lengthMultiplier = standardLength / Math.Max(mem.Keywords.Count, 1);
-                // 時間衰減 (含階梯保底)
+
+                // 必須有語意相關或人名匹配才有分數
+                if (semanticScore == 0f && nameBonus == 0f) return -1f;
+
+                // 時間衰減
                 float elapsedDays = (currentTick - mem.CreatedTick) / 60000f;
-                // 計算有效衰減天數(從保護期後才開始衰減)：若在保護期內則為 0，超過則減去保護期
                 float effectiveDecayDays = Math.Max(0, elapsedDays - gracePeriodDays);
                 float rawDecay = (float)Math.Exp(-effectiveDecayDays / timeDecayHalfLifeDays);
-                // 保底邏輯：Importance 越高，衰減下限越高
                 float minFloor = mem.Importance switch
                 {
-                    >= 5 => 0.5f, // 刻骨銘心：永不低於 50%
-                    4 => 0.3f,    // 重大：永不低於 30%
-                    _ => 0f       // 普通：可衰減至 0
+                    >= 5 => 0.5f,
+                    4 => 0.3f,
+                    _ => 0f
                 };
-                // 新手保護期 (15天內不衰減)
-                if (elapsedDays < 15f) rawDecay = 1.0f;
+                if (elapsedDays < gracePeriodDays) rawDecay = 1.0f;
                 float timeDecayFactor = Math.Max(rawDecay, minFloor);
-                // 最終公式
-                // Score = (關鍵字稀有度 * 修正 * W_Key) + (重要性 * W_Imp * 時間係數) - (提及次數罰分)
-                float totalScore = (rarityScoreSum * lengthMultiplier * weightKeyword)
-                     + (mem.Importance * weightImportance * timeDecayFactor)
-                     - (mem.AccessCount * weightAccess);
 
-                // [NEW] 如果沒有任何主上下文匹配，總分打 30% 折扣
-                if (!hasContextMatch)
-                {
-                    totalScore *= memoryBlockScoreMultiplier;  // 0.3f
-                }
+                // 最終公式
+                float totalScore =
+                    (semanticScore * W_semantic)
+                    + (mem.Importance * W_importance * timeDecayFactor)
+                    + nameBonus                                            // 人名加分
+                    - (mem.AccessCount * W_access);
+
                 return totalScore;
             }
 
-            // 5. 分層檢索
+            // 3. 分層檢索
             var relevantMemories = new List<MemoryRecord>();
 
-            // === 階段 1：STM（上限 3 條）===
+            // STM（上限 3 條）
             var scoredStm = stmList
                 .Select(m => new { Memory = m, Score = CalculateScore(m) })
                 .Where(x => x.Score >= 0)
                 .OrderByDescending(x => x.Score)
-                .ThenBy(x => x.Memory.AccessCount)
                 .ToList();
             if (scoredStm.Any())
             {
@@ -911,7 +896,7 @@ namespace RimTalk.Service
                 relevantMemories.AddRange(selectedStm);
             }
 
-            // === 階段 2：LTM（上限 1 條，無門檻）===
+            // LTM（上限 1 條）
             var scoredLtm = ltmList
                 .Select(m => new { Memory = m, Score = CalculateScore(m) })
                 .Where(x => x.Score >= 0)
@@ -923,18 +908,16 @@ namespace RimTalk.Service
                 relevantMemories.AddRange(selectedLtm);
             }
 
-            // === 階段 3：剩餘名額（從所有未選取的記憶中選）===
+            // 剩餘名額
             int remainingSlots = memoryLimit - relevantMemories.Count;
             if (remainingSlots > 0)
             {
-                // 排除已選取的記憶
                 var alreadySelected = new HashSet<MemoryRecord>(relevantMemories);
                 var remainingCandidates = allMemories
                     .Where(m => !alreadySelected.Contains(m))
                     .Select(m => new { Memory = m, Score = CalculateScore(m) })
                     .Where(x => x.Score >= 0)
                     .OrderByDescending(x => x.Score)
-                    .ThenBy(x => x.Memory.AccessCount)
                     .ToList();
                 if (remainingCandidates.Any())
                 {
@@ -949,12 +932,29 @@ namespace RimTalk.Service
                 }
             }
 
-            // 6. 更新 AccessCount
+            // 4. 更新 AccessCount
             foreach (var m in relevantMemories) m.AccessCount++;
 
-            // 7. 常識庫檢索 (優化匹配邏輯)
-            // [NEW] 實作評分公式與 AccessCount
-            var allKnowledge = comp?.CommonKnowledgeStore ?? [];
+            return relevantMemories;
+        }
+
+        /// <summary>
+        /// 根據關鍵詞檢索相關常識（保留原有邏輯）。
+        /// </summary>
+        public static List<MemoryRecord> GetRelevantKnowledge(string context)
+        {
+            if (string.IsNullOrWhiteSpace(context)) return new List<MemoryRecord>();
+
+            var comp = WorldComp;
+            var allKnowledge = comp?.CommonKnowledgeStore ?? new List<MemoryRecord>();
+            if (allKnowledge.Count == 0) return new List<MemoryRecord>();
+
+            // 權重
+            float weightImportance = Settings.Get().MemoryImportanceWeight;
+            const float weightKeyword = 2.0f;
+            const float standardLength = 5.0f;
+            const int knowledgeLimit = 10;
+
             var scoredKnowledge = new List<ScoredMemory>();
 
             foreach (var k in allKnowledge)
@@ -969,28 +969,22 @@ namespace RimTalk.Service
 
                 if (matchCount == 0) continue;
 
-                // Formula: score = (Keyword * lengthMultiplier * weightKeyword) + (Importance * weightImportance)
-
-                // 1. Keyword Score (Match Count)
                 float keywordScore = matchCount;
-                // 2. Length Multiplier
                 float lengthMultiplier = standardLength / Math.Max(k.Keywords.Count, 1);
-                // 3. Final Score Calculation
                 float score = (keywordScore * lengthMultiplier * weightKeyword)
                             + (k.Importance * weightImportance);
                 scoredKnowledge.Add(new ScoredMemory { Memory = k, Score = score });
             }
 
-            var relevantKnowledge = scoredKnowledge
+            var result = scoredKnowledge
                 .OrderByDescending(x => x.Score)
                 .Take(knowledgeLimit)
                 .Select(x => x.Memory)
                 .ToList();
 
-            // [NEW] 增加 AccessCount
-            foreach (var k in relevantKnowledge) k.AccessCount++;
+            foreach (var k in result) k.AccessCount++;
 
-            return (relevantMemories, relevantKnowledge);
+            return result;
         }
 
         // --- 輔助方法 ---

@@ -34,6 +34,17 @@ namespace RimTalk.Data
         /// </summary>
         public int CreatedTick;
 
+        /// <summary>
+        /// 記憶的語意向量 (768 維)。
+        /// 不透過 Scribe 序列化，由 VectorDatabase 獨立持久化。
+        /// </summary>
+        [System.NonSerialized]
+        public float[] Vector;
+        /// <summary>
+        /// 向量版本號，用於模型更新時失效重算。
+        /// </summary>
+        public int VectorVersion;
+
         // [可選] 若未來需要追蹤長期記憶是由哪些中期記憶合併而來，可在此擴充 SourceIds
 
         public void ExposeData()
@@ -43,6 +54,8 @@ namespace RimTalk.Data
             Scribe_Values.Look(ref Importance, "importance");
             Scribe_Values.Look(ref AccessCount, "accessCount");
             Scribe_Values.Look(ref CreatedTick, "createdTick");
+
+            Scribe_Values.Look(ref VectorVersion, "vectorVersion", 0); // 版本號的序列化
 
             // 確保讀檔後 Keywords 不為 null
             if (Scribe.mode == LoadSaveMode.PostLoadInit)

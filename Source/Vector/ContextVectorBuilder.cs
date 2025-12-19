@@ -1,6 +1,7 @@
-﻿using System;
+﻿using RimWorld;
+using System;
 using System.Collections.Generic;
-using RimWorld;
+using System.Linq;
 using Verse;
 
 namespace RimTalk.Vector
@@ -11,6 +12,8 @@ namespace RimTalk.Vector
     /// </summary>
     public class ContextVectorBuilder
     {
+        // 在類別開頭的欄位宣告中加入：
+        private readonly HashSet<string> _collectedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         // 收集的動態項目向量
         private readonly List<float[]> _collectedVectors = new List<float[]>();
 
@@ -135,6 +138,32 @@ namespace RimTalk.Vector
         }
 
         /// <summary>
+        /// 加入人名（用於人名加分）
+        /// </summary>
+        public void AddName(string name)
+        {
+            if (!string.IsNullOrWhiteSpace(name))
+                _collectedNames.Add(name);
+        }
+
+        /// <summary>
+        /// 加入多個人名
+        /// </summary>
+        public void AddNames(IEnumerable<string> names)
+        {
+            if (names == null) return;
+            foreach (var name in names)
+                AddName(name);
+        }
+        /// <summary>
+        /// 取得所有收集的人名
+        /// </summary>
+        public HashSet<string> GetAllNames()
+        {
+            return new HashSet<string>(_collectedNames, StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
         /// 計算最終 Context 向量（所有收集向量的平均）
         /// </summary>
         public float[] Build()
@@ -169,6 +198,14 @@ namespace RimTalk.Vector
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// 取得所有收集的向量（用於 Max-Sim 計算）
+        /// </summary>
+        public List<float[]> GetAllVectors()
+        {
+            return _collectedVectors.ToList();
         }
 
         /// <summary>

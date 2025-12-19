@@ -58,6 +58,48 @@ namespace RimTalk.Vector
             };
         }
 
+        #region 時間轉換
+
+        /// <summary>
+        /// 將 12 小時制時間字串轉換為語意描述
+        /// 輸入格式範例："9:30 AM", "11:45 PM"
+        /// </summary>
+        public static string MapTimeToSemantic(string hour12String)
+        {
+            // 解析 AM/PM 並轉換為 24 小時制
+            if (string.IsNullOrWhiteSpace(hour12String)) return "白天";
+
+            bool isPM = hour12String.ToUpper().Contains("PM");
+            // 提取小時數
+            var parts = hour12String.Split(':');
+            if (!int.TryParse(parts[0].Trim(), out int hour)) return "白天";
+
+            // 轉換為 24 小時制
+            if (isPM && hour != 12) hour += 12;
+            if (!isPM && hour == 12) hour = 0;
+
+            return MapHourToSemantic(hour);
+        }
+
+        /// <summary>
+        /// 將 24 小時制小時數轉換為語意描述
+        /// </summary>
+        public static string MapHourToSemantic(int hour)
+        {
+            return hour switch
+            {
+                >= 5 and < 8 => "清晨",
+                >= 8 and < 11 => "上午",
+                >= 11 and < 14 => "中午",
+                >= 14 and < 17 => "下午",
+                >= 17 and < 20 => "傍晚",
+                >= 20 and < 24 => "夜晚",
+                _ => "深夜"
+            };
+        }
+
+        #endregion
+
         #region Hediff 過濾
 
         /// <summary>

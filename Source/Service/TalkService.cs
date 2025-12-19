@@ -44,8 +44,8 @@ public static class TalkService
 
         List<Pawn> nearbyPawns = PawnSelector.GetAllNearByPawns(talkRequest.Initiator);
         if (talkRequest.Recipient.IsPlayer()) nearbyPawns.Insert(0, talkRequest.Recipient);
-        var (status, isInDanger) = talkRequest.Initiator.GetPawnStatusFull(nearbyPawns);
-        
+        var (status, isInDanger, statusActivities, statusNames) = talkRequest.Initiator.GetPawnStatusFull(nearbyPawns);
+
         // Avoid spamming generations if the pawn's status hasn't changed recently.
         if (talkRequest.TalkType != TalkType.User && status == pawn1.LastStatus && pawn1.RejectCount < 2)
         {
@@ -81,6 +81,9 @@ public static class TalkService
         PromptService.DecoratePrompt(talkRequest, pawns, status);
         //此時 talkRequest.Prompt 已經包含了 Ongoing Events！
 
+        // [NEW] 將 status 收集的資訊傳遞給 BuildContext
+        talkRequest.StatusActivities = statusActivities;
+        talkRequest.StatusNames = statusNames;
         // 2. 再構建 Context (現在可以讀取 talkRequest.Prompt 中的 Tag 來檢索記憶了)
         // 注意：需確認 PromptService.BuildContext 支援 (TalkRequest, List<Pawn>) 簽名
         string context = PromptService.BuildContext(talkRequest, pawns);

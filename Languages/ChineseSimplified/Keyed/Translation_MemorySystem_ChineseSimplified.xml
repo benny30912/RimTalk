@@ -13,8 +13,8 @@
   <RimTalk.Settings.CKCancelClear>取消 / 清空选择</RimTalk.Settings.CKCancelClear>
   <RimTalk.Settings.CKImportance>重要性</RimTalk.Settings.CKImportance>
 	<!-- Weight Settings (若未来要在 UI 显示) -->
-  <RimTalk.Settings.KeywordWeight>关键字权重: {0}</RimTalk.Settings.KeywordWeight>
-  <RimTalk.Settings.KeywordWeightTooltip>调整在检索记忆时，关键字（如人名、地名、特定名词）匹配的重要性。权重越高，包含关键字的记忆越容易被选中。</RimTalk.Settings.KeywordWeightTooltip>
+  <RimTalk.Settings.SemanticWeight>语义权重: {0}</RimTalk.Settings.SemanticWeight>
+  <RimTalk.Settings.SemanticWeightTooltip>调整在检索记忆时，语义匹配的重要性。权重越高，语义相关性越高的记忆越容易被选中。</RimTalk.Settings.SemanticWeightTooltip>
   <RimTalk.Settings.MemoryImportanceWeight>重要性权重: {0}</RimTalk.Settings.MemoryImportanceWeight>
   <RimTalk.Settings.MemoryImportanceWeightTooltip>调整记忆本身重要性分数（由 AI 评估）在检索时的影响力。权重越高，重要性高的记忆（如重大事件）越容易被选中。</RimTalk.Settings.MemoryImportanceWeightTooltip>
   <!-- Memory Service Errors -->
@@ -54,4 +54,24 @@
 
   <!-- [NEW] Add QuotaExceeded -->
   <RimTalk.TalkService.QuotaExceeded>API 配额已耗尽</RimTalk.TalkService.QuotaExceeded>
+
+  <!-- Resistance 描述 -->
+  <RimTalk.Describer.Resistance.Broken>意志已被完全击溃，随时准备加入</RimTalk.Describer.Resistance.Broken>
+  <RimTalk.Describer.Resistance.Barely>几乎无法抵抗，即将屈服</RimTalk.Describer.Resistance.Barely>
+  <RimTalk.Describer.Resistance.Weakened>意志已动摇，但仍保持警惕</RimTalk.Describer.Resistance.Weakened>
+  <RimTalk.Describer.Resistance.Strong>意志坚强，需要更多努力</RimTalk.Describer.Resistance.Strong>
+  <RimTalk.Describer.Resistance.Defiant>极度顽抗，需要很长时间</RimTalk.Describer.Resistance.Defiant>
+
+  <!-- Will 描述 -->
+  <RimTalk.Describer.Will.None>已无意志，随时可被奴役</RimTalk.Describer.Will.None>
+  <RimTalk.Describer.Will.Weak>意志薄弱，容易被奴役</RimTalk.Describer.Will.Weak>
+  <RimTalk.Describer.Will.Moderate>意志中等，可能稍加反抗</RimTalk.Describer.Will.Moderate>
+  <RimTalk.Describer.Will.Strong>意志坚强，难以奴役</RimTalk.Describer.Will.Strong>
+  <RimTalk.Describer.Will.Unyielding>意志不屈，极难奴役</RimTalk.Describer.Will.Unyielding>
+
+  <!-- Suppression 描述 -->
+  <RimTalk.Describer.Suppression.Rebellious>公然叛逆，很可能反抗或逃跑</RimTalk.Describer.Suppression.Rebellious>
+  <RimTalk.Describer.Suppression.Unstable>情绪不稳，可能试探底线</RimTalk.Describer.Suppression.Unstable>
+  <RimTalk.Describer.Suppression.Obedient>大致服从，但仍需警惕</RimTalk.Describer.Suppression.Obedient>
+  <RimTalk.Describer.Suppression.Cowed>完全顺从，不太可能反抗</RimTalk.Describer.Suppression.Cowed>
 </LanguageData>

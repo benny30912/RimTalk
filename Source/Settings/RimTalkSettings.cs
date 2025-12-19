@@ -17,7 +17,7 @@ public class RimTalkSettings : ModSettings
     public int CurrentMemoryConfigIndex = 0;
 
     // [NEW] Keyword Weight (Missing in current version)
-    public float KeywordWeight = 2.0f;
+    public float SemanticWeight = 9.0f;
 
     public bool UseCloudProviders = true;
     public bool UseSimpleConfig = true;
@@ -47,7 +47,7 @@ public class RimTalkSettings : ModSettings
     public Settings.ButtonDisplayMode ButtonDisplay = Settings.ButtonDisplayMode.Tab;
 
     // [NEW] 新增：記憶重要性權重，用於長期記憶剔除計算
-    public float MemoryImportanceWeight = 3.0f;
+    public float MemoryImportanceWeight = 2.0f;
 
     public ContextSettings Context = new();
 
@@ -231,7 +231,7 @@ public class RimTalkSettings : ModSettings
 
         // [NEW] 儲存權重
         Scribe_Values.Look(ref MemoryImportanceWeight, "memoryImportanceWeight", 3.0f);
-        Scribe_Values.Look(ref KeywordWeight, "KeywordWeight", 2.0f);
+        Scribe_Values.Look(ref SemanticWeight, "SemanticWeight", 9.0f);
 
         Scribe_Deep.Look(ref Context, "context");
 

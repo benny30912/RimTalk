@@ -1,6 +1,7 @@
 ﻿using RimTalk.Patch;
 using RimTalk.Source.Data;
 using RimTalk.Util;
+using System.Collections.Generic;
 using Verse;
 
 namespace RimTalk.Data;
@@ -14,6 +15,16 @@ public class TalkRequest
     public int MapId { get; set; }
     public int CreatedTick { get; set; }
     public bool IsMonologue;
+
+    /// <summary>
+    /// 從 GetPawnStatusFull 收集的動作句子（用於語意向量）
+    /// </summary>
+    public List<string> StatusActivities { get; set; } = new List<string>();
+
+    /// <summary>
+    /// 從 GetPawnStatusFull 收集的人名（用於人名加分）
+    /// </summary>
+    public List<string> StatusNames { get; set; } = new List<string>();
 
     public TalkRequest(string prompt, Pawn initiator, Pawn recipient = null, TalkType talkType = TalkType.Other)
     {

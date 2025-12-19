@@ -1,4 +1,6 @@
-﻿namespace RimTalk.Util;
+﻿using Verse;
+
+namespace RimTalk.Util;
 
 public static class Describer
 {
@@ -47,30 +49,29 @@ public static class Describer
             _ => "foul"
         };
     }
-    
+
+    // 使用翻譯鍵
     public static string Resistance(float value)
     {
-        if (value <= 0f) return "Completely broken, ready to join";
-        if (value < 2f) return "Barely resisting, close to giving in";
-        if (value < 6f) return "Weakened, but still cautious";
-        if (value < 12f) return "Strong-willed, requires effort";
-        return "Extremely defiant, will take a long time";
+        if (value <= 0f) return "RimTalk.Describer.Resistance.Broken".Translate();
+        if (value < 2f) return "RimTalk.Describer.Resistance.Barely".Translate();
+        if (value < 6f) return "RimTalk.Describer.Resistance.Weakened".Translate();
+        if (value < 12f) return "RimTalk.Describer.Resistance.Strong".Translate();
+        return "RimTalk.Describer.Resistance.Defiant".Translate();
     }
-
     public static string Will(float value)
     {
-        if (value <= 0f) return "No will left, ready for slavery";
-        if (value < 2f) return "Weak-willed, easy to enslave";
-        if (value < 6f) return "Moderate will, may resist a little";
-        if (value < 12f) return "Strong will, difficult to enslave";
-        return "Unyielding, very hard to enslave";
+        if (value <= 0f) return "RimTalk.Describer.Will.None".Translate();
+        if (value < 2f) return "RimTalk.Describer.Will.Weak".Translate();
+        if (value < 6f) return "RimTalk.Describer.Will.Moderate".Translate();
+        if (value < 12f) return "RimTalk.Describer.Will.Strong".Translate();
+        return "RimTalk.Describer.Will.Unyielding".Translate();
     }
-
     public static string Suppression(float value)
     {
-        if (value < 20f) return "Openly rebellious, likely to resist or escape";
-        if (value < 50f) return "Unstable, may push boundaries";
-        if (value < 80f) return "Generally obedient, but watchful";
-        return "Completely cowed, unlikely to resist";
+        if (value < 20f) return "RimTalk.Describer.Suppression.Rebellious".Translate();
+        if (value < 50f) return "RimTalk.Describer.Suppression.Unstable".Translate();
+        if (value < 80f) return "RimTalk.Describer.Suppression.Obedient".Translate();
+        return "RimTalk.Describer.Suppression.Cowed".Translate();
     }
 }
