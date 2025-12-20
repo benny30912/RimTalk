@@ -111,7 +111,7 @@ namespace RimTalk.Source.Memory
                         - **禁止**相对时间（"昨天"等），允许"近期"或"5501年"
       
                     2. 'keywords'：
-                        **只能**从该条综述涵盖的原始片段 keywords 中选择 3-5 个
+                        **只能**从该条综述涵盖的原始片段 keywords 中选择几个重点涉及的人名，无则留空
       
                     3. 'importance' (1-5)：
                         1=琐碎 | 2=普通 | 3=值得记住 | 4=重大 | 5=刻骨铭心
@@ -122,7 +122,7 @@ namespace RimTalk.Source.Memory
                     输出包含 'memories' 数组的 JSON 对象：
                     {
                       "memories": [
-                        { "summary": "...", "keywords": ["..."], "importance": 3, "source_ids": [1, 2, 5] }
+                        { "summary": "...", "keywords": ["..."], "importance": 3, "source_ids": ["550e8400", "a1b2c3d4", "a1b2c3d4"] }
                       ]
                     }
                 """;
@@ -194,11 +194,16 @@ namespace RimTalk.Source.Memory
                   1. 多维度归纳：找出这段时期的主要生活基调。
                   2. 去芜存菁：忽略琐事，除非它是生活基调的一部分。
                   3. 'summary' (简体中文)：以第三人称撰写传记风格的摘要。
-                  4. 'keywords'：**必须且只能**从原始片段中选择 3-5 个 keywords。
-                  5. 'importance'：继承高重要性事件(4-5)的分数。
+                  4. 'keywords'：**必须且只能**从原始片段 keywords 中选择几个重点涉及的人名，无则留空。
+                  5. 'importance'：参考来源片段，若高重要性可提升分数。
                   6. 'source_ids'：**必须**列出该条记忆涵盖的原始片段。
         
                   输出包含 'memories' 数组的 JSON 对象。
+                  {
+                      "memories": [
+                        { "summary": "...", "keywords": ["..."], "importance": 3, "source_ids": ["550e8400", "a1b2c3d4", "a1b2c3d4"] }
+                      ]
+                  }
                 """;
 
             try

@@ -74,4 +74,6 @@
   <RimTalk.Describer.Suppression.Unstable>情绪不稳，可能试探底线</RimTalk.Describer.Suppression.Unstable>
   <RimTalk.Describer.Suppression.Obedient>大致服从，但仍需警惕</RimTalk.Describer.Suppression.Obedient>
   <RimTalk.Describer.Suppression.Cowed>完全顺从，不太可能反抗</RimTalk.Describer.Suppression.Cowed>
+
+  <RimTalk.MentionedNames>提及姓名（以逗号分隔）</RimTalk.MentionedNames>
 </LanguageData>

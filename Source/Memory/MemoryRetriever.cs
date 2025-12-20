@@ -238,37 +238,5 @@ namespace RimTalk.Source.Memory
 
             return result;
         }
-
-        /// <summary>
-        /// 獲取所有現有關鍵詞 (用於保持標籤一致性)
-        /// </summary>
-        public static string GetAllExistingKeywords(Pawn pawn)
-        {
-            var keywords = new HashSet<string>();
-
-            var comp = Find.World?.GetComponent<RimTalkWorldComponent>();
-            if (comp == null) return "None";
-
-            // 從個人記憶收集 (STM + MTM + LTM)
-            if (comp.PawnMemories.TryGetValue(pawn.thingIDNumber, out var data) && data != null)
-            {
-                if (data.ShortTermMemories != null)
-                    foreach (var m in data.ShortTermMemories) keywords.AddRange(m.Keywords ?? []);
-                if (data.MediumTermMemories != null)
-                    foreach (var m in data.MediumTermMemories) keywords.AddRange(m.Keywords ?? []);
-                if (data.LongTermMemories != null)
-                    foreach (var m in data.LongTermMemories) keywords.AddRange(m.Keywords ?? []);
-            }
-
-            // 從常識庫收集
-            if (comp.CommonKnowledgeStore != null)
-            {
-                foreach (var k in comp.CommonKnowledgeStore) keywords.AddRange(k.Keywords ?? []);
-            }
-
-            if (keywords.Count == 0) return "None";
-
-            return string.Join(", ", keywords.Take(1000));
-        }
     }
 }

@@ -39,13 +39,7 @@ namespace RimTalk.Data
         // 常識檢索用的搜索文本
         public string KnowledgeSearchText { get; set; }
 
-        // 現有關鍵詞（用於 Instruction）
-        public string ExistingKeywords { get; set; }
-
         // 發話者名字（用於 Instruction）
         public string InitiatorName { get; set; }
-
-        // 全域常識（由各 Pawn 匯總）
-        public HashSet<string> AllKnowledge { get; set; } = new();
     }
 }

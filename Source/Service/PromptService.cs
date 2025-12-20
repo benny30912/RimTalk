@@ -39,23 +39,18 @@ public static class PromptService
         // 準備環境資料
         var gameData = CommonUtil.GetInGameData();
         var contextSettings = Settings.Get().Context;
+        var allPawnTexts = new StringBuilder();
 
         for (int i = 0; i < pawns.Count; i++)
         {
             var pawn = pawns[i];
             if (pawn.IsPlayer()) continue;
 
-            // 對第一個 Pawn（主發話者）獲取關鍵詞
-            if (i == 0)
-            {
-                snapshot.ExistingKeywords = MemoryRetriever.GetAllExistingKeywords(pawn);
-            }
-
             InfoLevel infoLevel = Settings.Get().Context.EnableContextOptimization
                                   && i != 0 ? InfoLevel.Short : InfoLevel.Normal;
 
             // 生成 Pawn 描述並收集動態項目
-            var (pawnText, pawnDynamicContext, builder) = CreatePawnContext(pawn, infoLevel);
+            var (pawnText, builder) = CreatePawnContext(pawn, infoLevel);
 
             // === 補充環境動態項目到 builder ===
             // (雖然環境是共享的，但是記憶是基於 pawn 的，即使在迴圈外部收集後續仍然要分配給個人，在內部收集是可接受的)
@@ -128,13 +123,15 @@ public static class PromptService
             };
             snapshot.PawnData.Add(pawnData);
 
-            // 常識檢索用的搜索文本
-            string searchContext = pawnDynamicContext + "\n" + (request.Prompt ?? "");
-            snapshot.KnowledgeSearchText = searchContext;
+            // 累積所有 pawn 文本
+            allPawnTexts.AppendLine(pawnText);
 
             // 快取 Pawn 的描述（暫時不含注入記憶）
             Cache.Get(pawn).Context = pawnText;
         }
+
+        // 常識檢索用的搜索文本
+        snapshot.KnowledgeSearchText = allPawnTexts.ToString() + "\n" + (request.Prompt ?? "");
 
         return snapshot;
     }
@@ -197,7 +194,6 @@ public static class PromptService
 
             fullContext.AppendLine(Constant.GetInstruction(
                 allKnowledge.ToList(),
-                snapshot.ExistingKeywords,
                 snapshot.InitiatorName
             )).AppendLine();
 
@@ -257,20 +253,17 @@ public static class PromptService
 
     /// <summary>Creates the full pawn context.</summary>
     // [MOD] 修改回傳簽名，新增 dynamicContext
-    private static (string text, string dynamicContext, ContextVectorBuilder builder) CreatePawnContext(
+    private static (string text, ContextVectorBuilder builder) CreatePawnContext(
     Pawn pawn,
     InfoLevel infoLevel = InfoLevel.Normal)
     {
         var sb = new StringBuilder();
-        var dynamicSb = new StringBuilder();
         var builder = new ContextVectorBuilder();
 
         sb.Append(CreatePawnBackstory(pawn, infoLevel));
 
         // Health
-        string health = ContextBuilder.GetHealthContext(pawn, infoLevel);
-        AppendIfNotEmpty(sb, health);
-        AppendIfNotEmpty(dynamicSb, health);
+        AppendIfNotEmpty(sb, ContextBuilder.GetHealthContext(pawn, infoLevel));
 
         // [NEW] 收集 Health 向量（事件性 Hediff）
         builder.CollectEventHediffs(pawn.health?.hediffSet?.hediffs);
@@ -281,21 +274,17 @@ public static class PromptService
 
         // Stop here for invaders
         if (pawn.IsEnemy())
-            return (sb.ToString(), dynamicSb.ToString(), builder);
+            return (sb.ToString(), builder);
 
         // Mood
-        string mood = ContextBuilder.GetMoodContext(pawn, infoLevel);
-        AppendIfNotEmpty(sb, mood);
-        AppendIfNotEmpty(dynamicSb, mood);
+        AppendIfNotEmpty(sb, ContextBuilder.GetMoodContext(pawn, infoLevel));
 
         // [NEW] 收集 Mood 向量
         if (pawn.needs?.mood != null)
             builder.CollectMood(pawn.needs.mood.CurLevelPercentage);
 
         // Thoughts
-        string thoughts = ContextBuilder.GetThoughtsContext(pawn, infoLevel);
-        AppendIfNotEmpty(sb, thoughts);
-        AppendIfNotEmpty(dynamicSb, thoughts);
+        AppendIfNotEmpty(sb, ContextBuilder.GetThoughtsContext(pawn, infoLevel));
 
         // [NEW] 收集 Thoughts 向量
         builder.CollectThoughts(ContextHelper.GetThoughts(pawn)?.Keys);
@@ -332,8 +321,6 @@ public static class PromptService
         // Relations
         string relations = ContextBuilder.GetRelationsContext(pawn, infoLevel);
         AppendIfNotEmpty(sb, relations);
-        AppendIfNotEmpty(dynamicSb, relations);
-
         // [NEW] 收集 Relations 人名和關係詞
         builder.CollectRelations(relations);
 
@@ -343,7 +330,7 @@ public static class PromptService
         if (infoLevel != InfoLevel.Short)
             AppendIfNotEmpty(sb, ContextBuilder.GetEquipmentContext(pawn, infoLevel));
 
-        return (sb.ToString(), dynamicSb.ToString(), builder);
+        return (sb.ToString(), builder);
     }
 
     /// <summary>Decorates the prompt with dialogue type, time, weather, location, and environment.</summary>

@@ -168,7 +168,7 @@ namespace RimTalk.UI
                 _editBufferSummary = Widgets.TextArea(textRect, _editBufferSummary);
                 editListing.Gap(6f);
                 // 編輯關鍵字
-                editListing.Label("Keywords (comma separated):");
+                editListing.Label("RimTalk.MentionedNames".Translate());
                 _editBufferKeywords = editListing.TextEntry(_editBufferKeywords);
                 editListing.Gap(6f);
                 // 編輯重要性

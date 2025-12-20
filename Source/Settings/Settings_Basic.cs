@@ -65,7 +65,6 @@ public partial class Settings
         listingStandard.Gap(6f); // 保持原有的間距
 
         // [NEW] === 記憶檢索權重設定 (Memory Retrieval Weights) ===
-        // 1. 關鍵字權重 (Keyword Weight)
         // string format "0.0"確保顯示一位小數
         var semanticWeightLabel = "RimTalk.Settings.SemanticWeight".Translate(settings.SemanticWeight.ToString("0.0"));
         var semanticWeightRect = listingStandard.GetRect(Text.CalcHeight(semanticWeightLabel, listingStandard.ColumnWidth));

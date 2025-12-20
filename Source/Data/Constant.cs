@@ -37,16 +37,16 @@ public static class Constant
                                                     FORMAT:
                                                     {{"name":"角色名","text":"对话"}}
                                                     ...
-                                                    {{"summary":"摘要","keywords":["标签"],"importance":1}}
+                                                    {{"summary":"摘要","keywords":["人名"],"importance":1}}
                                                     [SUMMARY] 第三人称概括,保留独有细节,禁止相对时间
-                                                    [KEYWORDS] 3-5个,只能从[context]或[tags]选择:{0},禁止包含"{1}",禁止创造新词
+                                                    [KEYWORDS] 列出对话中涉及或提及的所有人名(不含:{0}),无则留空
                                                     [IMPORTANCE] 1琐碎|2普通|3值得记住|4重大|5刻骨铭心 (日常=1)
                                                     [EXAMPLE]
                                                     INPUT: 青木 monologue about cold weather, complaining
                                                     OUTPUT:
                                                     {{"name":"青木","text":"（搓手）这鬼天气冻死人了。"}}
                                                     {{"name":"青木","text":"（叹气）算了，找点活干暖和暖和。"}}
-                                                    {{"summary":"青木抱怨天气寒冷,决定找些活干取暖。","keywords":["寒冷","抱怨","工作"],"importance":1}}
+                                                    {{"summary":"青木抱怨天气寒冷,决定找些活干取暖。","keywords":[],"importance":1}}
                                                     """;
 
     private const string SocialInstruction = """
@@ -55,9 +55,10 @@ public static class Constant
                                            "target": targetName
                                            """;
 
+    // [AFTER] 移除 existingKeywords 參數
     // [New] 支援注入常識的指令生成方法
     // [NEW] 新增參數：existingKeywords（現有關鍵詞列表字串）、initiator（發話者名稱列表）
-    public static string GetInstruction(List<string> knowledge, string existingKeywords = null, string initiatorName = null)  // [CHANGED] 改為單一字串
+    public static string GetInstruction(List<string> knowledge, string initiatorName = null)  // [CHANGED] 改為單一字串
     {
         var settings = Settings.Get();
         var baseInstruction = string.IsNullOrWhiteSpace(settings.CustomInstruction)
@@ -70,12 +71,10 @@ public static class Constant
             knowledgeBlock = "\n[Relevant Knowledge]\n" + string.Join("\n", knowledge) + "\n";
         }
 
-        // [NEW] 處理關鍵詞字串
-        string keywordsList = string.IsNullOrEmpty(existingKeywords) ? "(none)" : existingKeywords;
-
+        // [MODIFIED] 只使用 initiatorName
         // 使用 String.Format 替換佔位符
         // 注意：因為 JSON 中使用了 {{}} 來轉義大括號
-        string JsonInstruction = string.Format(JsonInstructionTemplate, keywordsList, string.IsNullOrEmpty(initiatorName) ? "" : initiatorName);
+        string JsonInstruction = string.Format(JsonInstructionTemplate, string.IsNullOrEmpty(initiatorName) ? "" : initiatorName);
 
         return baseInstruction + knowledgeBlock + JsonInstruction + (settings.ApplyMoodAndSocialEffects ? "\n" + SocialInstruction : "");
     }
