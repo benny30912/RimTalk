@@ -28,6 +28,11 @@
         <DebugSymbols>true</DebugSymbols>
         <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     </PropertyGroup>
+    <ItemGroup>
+      <Compile Remove="Resources\**" />
+      <EmbeddedResource Remove="Resources\**" />
+      <None Remove="Resources\**" />
+    </ItemGroup>
 
     <ItemGroup>
         <!-- Core RimWorld & UnityEngine libraries -->
