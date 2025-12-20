@@ -1,5 +1,4 @@
 ﻿using RimTalk.Data;
-using RimTalk.Util;
 using RimTalk.Vector;
 using RimWorld;
 using System;
@@ -65,6 +64,7 @@ namespace RimTalk.Source.Memory
                     lock (comp.PawnMemories)
                     {
                         comp.PawnMemories.Clear();
+                        VectorDatabase.Instance.Clear();  // [NEW] 在 lock 內清空向量
                     }
                 }
             }
@@ -80,14 +80,14 @@ namespace RimTalk.Source.Memory
             bool thresholdReached = AddMemoryInternal(pawn, memory);
 
             // 背景計算記憶向量
-            if (VectorService.Instance.IsInitialized && memory.Vector == null)
+            if (VectorService.Instance.IsInitialized && VectorDatabase.Instance.GetVector(memory.Id) == null)
             {
                 Task.Run(() =>
                 {
                     try
                     {
-                        memory.Vector = VectorService.Instance.ComputeEmbedding(memory.Summary);
-                        memory.VectorVersion = 1;
+                        var vector = VectorService.Instance.ComputeEmbedding(memory.Summary);
+                        VectorDatabase.Instance.AddVector(memory.Id, vector);
                     }
                     catch (Exception ex)
                     {
@@ -271,32 +271,6 @@ namespace RimTalk.Source.Memory
         }
 
         /// <summary>
-        /// 新增一條短期記憶 (STM) 到 Pawn 的記憶庫。
-        /// </summary>
-        public static bool AddMemory(Pawn pawn, MemoryRecord record)
-        {
-            var comp = Find.World?.GetComponent<RimTalkWorldComponent>();
-            if (comp == null || pawn == null) return false;
-
-            PawnMemoryData data;
-            lock (comp.PawnMemories)
-            {
-                if (!comp.PawnMemories.TryGetValue(pawn.thingIDNumber, out data))
-                {
-                    data = new PawnMemoryData { Pawn = pawn };
-                    comp.PawnMemories[pawn.thingIDNumber] = data;
-                }
-            }
-
-            lock (data)
-            {
-                data.ShortTermMemories.Add(record);
-                data.NewShortMemoriesSinceSummary++;
-                return data.NewShortMemoriesSinceSummary >= MaxShortMemories;
-            }
-        }
-
-        /// <summary>
         /// 編輯記憶內容
         /// </summary>
         public static void EditMemory(Pawn pawn, MemoryRecord memory, string newSummary, List<string> newKeywords, int newImportance)
@@ -332,30 +306,11 @@ namespace RimTalk.Source.Memory
                         if (data.ShortTermMemories?.Remove(memory) == true) return;
                         if (data.MediumTermMemories?.Remove(memory) == true) return;
                         if (data.LongTermMemories?.Remove(memory) == true) return;
+                        // [NEW] 同步刪除向量
+                        VectorDatabase.Instance.RemoveVector(memory.Id);
                     }
                 }
             }
         }
-
-        // --- 委派方法（保持 API 相容性）---
-
-        public static List<MemoryRecord> GetRelevantMemoriesBySemantic(
-            List<float[]> contextVectors, Pawn pawn, HashSet<string> contextNames = null)
-            => MemoryRetriever.GetRelevantMemoriesBySemantic(contextVectors, pawn, contextNames);
-
-        public static List<MemoryRecord> GetRelevantKnowledge(string context)
-            => MemoryRetriever.GetRelevantKnowledge(context);
-
-        public static string GetAllExistingKeywords(Pawn pawn)
-            => MemoryRetriever.GetAllExistingKeywords(pawn);
-
-        public static List<(Role role, string message)> BuildMemoryBlockFromHistory(Pawn pawn)
-            => MemoryFormatter.BuildMemoryBlockFromHistory(pawn);
-
-        public static string FormatRecalledMemories(List<MemoryRecord> memories)
-            => MemoryFormatter.FormatRecalledMemories(memories);
-
-        public static string GetTimeAgo(int createdTick)
-            => MemoryFormatter.GetTimeAgo(createdTick);
     }
 }

@@ -28,16 +28,6 @@ namespace RimTalk.Vector
         }
 
         /// <summary>
-        /// [NEW] 收集多個 Def 項目
-        /// </summary>
-        public void CollectDefs(IEnumerable<Def> defs)
-        {
-            if (defs == null) return;
-            foreach (var def in defs)
-                CollectDef(def);
-        }
-
-        /// <summary>
         /// [NEW] 收集固定文本項目（延遲向量化）
         /// </summary>
         public void CollectText(string text)
@@ -168,15 +158,6 @@ namespace RimTalk.Vector
         public List<ContextItem> GetCollectedItems()
         {
             return _collectedItems.ToList();
-        }
-
-        /// <summary>
-        /// 清除已收集的項目
-        /// </summary>
-        public void Clear()
-        {
-            _collectedItems.Clear();
-            _collectedNames.Clear();
         }
     }
 }

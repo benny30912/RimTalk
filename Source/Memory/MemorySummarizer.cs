@@ -2,13 +2,13 @@
 using RimTalk.Data;
 using RimTalk.Error;
 using RimTalk.Util;
+using RimTalk.Vector;
 using RimWorld;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -31,7 +31,8 @@ namespace RimTalk.Source.Memory
             [DataMember(Name = "summary")] public string Summary = "";
             [DataMember(Name = "keywords")] public List<string> Keywords = new();
             [DataMember(Name = "importance")] public int Importance = 0;
-            [DataMember(Name = "source_ids")] public List<int> SourceIds = new();
+            // [MODIFY] 改為 string 列表以接收 Guid 短碼
+            [DataMember(Name = "source_ids")] public List<string> SourceIds = new();
 
             public string GetText() => Summary;
         }
@@ -86,6 +87,12 @@ namespace RimTalk.Source.Memory
         {
             if (stmList.NullOrEmpty()) return [];
 
+            // [NEW] 建立短碼 -> Guid 映射
+            var idMap = stmList.ToDictionary(
+                m => m.Id.ToString("N").Substring(0, 8),  // 短碼
+                m => m.Id                                  // 完整 Guid
+            );
+
             string stmContext = MemoryFormatter.FormatMemoriesWithIds(stmList);
 
             string prompt =
@@ -131,7 +138,13 @@ namespace RimTalk.Source.Memory
                     .Where(m => m != null)
                     .Select(m =>
                     {
-                        var (calculatedTick, avgAccess) = CalculateMergedMetadata(m.SourceIds, stmList, currentTick);
+                        // [MODIFY] 將短碼轉換為完整 Guid
+                        var resolvedSourceIds = m.SourceIds?
+                            .Where(s => idMap.ContainsKey(s))
+                            .Select(s => idMap[s])
+                            .ToList() ?? [];
+
+                        var (calculatedTick, avgAccess) = CalculateMergedMetadata(resolvedSourceIds, stmList, currentTick);
 
                         return new MemoryRecord
                         {
@@ -139,7 +152,7 @@ namespace RimTalk.Source.Memory
                             Keywords = m.Keywords ?? [],
                             Importance = Mathf.Clamp(m.Importance, 1, 5),
                             CreatedTick = calculatedTick,
-                            AccessCount = avgAccess
+                            SourceIds = resolvedSourceIds  // [NEW] 儲存來源 ID
                         };
                     }).ToList();
             }
@@ -161,6 +174,12 @@ namespace RimTalk.Source.Memory
             int currentTick)
         {
             if (mtmList.NullOrEmpty()) return [];
+
+            // [NEW] 建立短碼 -> Guid 映射
+            var idMap = mtmList.ToDictionary(
+                m => m.Id.ToString("N").Substring(0, 8),  // 短碼
+                m => m.Id                                  // 完整 Guid
+            );
 
             string mtmContext = MemoryFormatter.FormatMemoriesWithIds(mtmList);
 
@@ -193,7 +212,13 @@ namespace RimTalk.Source.Memory
                     .Where(m => m != null)
                     .Select(m =>
                     {
-                        var (calculatedTick, avgAccess) = CalculateMergedMetadata(m.SourceIds, mtmList, currentTick);
+                        // [MODIFY] 將短碼轉換為完整 Guid
+                        var resolvedSourceIds = m.SourceIds?
+                            .Where(s => idMap.ContainsKey(s))
+                            .Select(s => idMap[s])
+                            .ToList() ?? [];
+
+                        var (calculatedTick, avgAccess) = CalculateMergedMetadata(resolvedSourceIds, mtmList, currentTick);
 
                         return new MemoryRecord
                         {
@@ -201,7 +226,8 @@ namespace RimTalk.Source.Memory
                             Keywords = m.Keywords ?? [],
                             Importance = Mathf.Clamp(m.Importance, 1, 5),
                             CreatedTick = calculatedTick,
-                            AccessCount = avgAccess
+                            AccessCount = avgAccess,
+                            SourceIds = resolvedSourceIds  // [NEW] 儲存來源 ID
                         };
                     }).ToList();
             }
@@ -216,7 +242,7 @@ namespace RimTalk.Source.Memory
         /// 統一計算合併後的記憶元數據 (時間與活躍度)。
         /// </summary>
         internal static (int Tick, int AccessCount) CalculateMergedMetadata(
-            List<int> sourceIds,
+            List<Guid> sourceIds,  // [MODIFY] 改為 Guid
             List<MemoryRecord> sources,
             int fallbackTick)
         {
@@ -228,12 +254,12 @@ namespace RimTalk.Source.Memory
             var validTicks = new List<long>();
             var validAccess = new List<int>();
 
+            // [MODIFY] 使用 Guid 查找
             foreach (var id in sourceIds)
             {
-                int index = id - 1;
-                if (index >= 0 && index < sources.Count)
+                var record = sources.FirstOrDefault(m => m.Id == id);
+                if (record != null)
                 {
-                    var record = sources[index];
                     validTicks.Add(record.CreatedTick);
                     validAccess.Add(record.AccessCount);
                 }
@@ -291,6 +317,8 @@ namespace RimTalk.Source.Memory
                 if (i < candidates.Count)
                 {
                     if (candidates[i].Score >= 9900f) break;
+                    // [NEW] 刪除對應向量
+                    VectorDatabase.Instance.RemoveVector(candidates[i].Memory.Id);
                     ltm.Remove(candidates[i].Memory);
                 }
             }

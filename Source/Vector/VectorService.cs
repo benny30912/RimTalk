@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -15,7 +14,7 @@ namespace RimTalk.Vector
     /// 職責：僅負責 ONNX 模型加載、推論 (Inference) 與 數學計算。
     /// 不包含任何具體的記憶儲存或檢索邏輯。
     /// </summary>
-    public class VectorService : IDisposable
+    public class VectorService
     {
         [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
         private static extern IntPtr LoadLibrary(string dllToLoad);
@@ -142,22 +141,6 @@ namespace RimTalk.Vector
         }
 
         /// <summary>
-        /// [異步] 計算單一句子的向量 (推薦 UI 或 遊戲邏輯使用)
-        /// </summary>
-        public async Task<float[]> ComputeEmbeddingAsync(string text)
-        {
-            if (!_isInitialized || string.IsNullOrWhiteSpace(text)) return new float[768];
-
-            return await Task.Run(() => 
-            {
-                lock (_inferenceLock)
-                {
-                    return InternalInference(new List<string> { text }).First();
-                }
-            });
-        }
-
-        /// <summary>
         /// [批次] 一次計算多個句子的向量
         /// 優勢：比呼叫多次 ComputeEmbedding 快得多。適合環境標籤生成。
         /// </summary>
@@ -188,14 +171,6 @@ namespace RimTalk.Vector
             }
             return dot; 
         }
-
-        public void Dispose()
-        {
-            _session?.Dispose();
-            _session = null;
-            _isInitialized = false;
-        }
-
         /// <summary>
         /// 核心推論邏輯 (支援 Batch)
         /// </summary>

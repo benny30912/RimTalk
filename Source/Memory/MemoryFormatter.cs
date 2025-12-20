@@ -1,6 +1,5 @@
 ﻿using RimTalk.Data;
 using RimTalk.Util;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -116,7 +115,9 @@ namespace RimTalk.Source.Memory
                 if (dayIndex < 0) dayIndex = 0;
 
                 string tags = string.Join(",", m.Keywords);
-                sb.AppendLine($"[ID: {i + 1}] [Day: {dayIndex}] (Imp:{m.Importance}) [{tags}] {m.Summary}");
+                // [MODIFY] 使用 Guid 的前 8 位作為簡短 ID 展示給 LLM
+                string shortId = m.Id.ToString("N").Substring(0, 8);
+                sb.AppendLine($"[ID: {shortId}] [Day: {dayIndex}] (Imp:{m.Importance}) [{tags}] {m.Summary}");
             }
             return sb.ToString();
         }

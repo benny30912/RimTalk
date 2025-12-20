@@ -134,7 +134,7 @@ public static class TalkService
 
             // ★ 修改點：使用 BuildMemoryBlockFromHistory
             // 這會回傳經過清洗的 List<(Role, string)>
-            var memoryBlock = MemoryService.BuildMemoryBlockFromHistory(initiator);
+            var memoryBlock = MemoryFormatter.BuildMemoryBlockFromHistory(initiator);
 
             // 將本次的請求 (Prompt) 加入到列表末尾 (這次是不清洗的，因為包含當前指令)
             // 注意：ChatStreaming 內部會再加一次 request.Prompt，所以這裡只要準備好 History 即可

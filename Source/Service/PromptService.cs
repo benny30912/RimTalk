@@ -48,7 +48,7 @@ public static class PromptService
             // 對第一個 Pawn（主發話者）獲取關鍵詞
             if (i == 0)
             {
-                snapshot.ExistingKeywords = MemoryService.GetAllExistingKeywords(pawn);
+                snapshot.ExistingKeywords = MemoryRetriever.GetAllExistingKeywords(pawn);
             }
 
             InfoLevel infoLevel = Settings.Get().Context.EnableContextOptimization
@@ -164,17 +164,17 @@ public static class PromptService
                 var contextVectors = SemanticCache.Instance.GetVectorsBatch(pawnData.Items);
 
                 // === 記憶檢索（語意向量 Max-Sim）===
-                var memories = MemoryService.GetRelevantMemoriesBySemantic(
+                var memories = MemoryRetriever.GetRelevantMemoriesBySemantic(
                     contextVectors, pawn, pawnData.Names);
 
                 // === 常識檢索（關鍵詞匹配）===
-                var knowledge = MemoryService.GetRelevantKnowledge(snapshot.KnowledgeSearchText);
+                var knowledge = MemoryRetriever.GetRelevantKnowledge(snapshot.KnowledgeSearchText);
 
                 // === 注入個人記憶 ===
                 string memoryBlock = "";
                 if (!memories.NullOrEmpty())
                 {
-                    memoryBlock = MemoryService.FormatRecalledMemories(memories);
+                    memoryBlock = MemoryFormatter.FormatRecalledMemories(memories);
                 }
                 string resolvedPawnText = pawnData.PawnText.Replace(
                     "[[MEMORY_INJECTION_POINT]]", memoryBlock.TrimEnd());

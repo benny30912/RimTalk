@@ -12,37 +12,21 @@ namespace RimTalk.Vector
     /// </summary>
     public static class SemanticMapper
     {
-        #region 心情轉換
-
-        // 心情固定描述（用於快取）
-        private static readonly string[] MoodDescriptions =
-        {
-            "崩溃边缘、绝望、痛苦",     // 0-10%
-            "心情很差、焦虑、不安",     // 10-30%
-            "有些沮丧、低落",           // 30-50%
-            "心情一般、平静",           // 50-70%
-            "心情不错、正面、开心",     // 70-90%
-            "非常开心、满足、幸福"      // 90-100%
-        };
-
         /// <summary>
         /// 將心情百分比轉換為固定語意描述
         /// </summary>
         public static string MapMoodToSemantic(float moodPercent)
         {
-            int index = moodPercent switch
+            return moodPercent switch
             {
-                < 0.1f => 0,
-                < 0.3f => 1,
-                < 0.5f => 2,
-                < 0.7f => 3,
-                < 0.9f => 4,
-                _ => 5
+                < 0.1f => "崩溃边缘、绝望、痛苦",
+                < 0.3f => "心情很差、焦虑、不安",
+                < 0.5f => "有些沮丧、低落",
+                < 0.7f => "心情一般、平静",
+                < 0.9f => "心情不错、正面、开心",
+                _ => "非常开心、满足、幸福"
             };
-            return MoodDescriptions[index];
         }
-
-        #endregion
 
         public static string MapTemperatureToSemantic(float celsius)
         {
@@ -100,8 +84,6 @@ namespace RimTalk.Vector
 
         #endregion
 
-        #region Hediff 過濾
-
         /// <summary>
         /// 過濾出「事件性」Hediff（急性疾病/傷害/亢奮）
         /// 排除永久傷殘、仿生義肢等靜態項目
@@ -129,8 +111,6 @@ namespace RimTalk.Vector
                        h.def.hediffClass == typeof(Hediff_Hangover);
             }).ToList();
         }
-
-        #endregion
 
         #region Relations 處理
 
@@ -190,8 +170,6 @@ namespace RimTalk.Vector
 
         #endregion
 
-        #region Surroundings 處理
-
         /// <summary>
         /// 從周遭物品中選一個，取得其語意文本 (Surrounding本來就是隨機的)
         /// 模擬「看到某物觸發聯想」
@@ -212,21 +190,6 @@ namespace RimTalk.Vector
         }
 
         /// <summary>
-        /// 從周遭物品標籤列表中選一個(Surrounding本來就是隨機的)
-        /// </summary>
-        public static string GetSurroundingLabel(List<string> labels)
-        {
-            if (labels == null || labels.Count == 0)
-                return null;
-
-            return labels[0];
-        }
-
-        #endregion
-
-        #region 輔助方法
-
-        /// <summary>
         /// 從 Def 取得語意文本 (label + description)
         /// </summary>
         public static string GetSemanticTextFromDef(Def def)
@@ -236,7 +199,5 @@ namespace RimTalk.Vector
             string desc = def.description ?? "";
             return string.IsNullOrWhiteSpace(desc) ? label : $"{label}: {desc}";
         }
-
-        #endregion
     }
 }

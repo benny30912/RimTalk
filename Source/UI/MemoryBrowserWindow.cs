@@ -206,7 +206,7 @@ namespace RimTalk.UI
                 Widgets.DrawBoxSolid(rect, new Color(0.15f, 0.15f, 0.2f, 0.3f));
                 // Header: Relative Time | Importance | Access Count
                 // [Use public MemoryService.GetTimeAgo]
-                string timeStr = MemoryService.GetTimeAgo(mem.CreatedTick);
+                string timeStr = MemoryFormatter.GetTimeAgo(mem.CreatedTick);
                 string headerInfo = $"{timeStr} | Importance: {mem.Importance} | Access: {mem.AccessCount}";
 
                 GUI.color = Color.gray;

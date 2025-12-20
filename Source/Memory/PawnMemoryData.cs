@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Verse;
 
-namespace RimTalk.Data
+namespace RimTalk.Source.Memory
 {
     /// <summary>
     /// 儲存單個 Pawn 的完整記憶資料 (STM / MTM / LTM)。

@@ -45,45 +45,6 @@ namespace RimTalk.Vector
         private SemanticCache() { }
 
         /// <summary>
-        /// 取得 Def 的向量（快取優先）
-        /// </summary>
-        public float[] GetVectorForDef(Def def)
-        {
-            if (def == null || !VectorService.Instance.IsInitialized)
-                return null;
-
-            int key = def.shortHash;
-
-            if (_defCache.TryGetValue(key, out float[] cached))
-                return cached;
-
-            string text = GetSemanticTextFromDef(def);
-            float[] vector = VectorService.Instance.ComputeEmbedding(text);
-            _defCache.TryAdd(key, vector);
-
-            return vector;
-        }
-
-        /// <summary>
-        /// 取得固定描述文本的向量（快取優先）
-        /// </summary>
-        public float[] GetVectorForText(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text) || !VectorService.Instance.IsInitialized)
-                return null;
-
-            int key = text.GetHashCode();
-
-            if (_textCache.TryGetValue(key, out float[] cached))
-                return cached;
-
-            float[] vector = VectorService.Instance.ComputeEmbedding(text);
-            _textCache.TryAdd(key, vector);
-
-            return vector;
-        }
-
-        /// <summary>
         /// [NEW] 批次取得向量（快取優先 + 批次計算未命中項目）
         /// 優勢：比逐個呼叫 GetVectorForDef/Text 快得多
         /// </summary>
@@ -110,7 +71,7 @@ namespace RimTalk.Vector
                 {
                     if (item.Def == null) continue;
                     key = item.Def.shortHash;
-                    text = GetSemanticTextFromDef(item.Def);
+                    text = SemanticMapper.GetSemanticTextFromDef(item.Def);
 
                     // 查詢 Def 快取
                     if (_defCache.TryGetValue(key, out var cached))
@@ -162,14 +123,6 @@ namespace RimTalk.Vector
 
             // 過濾掉 null（可能因為空項目）
             return results.Where(v => v != null).ToList();
-        }
-
-        private static string GetSemanticTextFromDef(Def def)
-        {
-            if (def == null) return string.Empty;
-            string label = def.label ?? def.defName;
-            string desc = def.description ?? "";
-            return string.IsNullOrWhiteSpace(desc) ? label : $"{label}: {desc}";
         }
 
         /// <summary>
@@ -273,17 +226,5 @@ namespace RimTalk.Vector
                 vector[i] = reader.ReadSingle();
             return vector;
         }
-
-        /// <summary>
-        /// 清除快取
-        /// </summary>
-        public void Clear()
-        {
-            _defCache.Clear();
-            _textCache.Clear();
-        }
-
-        public (int defCount, int textCount) GetStats()
-            => (_defCache.Count, _textCache.Count);
     }
 }

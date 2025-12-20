@@ -1,7 +1,5 @@
 ﻿using RimTalk.Data;
-using RimTalk.Util;
 using RimTalk.Vector;
-using RimWorld;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -80,12 +78,13 @@ namespace RimTalk.Source.Memory
             {
                 // 語意相似度（Max-Sim）
                 float semanticScore = 0f;
-                if (mem.Vector != null)
+                var memVector = VectorDatabase.Instance.GetVector(mem.Id);
+                if (memVector != null)
                 {
                     foreach (var cv in contextVectors)
                     {
                         if (cv == null) continue;
-                        float sim = VectorService.CosineSimilarity(cv, mem.Vector);
+                        float sim = VectorService.CosineSimilarity(cv, memVector);
                         if (sim > semanticScore) semanticScore = sim;
                     }
                     if (semanticScore < semanticThreshold) semanticScore = 0f;
@@ -246,12 +245,6 @@ namespace RimTalk.Source.Memory
         public static string GetAllExistingKeywords(Pawn pawn)
         {
             var keywords = new HashSet<string>();
-
-            // 核心關鍵詞庫
-            foreach (var coreTag in CoreMemoryTags.KeywordMap)
-            {
-                keywords.Add(coreTag);
-            }
 
             var comp = Find.World?.GetComponent<RimTalkWorldComponent>();
             if (comp == null) return "None";

@@ -1,7 +1,9 @@
 ﻿using RimTalk.Source.Memory;
 using RimTalk.Util;
+using RimTalk.Vector;
 using RimWorld.Planet;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using Verse;
@@ -25,6 +27,20 @@ public class RimTalkWorldComponent(World world) : WorldComponent(world)
 
     // 序列化用的列表 (因為 Scribe 不支援直接儲存複雜物件的 Dictionary)
     private List<PawnMemoryData> _memoryDataList = [];
+
+    // [NEW] 向量儲存路徑 (Config/RimTalk/)
+    private static string RimTalkDataPath => Path.Combine(
+        GenFilePaths.ConfigFolderPath,  // Config 資料夾
+        "RimTalk"
+    );
+    private string VectorDbPath => Path.Combine(
+        RimTalkDataPath,
+        $"{world.info.name}_vectors.bin"
+    );
+    private static string SemanticCachePath => Path.Combine(
+        RimTalkDataPath,
+        "semantic_cache.bin"
+    );
 
     // [OPT] 優化：每 5 秒檢查一次主執行緒佇列，避免每 Tick 空轉
     private const float MainThreadQueueCheckInterval = 5f;
@@ -59,6 +75,9 @@ public class RimTalkWorldComponent(World world) : WorldComponent(world)
             _memoryDataList = new List<PawnMemoryData>(PawnMemories.Values);
             // 移除 null 的項目 (雖不應發生，但以防萬一)
             _memoryDataList.RemoveAll(x => x == null);
+            // [NEW] 保存向量資料（傳入 PawnMemories 以過濾孤兒向量）
+            VectorDatabase.Instance.SaveToDisk(VectorDbPath, PawnMemories);
+            SemanticCache.Instance.SaveToDisk(SemanticCachePath);
         }
         // 這會保存所有的 Short/Medium/Long Term Memories
         Scribe_Collections.Look(ref _memoryDataList, "pawnMemories", LookMode.Deep);
@@ -78,6 +97,10 @@ public class RimTalkWorldComponent(World world) : WorldComponent(world)
 
             // [NEW] 確保常識庫不為 null
             CommonKnowledgeStore ??= [];
+
+            // [NEW] 載入向量資料並還原
+            SemanticCache.Instance.LoadFromDisk(SemanticCachePath);
+            VectorDatabase.Instance.LoadFromDisk(VectorDbPath);
         }
 
         try 

@@ -1,7 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Verse;
 
-namespace RimTalk.Data
+// [MODIFY] 命名空間變更
+namespace RimTalk.Source.Memory
 {
     /// <summary>
     /// 代表一條記憶紀錄 (適用於短/中/長期記憶)。
@@ -9,6 +11,9 @@ namespace RimTalk.Data
     /// </summary>
     public class MemoryRecord : IExposable
     {
+        // [NEW] 永久唯一識別碼
+        public Guid Id = Guid.NewGuid();
+
         /// <summary>
         /// 記憶內容摘要 (AI 生成)。
         /// </summary>
@@ -34,32 +39,35 @@ namespace RimTalk.Data
         /// </summary>
         public int CreatedTick;
 
-        /// <summary>
-        /// 記憶的語意向量 (768 維)。
-        /// 不透過 Scribe 序列化，由 VectorDatabase 獨立持久化。
-        /// </summary>
-        [System.NonSerialized]
-        public float[] Vector;
-        /// <summary>
-        /// 向量版本號，用於模型更新時失效重算。
-        /// </summary>
-        public int VectorVersion;
+        // [NEW] 來源記憶 ID 列表 (用於追蹤合併來源)
+        public List<Guid> SourceIds = [];
 
-        // [可選] 若未來需要追蹤長期記憶是由哪些中期記憶合併而來，可在此擴充 SourceIds
+        // [NEW] Guid 序列化用的臨時字串
+        private string _idString;
+        private List<string> _sourceIdStrings;
 
         public void ExposeData()
         {
+            // [NEW] 序列化 Guid Id
+            if (Scribe.mode == LoadSaveMode.Saving)
+                _idString = Id.ToString();
+            Scribe_Values.Look(ref _idString, "id");
+            if (Scribe.mode == LoadSaveMode.PostLoadInit && !string.IsNullOrEmpty(_idString))
+                Id = Guid.Parse(_idString);
+
             Scribe_Values.Look(ref Summary, "summary");
             Scribe_Collections.Look(ref Keywords, "keywords", LookMode.Value);
             Scribe_Values.Look(ref Importance, "importance");
             Scribe_Values.Look(ref AccessCount, "accessCount");
             Scribe_Values.Look(ref CreatedTick, "createdTick");
 
-            Scribe_Values.Look(ref VectorVersion, "vectorVersion", 0); // 版本號的序列化
-
-            // 確保讀檔後 Keywords 不為 null
+            // [NEW] 序列化 SourceIds
+            if (Scribe.mode == LoadSaveMode.Saving)
+                _sourceIdStrings = SourceIds?.ConvertAll(g => g.ToString()) ?? [];
+            Scribe_Collections.Look(ref _sourceIdStrings, "sourceIds", LookMode.Value);
             if (Scribe.mode == LoadSaveMode.PostLoadInit)
             {
+                SourceIds = _sourceIdStrings?.ConvertAll(s => Guid.Parse(s)) ?? [];
                 Keywords ??= [];
             }
         }
