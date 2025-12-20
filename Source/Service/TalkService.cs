@@ -81,13 +81,13 @@ public static class TalkService
         PromptService.DecoratePrompt(talkRequest, pawns, status);
         //此時 talkRequest.Prompt 已經包含了 Ongoing Events！
 
-        // [NEW] 將 status 收集的資訊傳遞給 BuildContext
+        // [NEW] 將 status 收集的資訊傳遞給 BuildContextSnapshot
         talkRequest.StatusActivities = statusActivities;
         talkRequest.StatusNames = statusNames;
-        // 2. 再構建 Context (現在可以讀取 talkRequest.Prompt 中的 Tag 來檢索記憶了)
-        // 注意：需確認 PromptService.BuildContext 支援 (TalkRequest, List<Pawn>) 簽名
-        string context = PromptService.BuildContext(talkRequest, pawns);
-        AIService.UpdateContext(context);
+
+        // [MOD] 2. 收集 Context 快照（主執行緒，不執行向量計算）
+        // 向量計算和記憶檢索移至後台執行緒
+        var contextSnapshot = PromptService.BuildContextSnapshot(talkRequest, pawns);
 
         var allInvolvedPawns = pawns.Union(nearbyPawns).Distinct().ToList();
 
@@ -103,8 +103,8 @@ public static class TalkService
         }
 
         // Offload the AI request and processing to a background thread to avoid blocking the game's main thread.
-        // [MOD] Pass pre-built playerDict instead of list of pawns
-        Task.Run(() => GenerateAndProcessTalkAsync(talkRequest, playerDict, allInvolvedPawns));
+        // [MOD] 傳遞 contextSnapshot 和 pawns 供後台解析
+        Task.Run(() => GenerateAndProcessTalkAsync(talkRequest, playerDict, allInvolvedPawns, contextSnapshot, pawns));
 
         return true;
     }
@@ -112,16 +112,23 @@ public static class TalkService
     /// <summary>
     /// Handles the asynchronous AI streaming and processes the responses.
     /// </summary>
-    // [MOD] 接收 Dictionary<string, Pawn> playerDict
-    private static async Task GenerateAndProcessTalkAsync(TalkRequest talkRequest, Dictionary<string, Pawn> playerDict, List<Pawn> allInvolvedPawns)
+    // [MOD] 接收 contextSnapshot 和 pawns 供後台解析
+    private static async Task GenerateAndProcessTalkAsync(
+        TalkRequest talkRequest,
+        Dictionary<string, Pawn> playerDict,
+        List<Pawn> allInvolvedPawns,
+        ContextSnapshot contextSnapshot,  // [NEW] Context 快照
+        List<Pawn> pawns)                  // [NEW] pawns 列表（用於解析）
     {
         var initiator = talkRequest.Initiator;
         try
         {
             Cache.Get(initiator).IsGeneratingTalk = true;
 
-            // Create a dictionary for quick pawn lookup by name during streaming.
-            // [REMOVED] 移除這行 (它在異步線程存取 Unity API，不安全)
+            // [NEW] 在後台執行緒解析 Context（批次向量計算 + 記憶檢索）
+            string context = await PromptService.ResolveContextAsync(contextSnapshot, pawns);
+            AIService.UpdateContext(context);
+
             var receivedResponses = new List<TalkResponse>();
 
             // ★ 修改點：使用 BuildMemoryBlockFromHistory

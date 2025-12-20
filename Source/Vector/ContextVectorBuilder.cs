@@ -1,4 +1,5 @@
-﻿using RimWorld;
+﻿using RimTalk.Data;
+using RimWorld;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,132 +10,130 @@ namespace RimTalk.Vector
     /// <summary>
     /// Context 向量建構器
     /// 收集動態情境項目，組合成 Context 向量用於記憶檢索。
+    /// [MOD] 改為收集 ContextItem，延遲向量計算到後台執行緒
     /// </summary>
     public class ContextVectorBuilder
     {
-        // 在類別開頭的欄位宣告中加入：
+        // [MOD] 改為收集 ContextItem 而非立即計算向量
+        private readonly List<ContextItem> _collectedItems = new List<ContextItem>();
         private readonly HashSet<string> _collectedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        // 收集的動態項目向量
-        private readonly List<float[]> _collectedVectors = new List<float[]>();
 
         /// <summary>
-        /// 加入 Def 向量（透過快取）
+        /// [NEW] 收集 Def 項目（延遲向量化）
         /// </summary>
-        public void AddDef(Def def)
+        public void CollectDef(Def def)
         {
-            if (def == null) return;
-            var vector = SemanticCache.Instance.GetVectorForDef(def);
-            if (vector != null)
-                _collectedVectors.Add(vector);
+            if (def != null)
+                _collectedItems.Add(new ContextItem { Type = ContextItem.ItemType.Def, Def = def });
         }
 
         /// <summary>
-        /// 加入多個 Def 向量
+        /// [NEW] 收集多個 Def 項目
         /// </summary>
-        public void AddDefs(IEnumerable<Def> defs)
+        public void CollectDefs(IEnumerable<Def> defs)
         {
             if (defs == null) return;
             foreach (var def in defs)
-                AddDef(def);
+                CollectDef(def);
         }
 
         /// <summary>
-        /// 加入固定文本向量（透過快取）
+        /// [NEW] 收集固定文本項目（延遲向量化）
         /// </summary>
-        public void AddText(string text)
+        public void CollectText(string text)
         {
-            if (string.IsNullOrWhiteSpace(text)) return;
-            var vector = SemanticCache.Instance.GetVectorForText(text);
-            if (vector != null)
-                _collectedVectors.Add(vector);
+            if (!string.IsNullOrWhiteSpace(text))
+                _collectedItems.Add(new ContextItem { Type = ContextItem.ItemType.Text, Text = text });
         }
 
         /// <summary>
-        /// 加入心情（轉換為固定描述後加入）
+        /// [NEW] 收集心情（轉換為語意描述後加入）
         /// </summary>
-        public void AddMood(float moodPercent)
+        public void CollectMood(float moodPercent)
         {
             string semantic = SemanticMapper.MapMoodToSemantic(moodPercent);
-            AddText(semantic);
+            CollectText(semantic);
         }
 
         /// <summary>
-        /// 加入事件性 Hediff（過濾後加入）
+        /// [NEW] 收集事件性 Hediff
         /// </summary>
-        public void AddEventHediffs(IEnumerable<Hediff> hediffs)
+        public void CollectEventHediffs(IEnumerable<Hediff> hediffs)
         {
             var eventHediffs = SemanticMapper.FilterEventHediffs(hediffs);
             foreach (var hediff in eventHediffs)
             {
                 if (hediff?.def != null)
-                    AddDef(hediff.def);
+                    CollectDef(hediff.def);
             }
         }
 
         /// <summary>
-        /// 加入 Thoughts（個別向量從快取取得）
+        /// [NEW] 收集 Thoughts
         /// </summary>
-        public void AddThoughts(IEnumerable<Thought> thoughts)
+        public void CollectThoughts(IEnumerable<Thought> thoughts)
         {
             if (thoughts == null) return;
             foreach (var thought in thoughts)
             {
                 if (thought?.def != null)
-                    AddDef(thought.def);
+                    CollectDef(thought.def);
             }
         }
 
         /// <summary>
-        /// 加入 Relations（提取關係詞彙後加入）
+        /// [NEW] 收集 Relations（提取關係詞彙）
         /// </summary>
-        public void AddRelations(string relationsText)
+        public void CollectRelations(string relationsText)
         {
             var relationWords = SemanticMapper.ExtractRelationWords(relationsText);
             foreach (var word in relationWords)
-                AddText(word);
+                CollectText(word);
         }
 
         /// <summary>
-        /// 加入 Surrounding（模擬聯想）
+        /// [NEW] 收集 Surrounding
         /// </summary>
-        public void AddSurrounding(List<string> labels)
+        public void CollectSurrounding(List<string> labels)
         {
             string label = SemanticMapper.GetSurroundingLabel(labels);
             if (!string.IsNullOrEmpty(label))
-                AddText(label);
+                CollectText(label);
         }
 
         /// <summary>
-        /// 加入天氣
+        /// [NEW] 收集天氣
         /// </summary>
-        public void AddWeather(WeatherDef weather)
+        public void CollectWeather(WeatherDef weather)
         {
             if (weather != null)
-                AddDef(weather);
+                CollectDef(weather);
         }
 
         /// <summary>
-        /// 加入季節
+        /// [NEW] 收集季節
         /// </summary>
-        public void AddSeason(Season season)
+        public void CollectSeason(Season season)
         {
-            // Season 是 enum，轉為文本
             string seasonText = season.Label();
-            AddText(seasonText);
+            CollectText(seasonText);
         }
 
         /// <summary>
-        /// 加入位置/房間
+        /// [NEW] 收集位置/房間
         /// </summary>
-        public void AddLocation(string locationText)
+        public void CollectLocation(string locationText)
         {
-            AddText(locationText);
+            CollectText(locationText);
         }
 
-        public void AddTemperature(float celsius)
+        /// <summary>
+        /// [NEW] 收集溫度
+        /// </summary>
+        public void CollectTemperature(float celsius)
         {
             string semantic = SemanticMapper.MapTemperatureToSemantic(celsius);
-            AddText(semantic);
+            CollectText(semantic);
         }
 
         /// <summary>
@@ -155,6 +154,7 @@ namespace RimTalk.Vector
             foreach (var name in names)
                 AddName(name);
         }
+
         /// <summary>
         /// 取得所有收集的人名
         /// </summary>
@@ -164,61 +164,101 @@ namespace RimTalk.Vector
         }
 
         /// <summary>
-        /// 計算最終 Context 向量（所有收集向量的平均）
+        /// [NEW] 取得收集的項目清單（供批次計算）
         /// </summary>
-        public float[] Build()
+        public List<ContextItem> GetCollectedItems()
         {
-            if (_collectedVectors.Count == 0)
-                return null;
-
-            // 計算平均向量
-            int dim = _collectedVectors[0].Length; // 768
-            float[] result = new float[dim];
-
-            foreach (var vec in _collectedVectors)
-            {
-                for (int i = 0; i < dim && i < vec.Length; i++)
-                    result[i] += vec[i];
-            }
-
-            // 平均
-            for (int i = 0; i < dim; i++)
-                result[i] /= _collectedVectors.Count;
-
-            // L2 歸一化
-            double norm = 0;
-            for (int i = 0; i < dim; i++)
-                norm += result[i] * result[i];
-            norm = Math.Sqrt(norm);
-
-            if (norm > 1e-12)
-            {
-                for (int i = 0; i < dim; i++)
-                    result[i] = (float)(result[i] / norm);
-            }
-
-            return result;
+            return _collectedItems.ToList();
         }
 
         /// <summary>
-        /// 取得所有收集的向量（用於 Max-Sim 計算）
+        /// 取得已收集的項目數量
         /// </summary>
-        public List<float[]> GetAllVectors()
-        {
-            return _collectedVectors.ToList();
-        }
+        public int Count => _collectedItems.Count;
 
         /// <summary>
-        /// 取得已收集的向量數量
-        /// </summary>
-        public int Count => _collectedVectors.Count;
-
-        /// <summary>
-        /// 清除已收集的向量
+        /// 清除已收集的項目
         /// </summary>
         public void Clear()
         {
-            _collectedVectors.Clear();
+            _collectedItems.Clear();
+            _collectedNames.Clear();
         }
+
+        #region 相容性方法（保留舊介面，內部改為收集）
+
+        /// <summary>
+        /// [COMPAT] 加入 Def 向量（現改為收集）
+        /// </summary>
+        public void AddDef(Def def) => CollectDef(def);
+
+        /// <summary>
+        /// [COMPAT] 加入多個 Def 向量
+        /// </summary>
+        public void AddDefs(IEnumerable<Def> defs) => CollectDefs(defs);
+
+        /// <summary>
+        /// [COMPAT] 加入固定文本向量
+        /// </summary>
+        public void AddText(string text) => CollectText(text);
+
+        /// <summary>
+        /// [COMPAT] 加入心情
+        /// </summary>
+        public void AddMood(float moodPercent) => CollectMood(moodPercent);
+
+        /// <summary>
+        /// [COMPAT] 加入事件性 Hediff
+        /// </summary>
+        public void AddEventHediffs(IEnumerable<Hediff> hediffs) => CollectEventHediffs(hediffs);
+
+        /// <summary>
+        /// [COMPAT] 加入 Thoughts
+        /// </summary>
+        public void AddThoughts(IEnumerable<Thought> thoughts) => CollectThoughts(thoughts);
+
+        /// <summary>
+        /// [COMPAT] 加入 Relations
+        /// </summary>
+        public void AddRelations(string relationsText) => CollectRelations(relationsText);
+
+        /// <summary>
+        /// [COMPAT] 加入 Surrounding
+        /// </summary>
+        public void AddSurrounding(List<string> labels) => CollectSurrounding(labels);
+
+        /// <summary>
+        /// [COMPAT] 加入天氣
+        /// </summary>
+        public void AddWeather(WeatherDef weather) => CollectWeather(weather);
+
+        /// <summary>
+        /// [COMPAT] 加入季節
+        /// </summary>
+        public void AddSeason(Season season) => CollectSeason(season);
+
+        /// <summary>
+        /// [COMPAT] 加入位置
+        /// </summary>
+        public void AddLocation(string locationText) => CollectLocation(locationText);
+
+        /// <summary>
+        /// [COMPAT] 加入溫度
+        /// </summary>
+        public void AddTemperature(float celsius) => CollectTemperature(celsius);
+
+        /// <summary>
+        /// [DEPRECATED] 計算最終 Context 向量
+        /// 此方法已不再使用，改為批次處理
+        /// </summary>
+        public float[] Build() => null;
+
+        /// <summary>
+        /// [DEPRECATED] 取得所有收集的向量
+        /// 此方法已不再使用，改用 GetCollectedItems + SemanticCache.GetVectorsBatch
+        /// </summary>
+        public List<float[]> GetAllVectors() => new List<float[]>();
+
+        #endregion
     }
 }
