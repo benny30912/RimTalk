@@ -3,6 +3,7 @@ using RimTalk.Data;
 using RimTalk.Error;
 using RimTalk.Patch;
 using RimTalk.Service;
+using RimTalk.Source.Memory;
 using RimTalk.Vector;
 using System;
 using System.IO;

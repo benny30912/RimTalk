@@ -363,7 +363,9 @@ public static class ContextBuilder
             var items = ContextHelper.CollectNearbyItems(mainPawn, 3);
             if (items.Any())
             {
-                var grouped = items.GroupBy(i => i).Select(g => g.Count() > 1 ? $"{g.Key} x {g.Count()}" : g.Key);
+                // [MOD] 改為從 Thing 取得 LabelCap
+                var labels = items.Select(t => t.LabelCap.ToString()).ToList();
+                var grouped = labels.GroupBy(l => l).Select(g => g.Count() > 1 ? $"{g.Key} x {g.Count()}" : g.Key);
                 sb.Append($"\nSurroundings: {string.Join(", ", grouped)}");
             }
         }

@@ -85,9 +85,12 @@ public static class ContextHelper
         return cells;
     }
 
-    public static List<string> CollectNearbyItems(Pawn pawn, int maxItems)
+    /// <summary>
+    /// [MOD] 改為回傳 List<Thing>，由呼叫端決定如何處理
+    /// </summary>
+    public static List<Thing> CollectNearbyItems(Pawn pawn, int maxItems)
     {
-        var items = new List<string>();
+        var items = new List<Thing>();
         var seenThings = new HashSet<Thing>();
         var nearbyCells = GetNearbyCells(pawn);
 
@@ -101,10 +104,10 @@ public static class ContextHelper
                 continue;
 
             // Skip cells with pawns/animals
-            if (thingsHere.Any(t => t?.def != null && 
-                t.def.category != ThingCategory.Building && 
+            if (thingsHere.Any(t => t?.def != null &&
+                t.def.category != ThingCategory.Building &&
                 t.def.category != ThingCategory.Plant &&
-                t.def.category != ThingCategory.Item && 
+                t.def.category != ThingCategory.Item &&
                 !t.def.IsFilth))
                 continue;
 
@@ -138,24 +141,7 @@ public static class ContextHelper
                 continue;
 
             seenThings.Add(picked);
-
-            if (picked is Building_Storage storage)
-            {
-                var stored = storage.AllSlotCells()
-                    .SelectMany(c => c.GetThingList(pawn.Map))
-                    .Distinct()
-                    .ToList();
-
-                if (stored.Count > 0)
-                {
-                    var storedSample = string.Join(", ", stored.OrderBy(_ => Rand.Value).Take(3).Select(i => i.LabelCap));
-                    items.Add($"{storage.LabelCap} ({storedSample})");
-                }
-            }
-            else
-            {
-                items.Add(picked.LabelCap);
-            }
+            items.Add(picked);
         }
 
         return items;

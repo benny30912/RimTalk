@@ -82,23 +82,30 @@ namespace RimTalk.Vector
         }
 
         /// <summary>
-        /// [NEW] 收集 Relations（提取關係詞彙）
+        /// 收集 Relations（同時提取關係詞彙和人名）
         /// </summary>
         public void CollectRelations(string relationsText)
         {
+            if (string.IsNullOrEmpty(relationsText)) return;
+
+            // 1. 收集關係詞彙
             var relationWords = SemanticMapper.ExtractRelationWords(relationsText);
             foreach (var word in relationWords)
                 CollectText(word);
+
+            // 2. 收集人名（用於人名加分）
+            var relationNames = SemanticMapper.ExtractRelationNames(relationsText);
+            AddNames(relationNames);
         }
 
         /// <summary>
-        /// [NEW] 收集 Surrounding
+        /// [MOD] 收集 Surrounding（改為接收 Thing 列表）
         /// </summary>
-        public void CollectSurrounding(List<string> labels)
+        public void CollectSurrounding(List<Thing> things)
         {
-            string label = SemanticMapper.GetSurroundingLabel(labels);
-            if (!string.IsNullOrEmpty(label))
-                CollectText(label);
+            string text = SemanticMapper.GetSurroundingText(things);
+            if (!string.IsNullOrEmpty(text))
+                CollectText(text);
         }
 
         /// <summary>
@@ -117,14 +124,6 @@ namespace RimTalk.Vector
         {
             string seasonText = season.Label();
             CollectText(seasonText);
-        }
-
-        /// <summary>
-        /// [NEW] 收集位置/房間
-        /// </summary>
-        public void CollectLocation(string locationText)
-        {
-            CollectText(locationText);
         }
 
         /// <summary>
@@ -172,11 +171,6 @@ namespace RimTalk.Vector
         }
 
         /// <summary>
-        /// 取得已收集的項目數量
-        /// </summary>
-        public int Count => _collectedItems.Count;
-
-        /// <summary>
         /// 清除已收集的項目
         /// </summary>
         public void Clear()
@@ -184,81 +178,5 @@ namespace RimTalk.Vector
             _collectedItems.Clear();
             _collectedNames.Clear();
         }
-
-        #region 相容性方法（保留舊介面，內部改為收集）
-
-        /// <summary>
-        /// [COMPAT] 加入 Def 向量（現改為收集）
-        /// </summary>
-        public void AddDef(Def def) => CollectDef(def);
-
-        /// <summary>
-        /// [COMPAT] 加入多個 Def 向量
-        /// </summary>
-        public void AddDefs(IEnumerable<Def> defs) => CollectDefs(defs);
-
-        /// <summary>
-        /// [COMPAT] 加入固定文本向量
-        /// </summary>
-        public void AddText(string text) => CollectText(text);
-
-        /// <summary>
-        /// [COMPAT] 加入心情
-        /// </summary>
-        public void AddMood(float moodPercent) => CollectMood(moodPercent);
-
-        /// <summary>
-        /// [COMPAT] 加入事件性 Hediff
-        /// </summary>
-        public void AddEventHediffs(IEnumerable<Hediff> hediffs) => CollectEventHediffs(hediffs);
-
-        /// <summary>
-        /// [COMPAT] 加入 Thoughts
-        /// </summary>
-        public void AddThoughts(IEnumerable<Thought> thoughts) => CollectThoughts(thoughts);
-
-        /// <summary>
-        /// [COMPAT] 加入 Relations
-        /// </summary>
-        public void AddRelations(string relationsText) => CollectRelations(relationsText);
-
-        /// <summary>
-        /// [COMPAT] 加入 Surrounding
-        /// </summary>
-        public void AddSurrounding(List<string> labels) => CollectSurrounding(labels);
-
-        /// <summary>
-        /// [COMPAT] 加入天氣
-        /// </summary>
-        public void AddWeather(WeatherDef weather) => CollectWeather(weather);
-
-        /// <summary>
-        /// [COMPAT] 加入季節
-        /// </summary>
-        public void AddSeason(Season season) => CollectSeason(season);
-
-        /// <summary>
-        /// [COMPAT] 加入位置
-        /// </summary>
-        public void AddLocation(string locationText) => CollectLocation(locationText);
-
-        /// <summary>
-        /// [COMPAT] 加入溫度
-        /// </summary>
-        public void AddTemperature(float celsius) => CollectTemperature(celsius);
-
-        /// <summary>
-        /// [DEPRECATED] 計算最終 Context 向量
-        /// 此方法已不再使用，改為批次處理
-        /// </summary>
-        public float[] Build() => null;
-
-        /// <summary>
-        /// [DEPRECATED] 取得所有收集的向量
-        /// 此方法已不再使用，改用 GetCollectedItems + SemanticCache.GetVectorsBatch
-        /// </summary>
-        public List<float[]> GetAllVectors() => new List<float[]>();
-
-        #endregion
     }
 }

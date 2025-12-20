@@ -1,4 +1,4 @@
-﻿using RimTalk.Service;
+﻿using RimTalk.Source.Memory;
 using RimTalk.Util;
 using RimWorld.Planet;
 using System.Collections.Generic;

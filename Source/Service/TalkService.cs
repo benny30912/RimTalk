@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using RimTalk.Data;
 using RimTalk.Source.Data;
+using RimTalk.Source.Memory;
 using RimTalk.UI;
 using RimTalk.Util;
 using RimWorld;

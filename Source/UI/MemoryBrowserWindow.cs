@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using RimTalk.Data;
-using RimTalk.Service;
+using RimTalk.Source.Memory;
 using UnityEngine;
 using Verse;
 

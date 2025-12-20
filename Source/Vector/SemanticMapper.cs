@@ -134,19 +134,6 @@ namespace RimTalk.Vector
 
         #region Relations 處理
 
-        // 關係詞彙對照（用於提取）
-        private static readonly HashSet<string> RelationWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            // 中文
-            "朋友", "好友", "仇人", "敌人", "情人", "情侣", "伴侣", "配偶",
-            "父亲", "母亲", "儿子", "女儿", "兄弟", "姊妹", "亲戚",
-            "前任", "前夫", "前妻", "恋人", "爱人",
-            // 英文
-            "friend", "enemy", "rival", "lover", "spouse", "husband", "wife",
-            "father", "mother", "son", "daughter", "brother", "sister",
-            "ex-lover", "fiancé", "fiancée"
-        };
-
         /// <summary>
         /// 從 Relations 字串中提取關係詞彙（用於語意匹配）
         /// 輸入格式範例："Alice(朋友), Bob(仇人)"
@@ -206,17 +193,15 @@ namespace RimTalk.Vector
         #region Surroundings 處理
 
         /// <summary>
-        /// 從周遭物品中隨機選一個，取得其語意文本
+        /// 從周遭物品中選一個，取得其語意文本 (Surrounding本來就是隨機的)
         /// 模擬「看到某物觸發聯想」
         /// </summary>
-        public static string GetRandomSurroundingText(List<Thing> things)
+        public static string GetSurroundingText(List<Thing> things)
         {
             if (things == null || things.Count == 0)
                 return null;
 
-            // 隨機選一個
-            var random = new Random();
-            var thing = things[random.Next(things.Count)];
+            var thing = things[0];
 
             if (thing?.def == null) return null;
 

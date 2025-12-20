@@ -1,6 +1,6 @@
 ﻿using HarmonyLib;
 using RimTalk.Data;
-using RimTalk.Service; // 用於 MemoryService
+using RimTalk.Source.Memory;
 using Verse;
 
 namespace RimTalk.Patch
