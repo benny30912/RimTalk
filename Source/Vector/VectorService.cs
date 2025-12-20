@@ -1,11 +1,12 @@
-﻿using System;
+﻿using Microsoft.ML.OnnxRuntime;
+using Microsoft.ML.OnnxRuntime.Tensors;
+using Microsoft.ML.Tokenizers;  // [新增] 官方 Tokenizer 庫
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using Microsoft.ML.OnnxRuntime;
-using Microsoft.ML.OnnxRuntime.Tensors;
-using Microsoft.ML.Tokenizers;  // [新增] 官方 Tokenizer 庫
 using Verse;
 
 namespace RimTalk.Vector
@@ -62,29 +63,40 @@ namespace RimTalk.Vector
                 Log.Message("[RimTalk] VectorService: Initializing...");
 
                 // 預先載入原生 DLL（保持不變）
+                // [修改] 跨平台原生庫預載入
                 if (!_nativeLoaded)
                 {
-                    string nativeDllPath = Path.Combine(
-                        Path.GetDirectoryName(modelPath),
-                        "..",
-                        "Native",
-                        "onnxruntime.dll"
-                    );
-                    nativeDllPath = Path.GetFullPath(nativeDllPath);
-
-                    if (File.Exists(nativeDllPath))
+                    _nativeLoaded = true;  // 無論成功與否，只嘗試一次
+                                           // 非 Windows 平台跳過預載入，讓 ONNX Runtime 自行處理
+                    if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
-                        var handle = LoadLibrary(nativeDllPath);
-                        if (handle == IntPtr.Zero)
+                        Log.Message("[RimTalk] Non-Windows platform detected, skipping native DLL preload");
+                    }
+                    else
+                    {
+                        // Windows 專用：手動預載入 onnxruntime.dll
+                        try
                         {
-                            Log.Warning($"[RimTalk] Failed to preload native DLL: {nativeDllPath}");
+                            string nativeDllPath = Path.Combine(
+                                Path.GetDirectoryName(modelPath),
+                                "..",
+                                "Native",
+                                "onnxruntime.dll"
+                            );
+                            nativeDllPath = Path.GetFullPath(nativeDllPath);
+                            if (File.Exists(nativeDllPath))
+                            {
+                                var handle = LoadLibrary(nativeDllPath);
+                                Log.Message(handle != IntPtr.Zero
+                                    ? $"[RimTalk] Preloaded native DLL: {nativeDllPath}"
+                                    : $"[RimTalk] Failed to preload native DLL: {nativeDllPath}");
+                            }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            Log.Message($"[RimTalk] Preloaded native DLL: {nativeDllPath}");
+                            Log.Warning($"[RimTalk] Native DLL preload error: {ex.Message}");
                         }
                     }
-                    _nativeLoaded = true;
                 }
 
                 // 驗證模型檔案存在

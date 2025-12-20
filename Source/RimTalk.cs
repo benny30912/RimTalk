@@ -52,7 +52,7 @@ public class RimTalk : GameComponent
 
                 if (mod != null)
                 {
-                    string modelPath = Path.Combine(mod.RootDir, "Resources", "Model", "text2vec-base-chinese.onnx");
+                    string modelPath = Path.Combine(mod.RootDir, "Resources", "Model", "bge-base-zh-v1.5_int8.onnx");
                     string vocabPath = Path.Combine(mod.RootDir, "Resources", "Model", "vocab.txt");
                     VectorService.Instance.Initialize(modelPath, vocabPath);
                 }

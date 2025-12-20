@@ -134,27 +134,48 @@ namespace RimTalk.Source.Memory
 
                 if (result?.Memories == null) return [];
 
-                return result.Memories
-                    .Where(m => m != null)
-                    .Select(m =>
+                var records = result.Memories
+                                    .Where(m => m != null)
+                                    .Select(m =>
+                                    {
+                                        // [MODIFY] 將短碼轉換為完整 Guid
+                                        var resolvedSourceIds = m.SourceIds?
+                                            .Where(s => idMap.ContainsKey(s))
+                                            .Select(s => idMap[s])
+                                            .ToList() ?? [];
+
+                                        var (calculatedTick, avgAccess) = CalculateMergedMetadata(resolvedSourceIds, stmList, currentTick);
+
+                                        return new MemoryRecord
+                                        {
+                                            Summary = m.Summary,
+                                            Keywords = m.Keywords ?? [],
+                                            Importance = Mathf.Clamp(m.Importance, 1, 5),
+                                            CreatedTick = calculatedTick,
+                                            SourceIds = resolvedSourceIds
+                                        };
+                                    }).ToList();
+
+                // [NEW] 批次計算 MTM 向量
+                if (VectorService.Instance.IsInitialized && records.Count > 0)
+                {
+                    try
                     {
-                        // [MODIFY] 將短碼轉換為完整 Guid
-                        var resolvedSourceIds = m.SourceIds?
-                            .Where(s => idMap.ContainsKey(s))
-                            .Select(s => idMap[s])
-                            .ToList() ?? [];
+                        var texts = records.Select(r => r.Summary).ToList();
+                        var vectors = VectorService.Instance.ComputeEmbeddingsBatch(texts);
 
-                        var (calculatedTick, avgAccess) = CalculateMergedMetadata(resolvedSourceIds, stmList, currentTick);
-
-                        return new MemoryRecord
+                        for (int i = 0; i < records.Count && i < vectors.Count; i++)
                         {
-                            Summary = m.Summary,
-                            Keywords = m.Keywords ?? [],
-                            Importance = Mathf.Clamp(m.Importance, 1, 5),
-                            CreatedTick = calculatedTick,
-                            SourceIds = resolvedSourceIds  // [NEW] 儲存來源 ID
-                        };
-                    }).ToList();
+                            VectorDatabase.Instance.AddVector(records[i].Id, vectors[i]);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warning($"[RimTalk] Failed to compute MTM vectors: {ex.Message}");
+                    }
+                }
+
+                return records;
             }
             catch (Exception ex)
             {
@@ -213,28 +234,49 @@ namespace RimTalk.Source.Memory
 
                 if (result?.Memories == null) return [];
 
-                return result.Memories
-                    .Where(m => m != null)
-                    .Select(m =>
+                var records = result.Memories
+                                    .Where(m => m != null)
+                                    .Select(m =>
+                                    {
+                                        // [MODIFY] 將短碼轉換為完整 Guid
+                                        var resolvedSourceIds = m.SourceIds?
+                                            .Where(s => idMap.ContainsKey(s))
+                                            .Select(s => idMap[s])
+                                            .ToList() ?? [];
+
+                                        var (calculatedTick, avgAccess) = CalculateMergedMetadata(resolvedSourceIds, mtmList, currentTick);
+
+                                        return new MemoryRecord
+                                        {
+                                            Summary = m.Summary,
+                                            Keywords = m.Keywords ?? [],
+                                            Importance = Mathf.Clamp(m.Importance, 1, 5),
+                                            CreatedTick = calculatedTick,
+                                            AccessCount = avgAccess,
+                                            SourceIds = resolvedSourceIds
+                                        };
+                                    }).ToList();
+
+                // [NEW] 批次計算 LTM 向量
+                if (VectorService.Instance.IsInitialized && records.Count > 0)
+                {
+                    try
                     {
-                        // [MODIFY] 將短碼轉換為完整 Guid
-                        var resolvedSourceIds = m.SourceIds?
-                            .Where(s => idMap.ContainsKey(s))
-                            .Select(s => idMap[s])
-                            .ToList() ?? [];
+                        var texts = records.Select(r => r.Summary).ToList();
+                        var vectors = VectorService.Instance.ComputeEmbeddingsBatch(texts);
 
-                        var (calculatedTick, avgAccess) = CalculateMergedMetadata(resolvedSourceIds, mtmList, currentTick);
-
-                        return new MemoryRecord
+                        for (int i = 0; i < records.Count && i < vectors.Count; i++)
                         {
-                            Summary = m.Summary,
-                            Keywords = m.Keywords ?? [],
-                            Importance = Mathf.Clamp(m.Importance, 1, 5),
-                            CreatedTick = calculatedTick,
-                            AccessCount = avgAccess,
-                            SourceIds = resolvedSourceIds  // [NEW] 儲存來源 ID
-                        };
-                    }).ToList();
+                            VectorDatabase.Instance.AddVector(records[i].Id, vectors[i]);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warning($"[RimTalk] Failed to compute LTM vectors: {ex.Message}");
+                    }
+                }
+
+                return records;
             }
             catch (Exception ex)
             {
