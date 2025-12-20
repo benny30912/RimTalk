@@ -15,3 +15,5 @@ Directory.Build.props
 Libs/Bubbles.dll
 !Libs/Bubbles.sh
 /.vs
+/Resources/Model/bge-base-zh-v1.5_int8.onnx
+/Resources/Model/vocab.txt

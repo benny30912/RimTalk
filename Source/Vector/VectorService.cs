@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
+using Microsoft.ML.Tokenizers;  // [新增] 官方 Tokenizer 庫
 using Verse;
 
 namespace RimTalk.Vector
@@ -25,14 +26,10 @@ namespace RimTalk.Vector
 
         private InferenceSession _session;
         private bool _isInitialized = false;
-        // 在類別內加入靜態欄位
         private static bool _nativeLoaded = false;
 
-        // 詞表與特殊 Token ID
-        private Dictionary<string, int> _vocab = new Dictionary<string, int>();
-        private int _unkId = 100;
-        private int _clsId = 101;
-        private int _sepId = 102;
+        // [修改] 使用官方 BertTokenizer 取代自定義詞表與方法
+        private BertTokenizer _tokenizer;
 
         public bool IsInitialized => _isInitialized;
 
@@ -64,21 +61,19 @@ namespace RimTalk.Vector
             {
                 Log.Message("[RimTalk] VectorService: Initializing...");
 
-                // 在 Initialize 方法開頭，try 區塊內的第一行加入：
+                // 預先載入原生 DLL（保持不變）
                 if (!_nativeLoaded)
                 {
-                    // 找到模型所在目錄 (Resources/Model/)，然後相對定位到 Resources/Native/
                     string nativeDllPath = Path.Combine(
-                        Path.GetDirectoryName(modelPath),  // Resources/Model/
-                        "..",                              // Resources/
-                        "Native",                          // Resources/Native/
+                        Path.GetDirectoryName(modelPath),
+                        "..",
+                        "Native",
                         "onnxruntime.dll"
                     );
-                    nativeDllPath = Path.GetFullPath(nativeDllPath); // 正規化路徑
+                    nativeDllPath = Path.GetFullPath(nativeDllPath);
 
                     if (File.Exists(nativeDllPath))
                     {
-                        // 使用 Windows API 預先載入原生 DLL
                         var handle = LoadLibrary(nativeDllPath);
                         if (handle == IntPtr.Zero)
                         {
@@ -99,24 +94,32 @@ namespace RimTalk.Vector
                     return;
                 }
 
-                // 2. 設定 ONNX Session 選項
+                // [新增] 載入 BertTokenizer
+                if (!File.Exists(vocabPath))
+                {
+                    Log.Warning($"[RimTalk] VectorService: Vocab not found at: {vocabPath}");
+                    return;
+                }
+
+                // 使用 BertOptions 設定 lowercase（與原實現一致）
+                var options = new BertOptions { LowerCaseBeforeTokenization = true };
+                _tokenizer = BertTokenizer.Create(vocabPath, options);
+                Log.Message($"[RimTalk] BertTokenizer loaded from: {vocabPath}");
+
+                // ONNX Session 設定（保持不變）
                 var sessionOptions = new SessionOptions();
                 sessionOptions.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
-                // 若 CPU 支援，可開啟多線程優化
-                sessionOptions.InterOpNumThreads = 2; 
+                sessionOptions.InterOpNumThreads = 2;
                 sessionOptions.IntraOpNumThreads = 2;
 
                 Log.Message($"[RimTalk] Loading model from: {modelPath}");
                 _session = new InferenceSession(modelPath, sessionOptions);
 
-                // 3. 加載詞表
-                LoadVocabulary(vocabPath);
-
                 _isInitialized = true;
-                
-                // 4. 預熱 (Warmup) - 強制 JIT 編譯與記憶體分配
+
+                // 預熱 (Warmup)
                 Task.Run(() => ComputeEmbedding("Warmup initialization text."));
-                
+
                 Log.Message("[RimTalk] VectorService: Initialization complete!");
             }
             catch (Exception ex)
@@ -161,16 +164,15 @@ namespace RimTalk.Vector
         public static float CosineSimilarity(float[] vec1, float[] vec2)
         {
             if (vec1.Length != vec2.Length) return 0f;
-            
+
             float dot = 0f;
-            // 由於 ComputeEmbedding 輸出的向量已經歸一化，這裡直接算內積即可
-            // 如果不確定來源，建議保留除以 Norm 的步驟
             for (int i = 0; i < vec1.Length; i++)
             {
                 dot += vec1[i] * vec2[i];
             }
-            return dot; 
+            return dot;
         }
+
         /// <summary>
         /// 核心推論邏輯 (支援 Batch)
         /// </summary>
@@ -179,20 +181,26 @@ namespace RimTalk.Vector
             try
             {
                 int batchSize = texts.Count;
-                int maxLen = 128; // 模型限制
+                int maxLen = 128;
 
-                // 1. 準備 Batch Tensors
                 var inputIdsTensor = new DenseTensor<long>(new[] { batchSize, maxLen });
                 var attentionMaskTensor = new DenseTensor<long>(new[] { batchSize, maxLen });
                 var tokenTypeIdsTensor = new DenseTensor<long>(new[] { batchSize, maxLen });
 
-                // 臨時存儲 inputIds 以供 Pooling 使用 (因為 Tensor 讀取較慢)
                 long[][] batchInputIds = new long[batchSize][];
 
-                // 2. Tokenize 每個句子並填入 Tensor
                 for (int b = 0; b < batchSize; b++)
                 {
-                    int[] tokens = Tokenize(texts[b], maxLen);
+                    // [修改] 使用 BertTokenizer.EncodeToIds() 取代自定義 Tokenize()
+                    // [修正] 正確的參數名稱和呼叫方式
+                    var encodedIds = _tokenizer.EncodeToIds(
+                        texts[b],
+                        maxTokenCount: maxLen,  // 修正：maxTokenCount 而非 maxLength
+                        out _,                   // normalizedText
+                        out _                    // charsConsumed
+                    );
+
+                    int[] tokens = encodedIds.ToArray();
                     batchInputIds[b] = new long[tokens.Length];
 
                     for (int i = 0; i < maxLen; i++)
@@ -200,20 +208,18 @@ namespace RimTalk.Vector
                         if (i < tokens.Length)
                         {
                             inputIdsTensor[b, i] = tokens[i];
-                            attentionMaskTensor[b, i] = (tokens[i] == 0) ? 0 : 1; // 0 is PAD
+                            attentionMaskTensor[b, i] = 1;  // [修改] 有 token 就是 1
                             batchInputIds[b][i] = tokens[i];
                         }
                         else
                         {
-                            // Padding
-                            inputIdsTensor[b, i] = 0;
+                            inputIdsTensor[b, i] = 0;  // PAD
                             attentionMaskTensor[b, i] = 0;
                         }
                         tokenTypeIdsTensor[b, i] = 0;
                     }
                 }
 
-                // 3. 執行推論
                 var inputs = new List<NamedOnnxValue>
                 {
                     NamedOnnxValue.CreateFromTensor("input_ids", inputIdsTensor),
@@ -223,10 +229,8 @@ namespace RimTalk.Vector
 
                 using (var results = _session.Run(inputs))
                 {
-                    // 獲取最後一層隱藏狀態 (Last Hidden State): [Batch, SeqLen, HiddenSize]
                     var outputData = results.First().AsEnumerable<float>().ToArray();
-                    
-                    // 4. 對每個 Batch 進行 Mean Pooling
+
                     var embeddings = new List<float[]>();
                     for (int b = 0; b < batchSize; b++)
                     {
@@ -239,7 +243,6 @@ namespace RimTalk.Vector
             catch (Exception ex)
             {
                 Log.Error($"[RimTalk] Inference Error: {ex.Message}");
-                // 發生錯誤時回傳空向量列表
                 return Enumerable.Repeat(new float[768], texts.Count).ToList();
             }
         }
@@ -253,7 +256,6 @@ namespace RimTalk.Vector
             float[] pooled = new float[HIDDEN_DIM];
             int validCount = 0;
 
-            // flatOutput 是展平的陣列，需要計算 offset
             int batchOffset = batchIndex * seqLen * HIDDEN_DIM;
 
             for (int i = 0; i < seqLen; i++)
@@ -291,94 +293,6 @@ namespace RimTalk.Vector
             }
 
             return pooled;
-        }
-
-        private int[] Tokenize(string text, int maxLen)
-        {
-            var tokens = new List<int> { _clsId };
-            text = text.ToLowerInvariant();
-
-            for (int i = 0; i < text.Length && tokens.Count < maxLen - 1; i++)
-            {
-                char c = text[i];
-                if (IsChinese(c))
-                {
-                    string s = c.ToString();
-                    tokens.Add(_vocab.ContainsKey(s) ? _vocab[s] : _unkId);
-                }
-                else if (!char.IsWhiteSpace(c))
-                {
-                    int start = i;
-                    while (i < text.Length && !char.IsWhiteSpace(text[i]) && !IsChinese(text[i])) i++;
-                    i--;
-                    
-                    string word = text.Substring(start, i - start + 1);
-                    tokens.AddRange(WordPieceTokenize(word));
-                }
-            }
-
-            tokens.Add(_sepId);
-            return tokens.ToArray();
-        }
-
-        private IEnumerable<int> WordPieceTokenize(string word)
-        {
-            // 這裡保留你原始的 WordPiece 邏輯
-            if (_vocab.TryGetValue(word, out int id)) return new[] { id };
-
-            var subTokens = new List<int>();
-            int start = 0;
-            bool isBad = false;
-
-            while (start < word.Length)
-            {
-                int end = word.Length;
-                int curId = -1;
-                while (start < end)
-                {
-                    string sub = word.Substring(start, end - start);
-                    if (start > 0) sub = "##" + sub;
-                    if (_vocab.TryGetValue(sub, out int foundId))
-                    {
-                        curId = foundId;
-                        break;
-                    }
-                    end--;
-                }
-                if (curId == -1) { isBad = true; break; }
-                subTokens.Add(curId);
-                start = end;
-            }
-            return isBad ? new[] { _unkId } : subTokens;
-        }
-
-        private bool IsChinese(char c)
-        {
-            return (c >= 0x4E00 && c <= 0x9FFF) || 
-                   (c >= 0x3400 && c <= 0x4DBF) || 
-                   (c >= 0x20000 && c <= 0x2A6DF);
-        }
-
-        private void LoadVocabulary(string vocabPath)
-        {
-            try
-            {
-                if (!File.Exists(vocabPath)) return;
-
-                var lines = File.ReadAllLines(vocabPath);
-                for (int i = 0; i < lines.Length; i++)
-                {
-                    if (!string.IsNullOrEmpty(lines[i])) _vocab[lines[i]] = i;
-                }
-
-                if (_vocab.ContainsKey("[UNK]")) _unkId = _vocab["[UNK]"];
-                if (_vocab.ContainsKey("[CLS]")) _clsId = _vocab["[CLS]"];
-                if (_vocab.ContainsKey("[SEP]")) _sepId = _vocab["[SEP]"];
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"[RimTalk] Vocab Load Error: {ex.Message}");
-            }
         }
     }
 }
