@@ -1,13 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using RimTalk.Data;
+﻿using RimTalk.Data;
 using RimTalk.Source.Data;
 using RimTalk.Source.Memory;
 using RimTalk.UI;
 using RimTalk.Util;
+using RimTalk.Vector;
 using RimWorld;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Verse;
 using Cache = RimTalk.Data.Cache;
 using Logger = RimTalk.Util.Logger;
@@ -254,10 +255,25 @@ public static class TalkService
             AccessCount = 0
         };
 
+        // 為每位參與者建立獨立副本並記錄
+        var copies = new List<MemoryRecord>();
         foreach (var pawn in pawns)
         {
             TalkHistory.AddMessageHistory(pawn, prompt, serializedResponses);
-            MemoryService.OnShortMemoriesGenerated(pawn, memoryRecord);
+            var copy = memoryRecord.Clone();
+            copies.Add(copy);
+            MemoryService.OnShortMemoriesGenerated(pawn, copy);
+        }
+
+        // [NEW] 只計算一次向量，複製給所有參與者
+        if (copies.Count > 0)
+        {
+            var primaryId = copies[0].Id;
+            var copyToIds = copies.Count > 1
+                ? copies.Skip(1).Select(c => c.Id).ToList()
+                : null;  // 單人時傳 null
+
+            VectorQueueService.Instance.Enqueue(primaryId, summary, copyToIds);
         }
     }
 

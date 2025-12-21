@@ -39,12 +39,28 @@ namespace RimTalk.Source.Memory
         /// </summary>
         public int CreatedTick;
 
-        // [NEW] 來源記憶 ID 列表 (用於追蹤合併來源)
+        // [MODIFY] 暫存用途，不序列化
         public List<Guid> SourceIds = [];
 
         // [NEW] Guid 序列化用的臨時字串
         private string _idString;
-        private List<string> _sourceIdStrings;
+
+        /// <summary>
+        /// 建立獨立副本（新 ID）
+        /// </summary>
+        public MemoryRecord Clone()
+        {
+            return new MemoryRecord
+            {
+                Id = Guid.NewGuid(),  // 新 ID
+                Summary = this.Summary,
+                Keywords = new List<string>(this.Keywords ?? new List<string>()),
+                Importance = this.Importance,
+                AccessCount = 0,  // 新記憶從 0 開始
+                CreatedTick = this.CreatedTick,
+                SourceIds = []
+            };
+        }
 
         public void ExposeData()
         {
@@ -61,14 +77,12 @@ namespace RimTalk.Source.Memory
             Scribe_Values.Look(ref AccessCount, "accessCount");
             Scribe_Values.Look(ref CreatedTick, "createdTick");
 
-            // [NEW] 序列化 SourceIds
-            if (Scribe.mode == LoadSaveMode.Saving)
-                _sourceIdStrings = SourceIds?.ConvertAll(g => g.ToString()) ?? [];
-            Scribe_Collections.Look(ref _sourceIdStrings, "sourceIds", LookMode.Value);
+            // [REMOVE] SourceIds 不再序列化
+            // 載入後初始化為空列表
             if (Scribe.mode == LoadSaveMode.PostLoadInit)
             {
-                SourceIds = _sourceIdStrings?.ConvertAll(s => Guid.Parse(s)) ?? [];
                 Keywords ??= [];
+                SourceIds = [];
             }
         }
     }

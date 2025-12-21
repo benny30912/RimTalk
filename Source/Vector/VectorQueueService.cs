@@ -59,9 +59,9 @@ namespace RimTalk.Vector
         // === 公開 API（方法重載）===
 
         /// <summary>
-        /// 記憶向量入口
+        /// 記憶向量入口（可選：複製給多個 ID）
         /// </summary>
-        public void Enqueue(Guid memoryId, string text)
+        public void Enqueue(Guid memoryId, string text, List<Guid> copyToIds = null)
         {
             if (string.IsNullOrWhiteSpace(text)) return;
             if (VectorDatabase.Instance.GetVector(memoryId) != null) return;
@@ -71,7 +71,8 @@ namespace RimTalk.Vector
             {
                 Type = VectorType.Memory,
                 MemoryId = memoryId,
-                Text = text
+                Text = text,
+                CopyToIds = copyToIds
             });
         }
 
@@ -182,6 +183,12 @@ namespace RimTalk.Vector
                             {
                                 case VectorType.Memory:
                                     VectorDatabase.Instance.AddVector(req.MemoryId, vectors[i]);
+                                    // [NEW] 複製給其他 ID
+                                    if (req.CopyToIds != null)
+                                    {
+                                        foreach (var copyId in req.CopyToIds)
+                                            VectorDatabase.Instance.AddVector(copyId, vectors[i]);
+                                    }
                                     break;
                                 case VectorType.ContextDef:
                                 case VectorType.ContextText:
@@ -291,7 +298,6 @@ namespace RimTalk.Vector
                             _pendingIds.TryRemove(req.MemoryId, out _);
                         else
                             _pendingIds.TryRemove(new Guid(req.ContextKey, 0, 0, new byte[8]), out _);
-
                         var vector = VectorService.Instance.LocalComputeEmbedding(req.Text, false);
                         if (vector != null)
                         {
@@ -299,6 +305,12 @@ namespace RimTalk.Vector
                             {
                                 case VectorType.Memory:
                                     VectorDatabase.Instance.AddVector(req.MemoryId, vector);
+                                    // [NEW] 複製給其他 ID
+                                    if (req.CopyToIds?.Count > 0)
+                                    {
+                                        foreach (var copyId in req.CopyToIds)
+                                            VectorDatabase.Instance.AddVector(copyId, vector);
+                                    }
                                     break;
                                 case VectorType.ContextDef:
                                 case VectorType.ContextText:
@@ -325,9 +337,10 @@ namespace RimTalk.Vector
         private class VectorRequest
         {
             public VectorType Type;
-            public Guid MemoryId;     // Type == Memory 時使用
-            public int ContextKey;    // Type == ContextDef/ContextText 時使用
+            public Guid MemoryId;
+            public int ContextKey;
             public string Text;
+            public List<Guid> CopyToIds;  // [NEW] 複製向量的目標 ID
         }
     }
 }

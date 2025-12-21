@@ -79,8 +79,7 @@ namespace RimTalk.Source.Memory
         {
             bool thresholdReached = AddMemoryInternal(pawn, memory);
 
-            // [MODIFY] 將向量計算加入佇列（非阻塞）
-            VectorQueueService.Instance.Enqueue(memory.Id, memory.Summary);
+            // [REMOVE] 不在這裡 Enqueue，由 TalkService 批次處理
 
             if (thresholdReached)
             {
