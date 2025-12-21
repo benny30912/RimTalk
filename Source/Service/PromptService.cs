@@ -158,7 +158,7 @@ public static class PromptService
                 if (pawn == null) continue;
 
                 // === 批次向量計算 ===
-                var contextVectors = SemanticCache.Instance.GetVectorsBatch(pawnData.Items);
+                var contextVectors = SemanticCache.Instance.GetVectorsBatch(pawnData.Items, isQuery: true);
 
                 // === 記憶檢索（語意向量 Max-Sim）===
                 var memories = MemoryRetriever.GetRelevantMemoriesBySemantic(

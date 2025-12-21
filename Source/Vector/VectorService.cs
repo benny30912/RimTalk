@@ -141,31 +141,46 @@ namespace RimTalk.Vector
             }
         }
 
+        // BGE 模型在進行「查詢 (Query)」的向量化時，通常需要加上特定的前綴指令，而在將「文件/記憶 (Document)」寫入資料庫時則不需要。
+        // 這裡的「查詢」與「文件」，指的是如果我們根據上下文尋找語意最相關的記憶，那麼上下文向量是「查詢」需要特定前綴，而記憶向量是「文件」不需要。
+        // BGE 模型的查詢前綴指令
+        private const string BGE_QUERY_PREFIX = "为这个句子生成表示以用于检索相关文章：";
+
         /// <summary>
         /// [同步] 計算單一句子的向量 (768維)
-        /// 注意：這會佔用 CPU 約 30-100ms，盡量不要在主執行緒頻繁呼叫。
         /// </summary>
-        public float[] ComputeEmbedding(string text)
+        /// <param name="text">輸入文本</param>
+        /// <param name="isQuery">是否為查詢（true=加前綴，false=文件不加前綴）</param>
+        public float[] ComputeEmbedding(string text, bool isQuery = false)
         {
             if (!_isInitialized || string.IsNullOrWhiteSpace(text)) return new float[768];
 
+            // BGE 查詢需要加前綴
+            string input = isQuery ? BGE_QUERY_PREFIX + text : text;
+
             lock (_inferenceLock)
             {
-                return InternalInference(new List<string> { text }).First();
+                return InternalInference(new List<string> { input }).First();
             }
         }
 
         /// <summary>
         /// [批次] 一次計算多個句子的向量
-        /// 優勢：比呼叫多次 ComputeEmbedding 快得多。適合環境標籤生成。
         /// </summary>
-        public List<float[]> ComputeEmbeddingsBatch(List<string> texts)
+        /// <param name="texts">輸入文本列表</param>
+        /// <param name="isQuery">是否為查詢（true=加前綴，false=文件不加前綴）</param>
+        public List<float[]> ComputeEmbeddingsBatch(List<string> texts, bool isQuery = false)
         {
             if (!_isInitialized || texts == null || texts.Count == 0) return new List<float[]>();
 
+            // BGE 查詢需要加前綴
+            var inputs = isQuery
+                ? texts.Select(t => BGE_QUERY_PREFIX + t).ToList()
+                : texts;
+
             lock (_inferenceLock)
             {
-                return InternalInference(texts);
+                return InternalInference(inputs);
             }
         }
 

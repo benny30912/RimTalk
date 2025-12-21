@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using UnityEngine.UIElements;
 using Verse;
 
 namespace RimTalk.Vector
@@ -50,7 +51,7 @@ namespace RimTalk.Vector
         /// </summary>
         /// <param name="items">Context 項目清單</param>
         /// <returns>向量清單（順序對應）</returns>
-        public List<float[]> GetVectorsBatch(List<ContextItem> items)
+        public List<float[]> GetVectorsBatch(List<ContextItem> items, bool isQuery = false)
         {
             if (items == null || items.Count == 0 || !VectorService.Instance.IsInitialized)
                 return new List<float[]>();
@@ -103,7 +104,7 @@ namespace RimTalk.Vector
             // === 階段二：批次計算未命中項目 ===
             if (uncachedTexts.Count > 0)
             {
-                var computed = VectorService.Instance.ComputeEmbeddingsBatch(uncachedTexts);
+                var computed = VectorService.Instance.ComputeEmbeddingsBatch(uncachedTexts, isQuery);
 
                 // === 階段三：填回結果並更新快取 ===
                 for (int j = 0; j < uncachedIndices.Count && j < computed.Count; j++)
