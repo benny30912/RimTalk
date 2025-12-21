@@ -37,16 +37,19 @@ public static class Constant
                                                     FORMAT:
                                                     {{"name":"角色名","text":"对话"}}
                                                     ...
-                                                    {{"summary":"摘要","keywords":["人名"],"importance":1}}
-                                                    [SUMMARY] 第三人称概括,保留独有细节,禁止相对时间
-                                                    [KEYWORDS] 列出对话中涉及或提及的所有人名(不含:{0}),无则留空
-                                                    [IMPORTANCE] 1琐碎|2普通|3值得记住|4重大|5刻骨铭心 (日常=1)
+                                                    {{"summary":"摘要","keywords":["标签1","标签2",...],"importance":1-5}}
+                                                    [summary] 新闻摘要风格概括：
+                                                    - 主词-动词-受词结构，必须保留涉及人名
+                                                    - 简洁但能捕捉到情感本质。如果使用了重要的昵称、侮辱性词语或戏剧性比喻，请保留它们。
+                                                    - 禁止相对时间（"昨天"等）
+                                                    [keywords] 列出对话中涉及的**重要**地点名或物品名（最多3个），无则留空
+                                                    [importance] 1琐碎|2普通|3值得记住|4重大|5刻骨铭心 (日常=1)
                                                     [EXAMPLE]
-                                                    INPUT: 青木 monologue about cold weather, complaining
+                                                    INPUT: Alice 在研究室向 Bob 展示新发明的义肢
                                                     OUTPUT:
-                                                    {{"name":"青木","text":"（搓手）这鬼天气冻死人了。"}}
-                                                    {{"name":"青木","text":"（叹气）算了，找点活干暖和暖和。"}}
-                                                    {{"summary":"青木抱怨天气寒冷,决定找些活干取暖。","keywords":[],"importance":1}}
+                                                    {"name":"Alice","text":"看，这是我设计的新型义肢！"}
+                                                    {"name":"Bob","text":"（活动手指）这比我的手还灵活，要不咱换换？"}
+                                                    {"summary":"Alice在研究室向Bob展示新设计的义肢，Bob 开玩笑说比自己的手还灵活。","keywords":["研究室","义肢"],"importance":2}
                                                     """;
 
     private const string SocialInstruction = """

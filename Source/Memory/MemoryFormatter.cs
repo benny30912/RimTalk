@@ -158,7 +158,9 @@ namespace RimTalk.Source.Memory
             foreach (var m in memories)
             {
                 string timeAgo = GetTimeAgo(m.CreatedTick);
-                sb.AppendLine($"- [{timeAgo}] {m.Summary}");
+                // [NEW] 顯示 keywords（地點/物品標籤）
+                string tags = m.Keywords.NullOrEmpty() ? "" : $" [{string.Join(", ", m.Keywords)}]";
+                sb.AppendLine($"- [{timeAgo}]{tags} {m.Summary}");
             }
             return sb.ToString();
         }

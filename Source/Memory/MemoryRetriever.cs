@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Verse;
+using static Mono.Security.X509.X520;
 
 namespace RimTalk.Source.Memory
 {
@@ -90,13 +91,14 @@ namespace RimTalk.Source.Memory
                     if (semanticScore < semanticThreshold) semanticScore = 0f;
                 }
 
-                // 人名匹配加分
+                // 人名匹配加分（改為 Summary 全文搜索）
                 float nameBonus = 0f;
-                if (contextNames != null && !mem.Keywords.NullOrEmpty())
+                if (contextNames != null && !string.IsNullOrEmpty(mem.Summary))
                 {
-                    foreach (var keyword in mem.Keywords)
+                    foreach (var name in contextNames)
                     {
-                        if (contextNames.Contains(keyword))
+                        // 使用 Contains 允許模糊聯想
+                        if (mem.Summary.Contains(name))
                             nameBonus += W_nameBonus;
                     }
                 }
