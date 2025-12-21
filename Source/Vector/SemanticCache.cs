@@ -227,5 +227,15 @@ namespace RimTalk.Vector
                 vector[i] = reader.ReadSingle();
             return vector;
         }
+
+        /// <summary>
+        /// 清空所有快取
+        /// </summary>
+        public void Clear()
+        {
+            _defCache.Clear();
+            _textCache.Clear();
+            Log.Message("[RimTalk] SemanticCache cleared");
+        }
     }
 }

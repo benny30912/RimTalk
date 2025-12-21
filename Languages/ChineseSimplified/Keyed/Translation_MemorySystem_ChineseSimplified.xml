@@ -76,4 +76,12 @@
   <RimTalk.Describer.Suppression.Cowed>完全顺从，不太可能反抗</RimTalk.Describer.Suppression.Cowed>
 
   <RimTalk.Keywords>关键词（以逗号分隔）</RimTalk.Keywords>
+
+  <RimTalk.Settings.VectorServiceHeader>语意向量服务</RimTalk.Settings.VectorServiceHeader>
+  <RimTalk.Settings.UseCloudVector>使用云端服务 (SiliconFlow bge-m3)</RimTalk.Settings.UseCloudVector>
+  <RimTalk.Settings.UseLocalVector>使用本地模型 (bge-base-zh-v1.5)</RimTalk.Settings.UseLocalVector>
+  <RimTalk.Settings.CloudVectorDesc>需要 SiliconFlow API Key，支援更长文本</RimTalk.Settings.CloudVectorDesc>
+  <RimTalk.Settings.LocalVectorDesc>免费离线运行，适合大多数场景</RimTalk.Settings.LocalVectorDesc>
+  <RimTalk.Settings.VectorModeChangeWarning>切换模型将导致旧的记忆索引失效，需要重新生成记忆快取。是否继续？ </RimTalk.Settings.VectorModeChangeWarning>
+  <RimTalk.Settings.VectorCacheCleared>向量快取已清除</RimTalk.Settings.VectorCacheCleared>
 </LanguageData>

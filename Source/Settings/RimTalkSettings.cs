@@ -16,6 +16,10 @@ public class RimTalkSettings : ModSettings
     public List<ApiConfig> MemoryConfigs = [];
     public int CurrentMemoryConfigIndex = 0;
 
+    // 雲端語意向量服務
+    public bool UseCloudVectorService = false;
+    public string VectorApiKey = "";
+
     // [NEW] Keyword Weight (Missing in current version)
     public float SemanticWeight = 9.0f;
 

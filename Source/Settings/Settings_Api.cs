@@ -1,11 +1,12 @@
-﻿using System;
+﻿using RimTalk.Client.OpenAI;
+using RimTalk.Data;
+using RimTalk.Util;
+using RimTalk.Vector;
+using RimWorld;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using RimTalk.Client.OpenAI;
-using RimTalk.Data;
-using RimTalk.Util;
-using RimWorld;
 using UnityEngine;
 using UnityEngine.Networking;
 using Verse;
@@ -46,7 +47,7 @@ public partial class Settings
             await Task.Delay(100);
         }
 
-        if (webRequest.isNetworkError || webRequest.isHttpError)
+        if (webRequest.result == UnityWebRequest.Result.ConnectionError || webRequest.result == UnityWebRequest.Result.ProtocolError)
         {
             Logger.Error($"Failed to fetch models: {webRequest.error}");
         }
@@ -174,6 +175,9 @@ public partial class Settings
         // [NEW] Add Memory Settings Section
         listingStandard.GapLine();
         DrawMemorySettings(listingStandard, settings);
+
+        listingStandard.GapLine();
+        DrawVectorServiceSettings(listingStandard, settings);
     }
 
     // [NEW] DrawMemorySettings Method
@@ -232,6 +236,90 @@ public partial class Settings
                 DrawCloudConfigRow(listingStandard, settings.MemoryConfigs[i], i, settings.MemoryConfigs);
                 listingStandard.Gap(3f);
             }
+        }
+    }
+
+    // [NEW] 語意向量服務設定
+    private bool _pendingVectorModeChange = false;
+    private bool _pendingVectorModeValue = false;
+
+    private void DrawVectorServiceSettings(Listing_Standard listingStandard, RimTalkSettings settings)
+    {
+        // 標題
+        Rect headerRect = listingStandard.GetRect(24f);
+        Widgets.Label(headerRect, "RimTalk.Settings.VectorServiceHeader".Translate());
+
+        listingStandard.Gap(6f);
+
+        // 雲端選項
+        Rect cloudRect = listingStandard.GetRect(24f);
+        bool newValue = settings.UseCloudVectorService;
+        if (Widgets.RadioButtonLabeled(cloudRect, "RimTalk.Settings.UseCloudVector".Translate(), settings.UseCloudVectorService))
+        {
+            if (!settings.UseCloudVectorService)
+            {
+                _pendingVectorModeChange = true;
+                _pendingVectorModeValue = true;
+            }
+        }
+
+        // 雲端描述
+        Text.Font = GameFont.Tiny;
+        GUI.color = Color.gray;
+        Rect cloudDescRect = listingStandard.GetRect(Text.LineHeight);
+        Widgets.Label(cloudDescRect, "RimTalk.Settings.CloudVectorDesc".Translate());
+        GUI.color = Color.white;
+        Text.Font = GameFont.Small;
+
+        // API Key（僅雲端模式顯示）
+        if (settings.UseCloudVectorService)
+        {
+            listingStandard.Gap(3f);
+            Rect apiKeyRect = listingStandard.GetRect(24f);
+            Rect labelRect = new Rect(apiKeyRect.x, apiKeyRect.y, 80f, apiKeyRect.height);
+            Rect inputRect = new Rect(apiKeyRect.x + 85f, apiKeyRect.y, 300f, apiKeyRect.height);
+            Widgets.Label(labelRect, "API Key:");
+            settings.VectorApiKey = Widgets.TextField(inputRect, settings.VectorApiKey);
+        }
+
+        listingStandard.Gap(3f);
+
+        // 本地選項
+        Rect localRect = listingStandard.GetRect(24f);
+        if (Widgets.RadioButtonLabeled(localRect, "RimTalk.Settings.UseLocalVector".Translate(), !settings.UseCloudVectorService))
+        {
+            if (settings.UseCloudVectorService)
+            {
+                _pendingVectorModeChange = true;
+                _pendingVectorModeValue = false;
+            }
+        }
+
+        // 本地描述
+        Text.Font = GameFont.Tiny;
+        GUI.color = Color.gray;
+        Rect localDescRect = listingStandard.GetRect(Text.LineHeight);
+        Widgets.Label(localDescRect, "RimTalk.Settings.LocalVectorDesc".Translate());
+        GUI.color = Color.white;
+        Text.Font = GameFont.Small;
+
+        // 處理模式切換確認
+        if (_pendingVectorModeChange)
+        {
+            _pendingVectorModeChange = false;
+            Find.WindowStack.Add(new Dialog_MessageBox(
+                "RimTalk.Settings.VectorModeChangeWarning".Translate(),
+                "RimTalk.Confirm".Translate(),
+                () => {
+                    settings.UseCloudVectorService = _pendingVectorModeValue;
+                    // 清除快取
+                    VectorDatabase.Instance.Clear();
+                    SemanticCache.Instance.Clear();
+                    Messages.Message("RimTalk.Settings.VectorCacheCleared".Translate(), MessageTypeDefOf.NeutralEvent);
+                },
+                "RimTalk.Cancel".Translate(),
+                null
+            ));
         }
     }
 

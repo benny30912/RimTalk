@@ -147,37 +147,64 @@ namespace RimTalk.Vector
         private const string BGE_QUERY_PREFIX = "为这个句子生成表示以用于检索相关文章：";
 
         /// <summary>
-        /// [同步] 計算單一句子的向量 (768維)
+        /// 計算嵌入向量（自動選擇雲端或本地）
         /// </summary>
-        /// <param name="text">輸入文本</param>
-        /// <param name="isQuery">是否為查詢（true=加前綴，false=文件不加前綴）</param>
         public float[] ComputeEmbedding(string text, bool isQuery = false)
         {
-            if (!_isInitialized || string.IsNullOrWhiteSpace(text)) return new float[768];
+            if (string.IsNullOrWhiteSpace(text)) return GetEmptyVector();
 
-            // BGE 查詢需要加前綴
+            // 根據設定選擇服務
+            if (Settings.Get().UseCloudVectorService)
+            {
+                return CloudVectorClient.Instance.ComputeEmbedding(text);
+            }
+            else
+            {
+                return LocalComputeEmbedding(text, isQuery);
+            }
+        }
+
+        /// <summary>
+        /// 批次計算嵌入向量（自動選擇雲端或本地）
+        /// </summary>
+        public List<float[]> ComputeEmbeddingsBatch(List<string> texts, bool isQuery = false)
+        {
+            if (texts == null || texts.Count == 0) return new List<float[]>();
+
+            if (Settings.Get().UseCloudVectorService)
+            {
+                return CloudVectorClient.Instance.ComputeEmbeddingsBatch(texts);
+            }
+            else
+            {
+                return LocalComputeEmbeddingsBatch(texts, isQuery);
+            }
+        }
+
+        /// <summary>
+        /// 取得空向量（維度根據模式不同）
+        /// </summary>
+        public float[] GetEmptyVector()
+        {
+            int dim = Settings.Get().UseCloudVectorService ? 1024 : 768;
+            return new float[dim];
+        }
+
+        // 將原本的 ComputeEmbedding 改名為 LocalComputeEmbedding
+        private float[] LocalComputeEmbedding(string text, bool isQuery)
+        {
+            if (!_isInitialized) return new float[768];
             string input = isQuery ? BGE_QUERY_PREFIX + text : text;
-
             lock (_inferenceLock)
             {
                 return InternalInference(new List<string> { input }).First();
             }
         }
 
-        /// <summary>
-        /// [批次] 一次計算多個句子的向量
-        /// </summary>
-        /// <param name="texts">輸入文本列表</param>
-        /// <param name="isQuery">是否為查詢（true=加前綴，false=文件不加前綴）</param>
-        public List<float[]> ComputeEmbeddingsBatch(List<string> texts, bool isQuery = false)
+        private List<float[]> LocalComputeEmbeddingsBatch(List<string> texts, bool isQuery)
         {
-            if (!_isInitialized || texts == null || texts.Count == 0) return new List<float[]>();
-
-            // BGE 查詢需要加前綴
-            var inputs = isQuery
-                ? texts.Select(t => BGE_QUERY_PREFIX + t).ToList()
-                : texts;
-
+            if (!_isInitialized) return texts.Select(_ => new float[768]).ToList();
+            var inputs = isQuery ? texts.Select(t => BGE_QUERY_PREFIX + t).ToList() : texts;
             lock (_inferenceLock)
             {
                 return InternalInference(inputs);
