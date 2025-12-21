@@ -80,6 +80,11 @@ namespace RimTalk.Source.Memory
                 // 語意相似度（Max-Sim）
                 float semanticScore = 0f;
                 var memVector = VectorDatabase.Instance.GetVector(mem.Id);
+                // [NEW] 缺失向量：加入佇列非阻塞補算（下次檢索時會命中）
+                if (memVector == null && !string.IsNullOrEmpty(mem.Summary))
+                {
+                    VectorQueueService.Instance.Enqueue(mem.Id, mem.Summary);
+                }
                 if (memVector != null)
                 {
                     foreach (var cv in contextVectors)

@@ -70,6 +70,14 @@ public static class JsonUtil
             return string.Empty;
         }
 
+        // [NEW] 修復 LLM 常見錯誤：{"name":"summary":"..."} → {"summary":"..."}
+        // 此錯誤發生在 LLM 誤將 field name 當作 value
+        sanitized = Regex.Replace(
+            sanitized,
+            @"""name""\s*:\s*""summary""\s*:\s*",
+            @"""summary"":"
+        );
+
         sanitized = Regex.Replace(
             sanitized, 
             @"""([^""]+)""\s*:\s*([,}])", 

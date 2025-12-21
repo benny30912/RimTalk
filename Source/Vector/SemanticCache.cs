@@ -4,7 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using UnityEngine.UIElements;
+using System.Threading.Tasks;
 using Verse;
 
 namespace RimTalk.Vector
@@ -46,35 +46,29 @@ namespace RimTalk.Vector
         private SemanticCache() { }
 
         /// <summary>
-        /// [NEW] 批次取得向量（快取優先 + 批次計算未命中項目）
-        /// 優勢：比逐個呼叫 GetVectorForDef/Text 快得多
+        /// [MODIFY] 批次取得向量（快取優先 + 異步計算未命中項目）
+        /// 雲端模式：async 計算，失敗時加入佇列
+        /// 本地模式：同步計算
         /// </summary>
-        /// <param name="items">Context 項目清單</param>
-        /// <returns>向量清單（順序對應）</returns>
-        public List<float[]> GetVectorsBatch(List<ContextItem> items, bool isQuery = false)
+        public async Task<List<float[]>> GetVectorsBatchAsync(List<ContextItem> items, bool isQuery = false)
         {
-            if (items == null || items.Count == 0 || !VectorService.Instance.IsInitialized)
+            if (items == null || items.Count == 0)
                 return new List<float[]>();
-
-            var results = new float[items.Count][];    // 保持與輸入相同順序
-            var uncachedIndices = new List<int>();     // 未命中快取的索引
-            var uncachedTexts = new List<string>();    // 未命中快取的文本
-            var uncachedKeys = new List<int>();        // 未命中快取的 Key
-
+            var results = new float[items.Count][];
+            var uncachedIndices = new List<int>();
+            var uncachedTexts = new List<string>();
+            var uncachedKeys = new List<int>();
             // === 階段一：查詢快取 ===
             for (int i = 0; i < items.Count; i++)
             {
                 var item = items[i];
                 int key;
                 string text;
-
                 if (item.Type == ContextItem.ItemType.Def)
                 {
                     if (item.Def == null) continue;
                     key = item.Def.shortHash;
                     text = SemanticMapper.GetSemanticTextFromDef(item.Def);
-
-                    // 查詢 Def 快取
                     if (_defCache.TryGetValue(key, out var cached))
                     {
                         results[i] = cached;
@@ -86,34 +80,56 @@ namespace RimTalk.Vector
                     if (string.IsNullOrWhiteSpace(item.Text)) continue;
                     text = item.Text;
                     key = text.GetHashCode();
-
-                    // 查詢 Text 快取
                     if (_textCache.TryGetValue(key, out var cached))
                     {
                         results[i] = cached;
                         continue;
                     }
                 }
-
-                // 未命中，加入待計算清單
                 uncachedIndices.Add(i);
                 uncachedTexts.Add(text);
                 uncachedKeys.Add(key);
             }
-
-            // === 階段二：批次計算未命中項目 ===
+            // === 階段二：計算未命中項目 ===
             if (uncachedTexts.Count > 0)
             {
-                var computed = VectorService.Instance.ComputeEmbeddingsBatch(uncachedTexts, isQuery);
-
+                List<float[]> computed;
+                if (Settings.Get().UseCloudVectorService)
+                {
+                    // 雲端模式：異步計算，失敗時加入佇列
+                    try
+                    {
+                        computed = await CloudVectorClient.Instance.ComputeEmbeddingsBatchAsync(uncachedTexts);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning($"[RimTalk] Context 向量計算失敗，加入佇列: {ex.Message}");
+                        for (int j = 0; j < uncachedTexts.Count; j++)
+                        {
+                            int idx = uncachedIndices[j];
+                            var item = items[idx];
+                            int key = uncachedKeys[j];
+                            VectorType type = item.Type == ContextItem.ItemType.Def
+                                ? VectorType.ContextDef
+                                : VectorType.ContextText;
+                            VectorQueueService.Instance.Enqueue(type, key, uncachedTexts[j]);
+                        }
+                        computed = new List<float[]>();
+                    }
+                }
+                else
+                {
+                    // 本地模式：在背景執行緒計算
+                    computed = await Task.Run(() =>
+                        VectorService.Instance.LocalComputeEmbeddingsBatch(uncachedTexts, isQuery)
+                    );
+                }
                 // === 階段三：填回結果並更新快取 ===
                 for (int j = 0; j < uncachedIndices.Count && j < computed.Count; j++)
                 {
                     int i = uncachedIndices[j];
                     int key = uncachedKeys[j];
                     results[i] = computed[j];
-
-                    // 更新對應的快取
                     var item = items[i];
                     if (item.Type == ContextItem.ItemType.Def)
                         _defCache.TryAdd(key, computed[j]);
@@ -121,9 +137,27 @@ namespace RimTalk.Vector
                         _textCache.TryAdd(key, computed[j]);
                 }
             }
-
-            // 過濾掉 null（可能因為空項目）
             return results.Where(v => v != null).ToList();
+        }
+
+        /// <summary>
+        /// 檢查是否已有快取向量
+        /// </summary>
+        public bool HasCachedVector(VectorType type, int key)
+        {
+            return type == VectorType.ContextDef
+                ? _defCache.ContainsKey(key)
+                : _textCache.ContainsKey(key);
+        }
+        /// <summary>
+        /// 外部寫入快取（供佇列處理器使用）
+        /// </summary>
+        public void AddToCache(VectorType type, int key, float[] vector)
+        {
+            if (type == VectorType.ContextDef)
+                _defCache.TryAdd(key, vector);
+            else
+                _textCache.TryAdd(key, vector);
         }
 
         /// <summary>

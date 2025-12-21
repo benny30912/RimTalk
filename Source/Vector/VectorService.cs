@@ -29,6 +29,10 @@ namespace RimTalk.Vector
         private bool _isInitialized = false;
         private static bool _nativeLoaded = false;
 
+        // [NEW] 模型路徑（供延遲載入使用）
+        private string _modelPath;
+        private string _vocabPath;
+
         // [修改] 使用官方 BertTokenizer 取代自定義詞表與方法
         private BertTokenizer _tokenizer;
 
@@ -130,7 +134,7 @@ namespace RimTalk.Vector
                 _isInitialized = true;
 
                 // 預熱 (Warmup)
-                Task.Run(() => ComputeEmbedding("Warmup initialization text."));
+                Task.Run(() => LocalComputeEmbedding("Warmup initialization text.", false));
 
                 Log.Message("[RimTalk] VectorService: Initialization complete!");
             }
@@ -141,57 +145,57 @@ namespace RimTalk.Vector
             }
         }
 
-        // BGE 模型在進行「查詢 (Query)」的向量化時，通常需要加上特定的前綴指令，而在將「文件/記憶 (Document)」寫入資料庫時則不需要。
+        /// <summary>
+        /// 卸載本地模型，釋放記憶體
+        /// </summary>
+        public void UnloadLocal()
+        {
+            lock (_inferenceLock)
+            {
+                if (_session != null)
+                {
+                    _session.Dispose();
+                    _session = null;
+                }
+                _tokenizer = null;
+                _isInitialized = false;
+                Log.Message("[RimTalk] VectorService: 本地模型已卸載");
+            }
+        }
+        /// <summary>
+        /// 背景載入本地模型（異步）
+        /// </summary>
+        public Task LoadLocalAsync()
+        {
+            return Task.Run(() =>
+            {
+                if (string.IsNullOrEmpty(_modelPath) || string.IsNullOrEmpty(_vocabPath))
+                {
+                    Log.Warning("[RimTalk] VectorService: 模型路徑未設定，無法載入");
+                    return;
+                }
+
+                Log.Message("[RimTalk] VectorService: 開始背景載入本地模型...");
+                Initialize(_modelPath, _vocabPath);
+            });
+        }
+        /// <summary>
+        /// 設定模型路徑（供延遲載入使用）
+        /// </summary>
+        public void SetModelPaths(string modelPath, string vocabPath)
+        {
+            _modelPath = modelPath;
+            _vocabPath = vocabPath;
+        }
+
+        // BGE 模型(1.5版)在進行「查詢 (Query)」的向量化時，通常需要加上特定的前綴指令，而在將「文件/記憶 (Document)」寫入資料庫時則不需要。
         // 這裡的「查詢」與「文件」，指的是如果我們根據上下文尋找語意最相關的記憶，那麼上下文向量是「查詢」需要特定前綴，而記憶向量是「文件」不需要。
         // BGE 模型的查詢前綴指令
         private const string BGE_QUERY_PREFIX = "为这个句子生成表示以用于检索相关文章：";
 
-        /// <summary>
-        /// 計算嵌入向量（自動選擇雲端或本地）
-        /// </summary>
-        public float[] ComputeEmbedding(string text, bool isQuery = false)
-        {
-            if (string.IsNullOrWhiteSpace(text)) return GetEmptyVector();
-
-            // 根據設定選擇服務
-            if (Settings.Get().UseCloudVectorService)
-            {
-                return CloudVectorClient.Instance.ComputeEmbedding(text);
-            }
-            else
-            {
-                return LocalComputeEmbedding(text, isQuery);
-            }
-        }
-
-        /// <summary>
-        /// 批次計算嵌入向量（自動選擇雲端或本地）
-        /// </summary>
-        public List<float[]> ComputeEmbeddingsBatch(List<string> texts, bool isQuery = false)
-        {
-            if (texts == null || texts.Count == 0) return new List<float[]>();
-
-            if (Settings.Get().UseCloudVectorService)
-            {
-                return CloudVectorClient.Instance.ComputeEmbeddingsBatch(texts);
-            }
-            else
-            {
-                return LocalComputeEmbeddingsBatch(texts, isQuery);
-            }
-        }
-
-        /// <summary>
-        /// 取得空向量（維度根據模式不同）
-        /// </summary>
-        public float[] GetEmptyVector()
-        {
-            int dim = Settings.Get().UseCloudVectorService ? 1024 : 768;
-            return new float[dim];
-        }
-
+        // === 修改 private 為 public ===
         // 將原本的 ComputeEmbedding 改名為 LocalComputeEmbedding
-        private float[] LocalComputeEmbedding(string text, bool isQuery)
+        public float[] LocalComputeEmbedding(string text, bool isQuery)
         {
             if (!_isInitialized) return new float[768];
             string input = isQuery ? BGE_QUERY_PREFIX + text : text;
@@ -201,7 +205,8 @@ namespace RimTalk.Vector
             }
         }
 
-        private List<float[]> LocalComputeEmbeddingsBatch(List<string> texts, bool isQuery)
+        // === 修改 private 為 public ===
+        public List<float[]> LocalComputeEmbeddingsBatch(List<string> texts, bool isQuery)
         {
             if (!_isInitialized) return texts.Select(_ => new float[768]).ToList();
             var inputs = isQuery ? texts.Select(t => BGE_QUERY_PREFIX + t).ToList() : texts;

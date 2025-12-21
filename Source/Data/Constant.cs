@@ -39,11 +39,16 @@ public static class Constant
                                                     ...
                                                     {{"summary":"摘要","keywords":["标签1","标签2",...],"importance":1-5}}
                                                     [summary] 新闻摘要风格概括：
-                                                    - 主词-动词-受词结构，必须保留涉及人名
+                                                    - 主词-动词-受词结构，必须保留涉及人名，禁止相对时间（"昨天"等）
                                                     - 简洁但能捕捉到情感本质。如果使用了重要的昵称、侮辱性词语或戏剧性比喻，请保留它们。
-                                                    - 禁止相对时间（"昨天"等）
-                                                    [keywords] 列出对话中涉及的**重要**地点名或物品名（最多3个），无则留空
-                                                    [importance] 1琐碎|2普通|3值得记住|4重大|5刻骨铭心 (日常=1)
+                                                    [keywords] 列出对话中提及的地点、物品或关键概念、情绪（最多3个），优先提取具体名词。
+                                                    [importance] 
+                                                    1=琐碎日常（闲聊、抱怨）
+                                                    2=普通互动（正常对话、小争执、日常事件）
+                                                    3=值得记住（明确冲突、承诺、重要发现）
+                                                    4=重大事件（受伤、战斗、重大关系变化）
+                                                    5=刻骨铭心（生死、背叛、重大转折）
+                                                    默认使用 1-2，只有真正重要的事件才用 3+
                                                     [EXAMPLE]
                                                     INPUT: Alice 在研究室向 Bob 展示新发明的义肢
                                                     OUTPUT:
@@ -61,7 +66,7 @@ public static class Constant
     // [AFTER] 移除 existingKeywords 參數
     // [New] 支援注入常識的指令生成方法
     // [NEW] 新增參數：existingKeywords（現有關鍵詞列表字串）、initiator（發話者名稱列表）
-    public static string GetInstruction(List<string> knowledge, string initiatorName = null)  // [CHANGED] 改為單一字串
+    public static string GetInstruction(List<string> knowledge)  // [CHANGED] 改為單一字串
     {
         var settings = Settings.Get();
         var baseInstruction = string.IsNullOrWhiteSpace(settings.CustomInstruction)
@@ -74,10 +79,9 @@ public static class Constant
             knowledgeBlock = "\n[Relevant Knowledge]\n" + string.Join("\n", knowledge) + "\n";
         }
 
-        // [MODIFIED] 只使用 initiatorName
-        // 使用 String.Format 替換佔位符
-        // 注意：因為 JSON 中使用了 {{}} 來轉義大括號
-        string JsonInstruction = string.Format(JsonInstructionTemplate, string.IsNullOrEmpty(initiatorName) ? "" : initiatorName);
+        // [MODIFIED] 移除 String.Format，因為 JsonInstructionTemplate 不需要參數替換
+        // initiatorName 參數目前未使用，保留供未來擴展
+        string JsonInstruction = JsonInstructionTemplate;
 
         return baseInstruction + knowledgeBlock + JsonInstruction + (settings.ApplyMoodAndSocialEffects ? "\n" + SocialInstruction : "");
     }

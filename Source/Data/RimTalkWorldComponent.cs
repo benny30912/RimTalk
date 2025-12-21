@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Verse;
+using System;
 
 namespace RimTalk.Data;
 
@@ -53,7 +54,7 @@ public class RimTalkWorldComponent(World world) : WorldComponent(world)
         base.WorldComponentTick();
 
         // 使用 GenTicks.TicksGame 替代 Counter.Tick
-        if (GenTicks.TicksGame % CommonUtil.GetTicksForDuration(MainThreadQueueCheckInterval) == 0)
+        if (GenTicks.TicksGame % Math.Max(60, CommonUtil.GetTicksForDuration(MainThreadQueueCheckInterval)) == 0)
         {
             // 驅動 MemoryService 的主執行緒任務佇列
             MemoryService.Update();

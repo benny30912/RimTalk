@@ -84,4 +84,7 @@
   <RimTalk.Settings.LocalVectorDesc>免费离线运行，适合大多数场景</RimTalk.Settings.LocalVectorDesc>
   <RimTalk.Settings.VectorModeChangeWarning>切换模型将导致旧的记忆索引失效，需要重新生成记忆快取。是否继续？ </RimTalk.Settings.VectorModeChangeWarning>
   <RimTalk.Settings.VectorCacheCleared>向量快取已清除</RimTalk.Settings.VectorCacheCleared>
+
+  <RimTalk.Confirm>确认</RimTalk.Confirm>
+  <RimTalk.Cancel>取消</RimTalk.Cancel>
 </LanguageData>

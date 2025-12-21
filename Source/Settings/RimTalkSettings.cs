@@ -237,6 +237,10 @@ public class RimTalkSettings : ModSettings
         Scribe_Values.Look(ref MemoryImportanceWeight, "memoryImportanceWeight", 3.0f);
         Scribe_Values.Look(ref SemanticWeight, "SemanticWeight", 9.0f);
 
+        // [FIX] 儲存雲端語意向量設定
+        Scribe_Values.Look(ref UseCloudVectorService, "useCloudVectorService", false);
+        Scribe_Values.Look(ref VectorApiKey, "vectorApiKey", "");
+
         Scribe_Deep.Look(ref Context, "context");
 
         // Debug window settings

@@ -38,8 +38,5 @@ namespace RimTalk.Data
 
         // 常識檢索用的搜索文本
         public string KnowledgeSearchText { get; set; }
-
-        // 發話者名字（用於 Instruction）
-        public string InitiatorName { get; set; }
     }
 }

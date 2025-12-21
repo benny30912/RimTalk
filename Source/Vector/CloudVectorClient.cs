@@ -19,6 +19,9 @@ namespace RimTalk.Vector
         private const string MODEL = "BAAI/bge-m3";
         private const int VECTOR_DIM = 1024;  // bge-m3 維度
 
+        // [NEW] 冷卻狀態（由外部 VectorQueueService 管理，這裡僅保留錯誤碼檢測）
+        public bool IsRateLimited { get; private set; } = false;
+
         private static CloudVectorClient _instance;
         private static readonly object _lock = new();
 
@@ -38,22 +41,6 @@ namespace RimTalk.Vector
         }
 
         private CloudVectorClient() { }
-
-        /// <summary>
-        /// 單條文本嵌入（同步包裝）
-        /// </summary>
-        public float[] ComputeEmbedding(string text)
-        {
-            return ComputeEmbeddingAsync(text).Result;
-        }
-
-        /// <summary>
-        /// 批次文本嵌入（同步包裝）
-        /// </summary>
-        public List<float[]> ComputeEmbeddingsBatch(List<string> texts)
-        {
-            return ComputeEmbeddingsBatchAsync(texts).Result;
-        }
 
         /// <summary>
         /// 單條文本嵌入（異步）
@@ -106,9 +93,20 @@ namespace RimTalk.Vector
 
                 if (request.result == UnityWebRequest.Result.ConnectionError || request.result == UnityWebRequest.Result.ProtocolError)
                 {
-                    Log.Error($"[RimTalk] CloudVectorClient error: {request.error}");
+                    // [NEW] 檢測限流錯誤
+                    if (request.responseCode == 403 || request.responseCode == 429)
+                    {
+                        IsRateLimited = true;
+                        Log.Warning($"[RimTalk] CloudVectorClient 限流: {request.responseCode}");
+                    }
+                    else
+                    {
+                        Log.Error($"[RimTalk] CloudVectorClient error: {request.error}");
+                    }
                     return texts.Select(_ => new float[VECTOR_DIM]).ToList();
                 }
+                // 成功時重置限流狀態
+                IsRateLimited = false;
 
                 var response = JsonUtil.DeserializeFromJson<EmbeddingResponse>(request.downloadHandler.text);
                 if (response?.Data == null)

@@ -104,7 +104,7 @@ namespace RimTalk.Source.Memory
       
                     任务：将这些零散片段归纳为**6-8 条**更完整的"事件记忆"。
       
-                    1. 'summary' (简体中文)：
+                    1. 'summary' (简体中文，150字以内)：
                         - 聚合：相关事件合并为一条（如襲擊+受傷+治療），用连接词（"因此"、"随后"、"导致"）串联事件
                         - 去重：重复行为归纳为模式（"吃了3次"→"吃了好几顿"），但异常事件独立记录
                         - 語意摺疊：将原始 keywords 中的地点/物品融入叙述句中
@@ -113,10 +113,15 @@ namespace RimTalk.Source.Memory
                         - 禁止相对时间（"昨天"等）
       
                     2. 'keywords'：
-                        生成更抽象的标签（最多4个），如"机械族威胁"、"医疗危机"（最多4个，只选最具代表的），无则留空
+                        列出本段记忆最具有戏剧张力或标志性的具体概念标签（最多4个）
       
-                    3. 'importance' (1-5)：
-                        参考来源片段，1=琐碎 | 2=普通 | 3=值得记住 | 4=重大 | 5=刻骨铭心
+                    3. 'importance' (1-5)：参考来源片段
+                        1=琐碎日常（闲聊、抱怨）
+                        2=普通互动（正常对话、小争执、日常事件）
+                        3=值得记住（明确冲突、承诺、重要发现）
+                        4=重大事件（受伤、战斗、重大关系变化）
+                        5=刻骨铭心（生死、背叛、重大转折）
+                        只有真正重要的事件才用 3+
       
                     4. 'source_ids'(必填)：
                         **必须**列出合并来源的原始 ID
@@ -172,23 +177,10 @@ namespace RimTalk.Source.Memory
                                         };
                                     }).ToList();
 
-                // [NEW] 批次計算 MTM 向量
-                if (VectorService.Instance.IsInitialized && records.Count > 0)
+                // [MODIFY] 將向量計算加入佇列
+                foreach (var record in records)
                 {
-                    try
-                    {
-                        var texts = records.Select(r => r.Summary).ToList();
-                        var vectors = VectorService.Instance.ComputeEmbeddingsBatch(texts);
-
-                        for (int i = 0; i < records.Count && i < vectors.Count; i++)
-                        {
-                            VectorDatabase.Instance.AddVector(records[i].Id, vectors[i]);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Warning($"[RimTalk] Failed to compute MTM vectors: {ex.Message}");
-                    }
+                    VectorQueueService.Instance.Enqueue(record.Id, record.Summary);
                 }
 
                 return records;
@@ -229,12 +221,17 @@ namespace RimTalk.Source.Memory
         
                   任务：分析上述片段，将其重组为**6-8条**6主题鲜明的长期记忆条目。
 
-                  1. 'summary' (简体中文)：以第三人称撰写传记风格的摘要，包含心理状态描述，必须保留涉及人名。
+                  1. 'summary' (简体中文，250字以内)：以第三人称撰写传记风格的摘要，包含心理状态描述，必须保留涉及人名。
                   - 多维度归纳：找出这段时期的主要生活基调。
                   - 去芜存菁：忽略琐事，除非它是生活基调的一部分，保留可能影响未来的关键痛点（如「资源短缺」「某人的背叛」），並以具体事件作为例证。
-                  - 语意折叠：将琐碎的细节 (如具体吃了什么) 折叠为高层次描述 (如生活困苦)。
+                  - 语意折叠：将琐碎的细节 (如具体吃了什么) 折叠为高层次描述 (如生活困苦)，聚焦长期影响。
                   2. 'keywords'：列出来源片段中**最具标志性**的概念（最多5个），忽略琐碎细节，无则留空。
-                  3. 'importance'：参考来源片段，1=琐碎 | 2=普通 | 3=值得记住 | 4=重大 | 5=刻骨铭心，若高重要性可提升分数。
+                  3. 'importance'：参考来源片段，若高重要性可提升分数
+                    1=琐碎日常（闲聊、抱怨）
+                    2=普通互动（正常对话、小争执、日常事件）
+                    3=值得记住（明确冲突、承诺、重要发现）
+                    4=重大事件（受伤、战斗、重大关系变化）
+                    5=刻骨铭心（生死、背叛、重大转折）
                   4. 'source_ids'：**必须**列出该条记忆涵盖的原始片段。
         
                   输出包含 'memories' 数组的 JSON 对象。
@@ -289,23 +286,10 @@ namespace RimTalk.Source.Memory
                                         };
                                     }).ToList();
 
-                // [NEW] 批次計算 LTM 向量
-                if (VectorService.Instance.IsInitialized && records.Count > 0)
+                // [MODIFY] 將向量計算加入佇列
+                foreach (var record in records)
                 {
-                    try
-                    {
-                        var texts = records.Select(r => r.Summary).ToList();
-                        var vectors = VectorService.Instance.ComputeEmbeddingsBatch(texts);
-
-                        for (int i = 0; i < records.Count && i < vectors.Count; i++)
-                        {
-                            VectorDatabase.Instance.AddVector(records[i].Id, vectors[i]);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Warning($"[RimTalk] Failed to compute LTM vectors: {ex.Message}");
-                    }
+                    VectorQueueService.Instance.Enqueue(record.Id, record.Summary);
                 }
 
                 return records;

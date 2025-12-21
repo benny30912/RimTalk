@@ -33,8 +33,6 @@ public static class PromptService
     public static ContextSnapshot BuildContextSnapshot(TalkRequest request, List<Pawn> pawns)
     {
         var snapshot = new ContextSnapshot();
-        var pawnContexts = new StringBuilder();
-        snapshot.InitiatorName = pawns.FirstOrDefault()?.LabelShort ?? "";
 
         // 準備環境資料
         var gameData = CommonUtil.GetInGameData();
@@ -145,62 +143,45 @@ public static class PromptService
     /// </summary>
     public static async Task<string> ResolveContextAsync(ContextSnapshot snapshot, List<Pawn> pawns)
     {
-        return await Task.Run(() =>
+        var pawnContexts = new StringBuilder();
+        var allKnowledge = new HashSet<string>();
+        // 處理每個 Pawn
+        for (int i = 0; i < snapshot.PawnData.Count; i++)
         {
-            var pawnContexts = new StringBuilder();
-            var allKnowledge = new HashSet<string>();
-
-            // 處理每個 Pawn
-            for (int i = 0; i < snapshot.PawnData.Count; i++)
+            var pawnData = snapshot.PawnData[i];
+            var pawn = pawns.FirstOrDefault(p => p.thingIDNumber == pawnData.PawnId);
+            if (pawn == null) continue;
+            // === 批次向量計算（異步）===
+            var contextVectors = await SemanticCache.Instance.GetVectorsBatchAsync(pawnData.Items, isQuery: true);
+            // === 記憶檢索（語意向量 Max-Sim）===
+            var memories = MemoryRetriever.GetRelevantMemoriesBySemantic(
+                contextVectors, pawn, pawnData.Names);
+            // === 常識檢索（關鍵詞匹配）===
+            var knowledge = MemoryRetriever.GetRelevantKnowledge(snapshot.KnowledgeSearchText);
+            // === 注入個人記憶 ===
+            string memoryBlock = "";
+            if (!memories.NullOrEmpty())
             {
-                var pawnData = snapshot.PawnData[i];
-                var pawn = pawns.FirstOrDefault(p => p.thingIDNumber == pawnData.PawnId);
-                if (pawn == null) continue;
-
-                // === 批次向量計算 ===
-                var contextVectors = SemanticCache.Instance.GetVectorsBatch(pawnData.Items, isQuery: true);
-
-                // === 記憶檢索（語意向量 Max-Sim）===
-                var memories = MemoryRetriever.GetRelevantMemoriesBySemantic(
-                    contextVectors, pawn, pawnData.Names);
-
-                // === 常識檢索（關鍵詞匹配）===
-                var knowledge = MemoryRetriever.GetRelevantKnowledge(snapshot.KnowledgeSearchText);
-
-                // === 注入個人記憶 ===
-                string memoryBlock = "";
-                if (!memories.NullOrEmpty())
-                {
-                    memoryBlock = MemoryFormatter.FormatRecalledMemories(memories);
-                }
-                string resolvedPawnText = pawnData.PawnText.Replace(
-                    "[[MEMORY_INJECTION_POINT]]", memoryBlock.TrimEnd());
-
-                // 收集常識
-                if (!knowledge.NullOrEmpty())
-                {
-                    foreach (var k in knowledge)
-                        if (!string.IsNullOrEmpty(k.Summary))
-                            allKnowledge.Add(k.Summary);
-                }
-
-                pawnContexts.AppendLine()
-                       .AppendLine($"[Person {i + 1}]")
-                       .AppendLine(resolvedPawnText);
+                memoryBlock = MemoryFormatter.FormatRecalledMemories(memories);
             }
-
-            // === 組合完整 Context ===
-            var fullContext = new StringBuilder();
-
-            fullContext.AppendLine(Constant.GetInstruction(
-                allKnowledge.ToList(),
-                snapshot.InitiatorName
-            )).AppendLine();
-
-            fullContext.Append(pawnContexts);
-
-            return fullContext.ToString();
-        });
+            string resolvedPawnText = pawnData.PawnText.Replace(
+                "[[MEMORY_INJECTION_POINT]]", memoryBlock.TrimEnd());
+            // 收集常識
+            if (!knowledge.NullOrEmpty())
+            {
+                foreach (var k in knowledge)
+                    if (!string.IsNullOrEmpty(k.Summary))
+                        allKnowledge.Add(k.Summary);
+            }
+            pawnContexts.AppendLine()
+                   .AppendLine($"[Person {i + 1}]")
+                   .AppendLine(resolvedPawnText);
+        }
+        // === 組合完整 Context ===
+        var fullContext = new StringBuilder();
+        fullContext.AppendLine(Constant.GetInstruction(allKnowledge.ToList())).AppendLine();
+        fullContext.Append(pawnContexts);
+        return fullContext.ToString();
     }
 
     // ===============================================================

@@ -315,6 +315,8 @@ public partial class Settings
                     // 清除快取
                     VectorDatabase.Instance.Clear();
                     SemanticCache.Instance.Clear();
+                    // [NEW] 觸發佇列服務模式切換
+                    VectorQueueService.Instance.OnModeChanged(_pendingVectorModeValue);
                     Messages.Message("RimTalk.Settings.VectorCacheCleared".Translate(), MessageTypeDefOf.NeutralEvent);
                 },
                 "RimTalk.Cancel".Translate(),

@@ -39,33 +39,7 @@ public class RimTalk : GameComponent
         if (settings != null)
         {
             settings.CurrentCloudConfigIndex = 0;
-        }
-
-        // [NEW] 初始化向量服務 (僅需執行一次)
-        if (!VectorService.Instance.IsInitialized)
-        {
-            try
-            {
-                // 取得 RimTalk Mod 根目錄
-                var mod = LoadedModManager.RunningModsListForReading
-                    .FirstOrDefault(m => m.PackageIdPlayerFacing.ToLower() == "cj.rimtalk");
-
-                if (mod != null)
-                {
-                    string modelPath = Path.Combine(mod.RootDir, "Resources", "Model", "bge-base-zh-v1.5_int8.onnx");
-                    string vocabPath = Path.Combine(mod.RootDir, "Resources", "Model", "vocab.txt");
-                    VectorService.Instance.Initialize(modelPath, vocabPath);
-                }
-                else
-                {
-                    Log.Warning("[RimTalk] Cannot find RimTalk mod for VectorService initialization.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"[RimTalk] VectorService initialization failed: {ex.Message}");
-            }
-        }
+        } 
 
         AIErrorHandler.ResetQuotaWarning();
         TickManagerPatch.Reset();
@@ -80,6 +54,42 @@ public class RimTalk : GameComponent
         Cache.InitializePlayerPawn();
 
         if (soft) return;
+
+        // [MODIFY] 延遲載入向量服務 + 初始化佇列服務
+        try
+        {
+            // 取得 RimTalk Mod 根目錄
+            var mod = LoadedModManager.RunningModsListForReading
+                .FirstOrDefault(m => m.PackageIdPlayerFacing.ToLower() == "cj.rimtalk");
+            if (mod != null)
+            {
+                string modelPath = Path.Combine(mod.RootDir, "Resources", "Model", "bge-base-zh-v1.5_int8.onnx");
+                string vocabPath = Path.Combine(mod.RootDir, "Resources", "Model", "vocab.txt");
+
+                // 設定模型路徑（供延遲載入使用）
+                VectorService.Instance.SetModelPaths(modelPath, vocabPath);
+
+                // 根據設定決定是否立即初始化
+                if (!Settings.Get().UseCloudVectorService && !VectorService.Instance.IsInitialized)
+                {
+                    VectorService.Instance.Initialize(modelPath, vocabPath);
+                }
+
+                // 切換模型時初始化佇列服務
+                VectorQueueService.Instance.OnModeChanged(Settings.Get().UseCloudVectorService);
+            }
+            else
+            {
+                Log.Warning("[RimTalk] Cannot find RimTalk mod for VectorService initialization.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"[RimTalk] VectorService initialization failed: {ex.Message}");
+        }
+
+        // [NEW] 清空向量請求佇列
+        VectorQueueService.Instance.Clear();
 
         Counter.Tick = 0;
         Cache.Clear();

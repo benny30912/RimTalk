@@ -79,22 +79,8 @@ namespace RimTalk.Source.Memory
         {
             bool thresholdReached = AddMemoryInternal(pawn, memory);
 
-            // 背景計算記憶向量
-            if (VectorService.Instance.IsInitialized && VectorDatabase.Instance.GetVector(memory.Id) == null)
-            {
-                Task.Run(() =>
-                {
-                    try
-                    {
-                        var vector = VectorService.Instance.ComputeEmbedding(memory.Summary);
-                        VectorDatabase.Instance.AddVector(memory.Id, vector);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Warning($"[RimTalk] Failed to compute memory vector: {ex.Message}");
-                    }
-                });
-            }
+            // [MODIFY] 將向量計算加入佇列（非阻塞）
+            VectorQueueService.Instance.Enqueue(memory.Id, memory.Summary);
 
             if (thresholdReached)
             {
@@ -138,6 +124,8 @@ namespace RimTalk.Source.Memory
                                 {
                                     while (d.ShortTermMemories.Count > MaxShortMemories)
                                     {
+                                        // [FIX] 同步刪除對應向量
+                                        VectorDatabase.Instance.RemoveVector(d.ShortTermMemories[0].Id);
                                         d.ShortTermMemories.RemoveAt(0);
                                     }
                                 }
@@ -208,6 +196,8 @@ namespace RimTalk.Source.Memory
                                 {
                                     while (d.MediumTermMemories.Count > MaxMediumMemories)
                                     {
+                                        // [FIX] 同步刪除對應向量
+                                        VectorDatabase.Instance.RemoveVector(d.MediumTermMemories[0].Id);
                                         d.MediumTermMemories.RemoveAt(0);
                                     }
                                 }
@@ -303,11 +293,15 @@ namespace RimTalk.Source.Memory
                 {
                     lock (data)
                     {
-                        if (data.ShortTermMemories?.Remove(memory) == true) return;
-                        if (data.MediumTermMemories?.Remove(memory) == true) return;
-                        if (data.LongTermMemories?.Remove(memory) == true) return;
-                        // [NEW] 同步刪除向量
-                        VectorDatabase.Instance.RemoveVector(memory.Id);
+                        // [FIX] 先嘗試移除記憶，成功後再刪除向量
+                        bool removed = data.ShortTermMemories?.Remove(memory) == true ||
+                                       data.MediumTermMemories?.Remove(memory) == true ||
+                                       data.LongTermMemories?.Remove(memory) == true;
+
+                        if (removed)
+                        {
+                            VectorDatabase.Instance.RemoveVector(memory.Id);
+                        }
                     }
                 }
             }

@@ -45,7 +45,7 @@ public static class TalkService
 
         List<Pawn> nearbyPawns = PawnSelector.GetAllNearByPawns(talkRequest.Initiator);
         if (talkRequest.Recipient.IsPlayer()) nearbyPawns.Insert(0, talkRequest.Recipient);
-        var (status, isInDanger, statusActivities, statusNames) = talkRequest.Initiator.GetPawnStatusFull(nearbyPawns);
+        var (status, isInDanger, statusActivities, statusNames) = talkRequest.Initiator.GetPawnStatusFullExtend(nearbyPawns);
 
         // Avoid spamming generations if the pawn's status hasn't changed recently.
         if (talkRequest.TalkType != TalkType.User && status == pawn1.LastStatus && pawn1.RejectCount < 2)

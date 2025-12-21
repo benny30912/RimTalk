@@ -116,7 +116,20 @@ public static class PawnUtil
         return pawn.ageTracker?.CurLifeStage?.developmentalStage < DevelopmentalStage.Child;
     }
 
-    public static (string status, bool isInDanger, List<string> activities, List<string> names) GetPawnStatusFull(
+    /// <summary>
+    /// [向後相容] 舊版 GetPawnStatusFull，僅回傳 (status, isInDanger)。
+    /// 保留此簽名供外部 Mod（如 RimTalkEventMemory）使用。
+    /// </summary>
+    public static (string status, bool isInDanger) GetPawnStatusFull(
+        this Pawn pawn,
+        List<Pawn> nearbyPawns)
+    {
+        // 委派給新版方法，丟棄額外回傳值
+        var (status, isInDanger, _, _) = GetPawnStatusFullExtend(pawn, nearbyPawns);
+        return (status, isInDanger);
+    }
+
+    public static (string status, bool isInDanger, List<string> activities, List<string> names) GetPawnStatusFullExtend(
     this Pawn pawn,
     List<Pawn> nearbyPawns)
     {
