@@ -75,6 +75,8 @@ public class RimTalk : GameComponent
                     VectorService.Instance.Initialize(modelPath, vocabPath);
                 }
 
+                // [NEW] 清空向量請求佇列
+                VectorQueueService.Instance.Clear();
                 // 切換模型時初始化佇列服務
                 VectorQueueService.Instance.OnModeChanged(Settings.Get().UseCloudVectorService);
             }
@@ -87,9 +89,6 @@ public class RimTalk : GameComponent
         {
             Log.Error($"[RimTalk] VectorService initialization failed: {ex.Message}");
         }
-
-        // [NEW] 清空向量請求佇列
-        VectorQueueService.Instance.Clear();
 
         Counter.Tick = 0;
         Cache.Clear();

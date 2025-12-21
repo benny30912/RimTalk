@@ -123,28 +123,22 @@ namespace RimTalk.Source.Memory
         }
 
         /// <summary>
-        /// 將遊戲 Tick 轉換為相對時間描述
+        /// 将游戏 Tick 转换为相对时间描述（执行绪安全）
         /// </summary>
         public static string GetTimeAgo(int createdTick)
         {
-            if (createdTick <= 0) return "RimTalk.TimeAgo.Unknown".Translate();
-
+            if (createdTick <= 0) return "未知时间";
             int diff = GenTicks.TicksGame - createdTick;
             if (diff < 0) diff = 0;
-
             float hours = diff / 2500f;
-
-            if (hours < 1f) return "RimTalk.TimeAgo.JustNow".Translate();
-            if (hours < 24f) return "RimTalk.TimeAgo.HoursAgo".Translate((int)hours);
-
+            if (hours < 1f) return "刚才";
+            if (hours < 24f) return $"{(int)hours}小时前";
             float days = hours / 24f;
-            if (days < 15f) return "RimTalk.TimeAgo.DaysAgo".Translate((int)days);
-
+            if (days < 15f) return $"{(int)days}天前";
             float seasons = days / 15f;
-            if (seasons < 4.0f) return "RimTalk.TimeAgo.SeasonsAgo".Translate((int)seasons);
-
+            if (seasons < 4.0f) return $"{(int)seasons}季前";
             float years = seasons / 4f;
-            return "RimTalk.TimeAgo.YearsAgo".Translate((int)years);
+            return $"{(int)years}年前";
         }
 
         /// <summary>
