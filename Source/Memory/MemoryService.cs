@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using Verse;
+using Verse.Noise;
 using Logger = RimTalk.Util.Logger;
 
 namespace RimTalk.Source.Memory
@@ -30,6 +31,7 @@ namespace RimTalk.Source.Memory
         public const int MaxShortMemories = 30;
         public const int MaxMediumMemories = 60;
         public const int MaxLongMemories = 40;
+        public const int MemoryBuffer = 5;  // [NEW] 共用緩衝
 
         private static RimTalkWorldComponent WorldComp => Find.World?.GetComponent<RimTalkWorldComponent>();
 
@@ -121,12 +123,7 @@ namespace RimTalk.Source.Memory
                             {
                                 lock (d)
                                 {
-                                    while (d.ShortTermMemories.Count > MaxShortMemories)
-                                    {
-                                        // [FIX] 同步刪除對應向量
-                                        VectorDatabase.Instance.RemoveVector(d.ShortTermMemories[0].Id);
-                                        d.ShortTermMemories.RemoveAt(0);
-                                    }
+                                    CleanupExcessMemories(d.ShortTermMemories, MaxShortMemories, d.NewShortMemoriesSinceSummary, forceFull: true); // 強制清理到 30
                                 }
                             }
                         }
@@ -161,6 +158,13 @@ namespace RimTalk.Source.Memory
 
                 Messages.Message("RimTalk.MemoryService.MediumMemoryCreated".Translate(pawn.LabelShort), pawn, MessageTypeDefOf.NeutralEvent, false);
 
+                // [NEW] 即時清理超額的已歸檔記憶
+                CleanupExcessMemories(
+                    data.MediumTermMemories,
+                    MaxMediumMemories,
+                    data.NewMediumMemoriesSinceArchival
+                );
+
                 if (data.NewMediumMemoriesSinceArchival >= MaxMediumMemories)
                 {
                     TriggerMtmToLtmConsolidation(pawn, data);
@@ -193,12 +197,7 @@ namespace RimTalk.Source.Memory
                             {
                                 lock (d)
                                 {
-                                    while (d.MediumTermMemories.Count > MaxMediumMemories)
-                                    {
-                                        // [FIX] 同步刪除對應向量
-                                        VectorDatabase.Instance.RemoveVector(d.MediumTermMemories[0].Id);
-                                        d.MediumTermMemories.RemoveAt(0);
-                                    }
+                                    CleanupExcessMemories(d.MediumTermMemories, MaxMediumMemories, d.NewMediumMemoriesSinceArchival, forceFull: true);
                                 }
                             }
                         }
@@ -234,6 +233,26 @@ namespace RimTalk.Source.Memory
             }
         }
 
+        /// <summary>
+        /// 清理超額記憶，保護未處理的新記憶
+        /// </summary>
+        private static void CleanupExcessMemories(List<MemoryRecord> memories, int maxCount, int newSinceProcess, bool forceFull = false)
+        {
+            int limit = forceFull ? maxCount : (maxCount + MemoryBuffer);
+            int excess = memories.Count - limit;
+            if (excess <= 0) return;
+
+            // 可安全刪除的數量 = 已處理的記憶數
+            int alreadyProcessed = memories.Count - newSinceProcess;
+            int safeToDelete = Math.Min(excess, Math.Max(0, alreadyProcessed));
+
+            for (int i = 0; i < safeToDelete; i++)
+            {
+                VectorDatabase.Instance.RemoveVector(memories[0].Id);
+                memories.RemoveAt(0);
+            }
+        }
+
         // --- CRUD ---
 
         private static bool AddMemoryInternal(Pawn pawn, MemoryRecord record)
@@ -255,6 +274,14 @@ namespace RimTalk.Source.Memory
             {
                 data.ShortTermMemories.Add(record);
                 data.NewShortMemoriesSinceSummary++;
+
+                // [NEW] 即時清理超額的已總結記憶
+                CleanupExcessMemories(
+                    data.ShortTermMemories,
+                    MaxShortMemories,
+                    data.NewShortMemoriesSinceSummary
+                );
+
                 return data.NewShortMemoriesSinceSummary >= MaxShortMemories;
             }
         }
