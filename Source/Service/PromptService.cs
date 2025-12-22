@@ -216,7 +216,9 @@ public static class PromptService
             var (pawn, pawnData, _) = pawnVectorData[i];
 
             var memories = memoriesDict.TryGetValue(pawn, out var mems) ? mems : new List<MemoryRecord>();
-            var knowledge = MemoryRetriever.GetRelevantKnowledge(snapshot.KnowledgeSearchText);
+
+            string knowledgeSearchText = BuildKnowledgeSearchText(snapshot.KnowledgeSearchText, memories);
+            var knowledge = MemoryRetriever.GetRelevantKnowledge(knowledgeSearchText);
 
             string memoryBlock = "";
             if (!memories.NullOrEmpty())
@@ -437,6 +439,32 @@ public static class PromptService
     {
         if (!string.IsNullOrEmpty(text))
             sb.AppendLine(text);
+    }
+
+    /// <summary>
+    /// 組合常識搜索文本（加入記憶摘要和關鍵詞）
+    /// 擴展搜索範圍，讓常識能匹配記憶中提及的主題
+    /// </summary>
+    private static string BuildKnowledgeSearchText(string baseText, List<MemoryRecord> memories)
+    {
+        if (memories.NullOrEmpty())
+            return baseText;
+
+        var sb = new StringBuilder(baseText);
+        sb.AppendLine();
+
+        foreach (var m in memories)
+        {
+            // 加入記憶摘要
+            if (!string.IsNullOrEmpty(m.Summary))
+                sb.AppendLine(m.Summary);
+
+            // 加入記憶關鍵詞（關鍵詞匹配的核心）
+            if (!m.Keywords.NullOrEmpty())
+                sb.AppendLine(string.Join(" ", m.Keywords));
+        }
+
+        return sb.ToString();
     }
 
     /// <summary>
