@@ -47,10 +47,11 @@ namespace RimTalk.Source.Memory
         public static List<MemoryRecord> GetRelevantMemoriesBySemantic(
             List<float[]> contextVectors,
             Pawn pawn,
-            HashSet<string> contextNames = null)
+            HashSet<string> contextNames = null,
+            int pawnCount = 1)  // [NEW] 新增參數
         {
             // 單人模式：配額 8 條 (STM 3 + LTM 1 + 剩餘 4)
-            var quotas = GetMemoryQuotas(1);
+            var quotas = GetMemoryQuotas(pawnCount);  // [MOD]
             return GetRelevantMemoriesInternal(contextVectors, pawn, contextNames, quotas);
         }
 

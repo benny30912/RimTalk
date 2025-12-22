@@ -89,7 +89,8 @@ public class Player2Client : IAIClient
                 {
                     Messages.Message(
                         "RimTalk: Player2 desktop app detected! Using automatic authentication (no API key needed).",
-                        MessageTypeDefOf.PositiveEvent
+                        MessageTypeDefOf.PositiveEvent,
+                        false
                     );
                     Logger.Message("RimTalk: ✓ Successfully connected to local Player2 app");
                 }
@@ -118,7 +119,8 @@ public class Player2Client : IAIClient
                 {
                     Messages.Message(
                         "RimTalk: Player2 desktop app not found. Please start Player2 app or add API key manually.",
-                        MessageTypeDefOf.CautionInput
+                        MessageTypeDefOf.CautionInput,
+                        false
                     );
                     Logger.Message("RimTalk: Player2 local app not available, manual API key required");
                 }

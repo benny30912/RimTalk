@@ -11,6 +11,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;  // [NEW] 為了 Task<T>
 using Verse;
 using Verse.AI.Group;
+using static Verse.AI.ThingCountTracker;
 using Cache = RimTalk.Data.Cache;
 
 namespace RimTalk.Service;
@@ -44,7 +45,7 @@ public static class PromptService
         if (!string.IsNullOrEmpty(request.DialogueType) &&
             (string.IsNullOrEmpty(contextFromPrompt) || !contextFromPrompt.Contains(request.DialogueType)))
         {
-            contextFromPrompt += $"\nDialogueType: {request.DialogueType}";
+            contextFromPrompt = $"\nDialogueType: {request.DialogueType}" + contextFromPrompt;
         }
 
         List<string> filteredLines = new List<string>();
@@ -75,10 +76,6 @@ public static class PromptService
             var fullQuerySb = new StringBuilder(queryText);
             if (filteredLines.Count > 0)
                 fullQuerySb.AppendLine(string.Join("\n", filteredLines));
-
-            // 加入 StatusNames（唯一需要單獨處理的）
-            if (request.StatusNames != null && request.StatusNames.Count > 0)
-                fullQuerySb.AppendLine($"People: {string.Join(", ", request.StatusNames)}");
 
             // === 以下保持原有的向量收集邏輯（不改動）===
 
@@ -201,9 +198,10 @@ public static class PromptService
         {
             // 本地模式：同步 Max-Sim
             memoriesDict = new Dictionary<Pawn, List<MemoryRecord>>();
+            int pawnCount = pawnVectorData.Count;  // [NEW]
             foreach (var (pawn, data, vectors) in pawnVectorData)
             {
-                var memories = MemoryRetriever.GetRelevantMemoriesBySemantic(vectors, pawn, data.Names);
+                var memories = MemoryRetriever.GetRelevantMemoriesBySemantic(vectors, pawn, data.Names, pawnCount);  // [MOD]
                 memoriesDict[pawn] = memories;
             }
         }

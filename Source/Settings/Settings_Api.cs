@@ -317,7 +317,7 @@ public partial class Settings
                     SemanticCache.Instance.Clear();
                     // [NEW] 觸發佇列服務模式切換
                     VectorQueueService.Instance.OnModeChanged(_pendingVectorModeValue);
-                    Messages.Message("RimTalk.Settings.VectorCacheCleared".Translate(), MessageTypeDefOf.NeutralEvent);
+                    Messages.Message("RimTalk.Settings.VectorCacheCleared".Translate(), MessageTypeDefOf.NeutralEvent, false);
                 },
                 "RimTalk.Cancel".Translate(),
                 null
@@ -518,7 +518,8 @@ public partial class Settings
                     {
                         Messages.Message(
                             "RimTalk: Player2 desktop app detected and ready for use!", 
-                            MessageTypeDefOf.PositiveEvent
+                            MessageTypeDefOf.PositiveEvent,
+                            false
                         );
                         Logger.Message("RimTalk: Player2 desktop app status check - Available");
                     }
@@ -526,7 +527,8 @@ public partial class Settings
                     {
                         Messages.Message(
                             "RimTalk: Player2 desktop app not detected. Install and start Player2 app, or add API key manually.", 
-                            MessageTypeDefOf.CautionInput
+                            MessageTypeDefOf.CautionInput,
+                            false
                         );
                         Logger.Message("RimTalk: Player2 desktop app status check - Not available");
                     }
