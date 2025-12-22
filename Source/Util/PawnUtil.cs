@@ -182,7 +182,7 @@ public static class PawnUtil
                     collectedNames.Add(p.LabelShort);
                     string activity = GetPawnActivity(p, relevantPawns, useOptimization);
                     if (!string.IsNullOrEmpty(activity))
-                        collectedActivities.Add(activity);
+                        collectedActivities.Add($"{p.LabelShort} {activity}");
                 }
             }
 
@@ -193,10 +193,14 @@ public static class PawnUtil
                 lines.Add("Nearby: " + nearbyList);
                 hasAnyNearbyLog = true;
 
-                // [NEW] 收集附近人名
+                // [NEW] 收集附近每個人的活動（分開收集）
                 foreach (var np in nearbyPawns.Where(p => !relevantPawns.Contains(p) && (notablePawns == null || !notablePawns.Contains(p))))
                 {
                     collectedNames.Add(np.LabelShort);
+                    // [NEW] 每個人的活動分開收集
+                    string activity = GetPawnActivity(np, relevantPawns, useOptimization);
+                    if (!string.IsNullOrEmpty(activity))
+                        collectedActivities.Add($"{np.LabelShort} {activity}");  // [MOD] 加入人名+活動
                 }
             }
         }

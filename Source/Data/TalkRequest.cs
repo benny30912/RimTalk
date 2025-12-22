@@ -26,6 +26,11 @@ public class TalkRequest
     /// </summary>
     public List<string> StatusNames { get; set; } = new List<string>();
 
+    /// <summary>
+    /// [NEW] 對話類型語意描述，供向量化使用
+    /// </summary>
+    public string DialogueType { get; set; }
+
     public TalkRequest(string prompt, Pawn initiator, Pawn recipient = null, TalkType talkType = TalkType.Other)
     {
         TalkType = talkType;

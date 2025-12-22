@@ -33,11 +33,32 @@ public static class PromptService
     public static ContextSnapshot BuildContextSnapshot(TalkRequest request, List<Pawn> pawns)
     {
         var snapshot = new ContextSnapshot();
-
-        // 準備環境資料
         var gameData = CommonUtil.GetInGameData();
         var contextSettings = Settings.Get().Context;
         var allPawnTexts = new StringBuilder();
+
+        // [NEW] 提取完整情境描述（用於 QueryText）
+        string contextFromPrompt = MemoryFormatter.ExtractContextFromPrompt(request.Prompt ?? "");
+
+        // 只在 DialogueType 不重複時加入 QueryText
+        if (!string.IsNullOrEmpty(request.DialogueType) &&
+            (string.IsNullOrEmpty(contextFromPrompt) || !contextFromPrompt.Contains(request.DialogueType)))
+        {
+            contextFromPrompt += $"\nDialogueType: {request.DialogueType}";
+        }
+
+        List<string> filteredLines = new List<string>();
+
+        if (!string.IsNullOrEmpty(contextFromPrompt))
+        {
+            // [NEW] 過濾 Today 行（日期對記憶檢索無意義）
+            filteredLines = contextFromPrompt
+                .Split('\n')
+                .Where(line => !line.TrimStart().StartsWith("Today:", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        var ongoingEvents = ExtractOngoingEventsList(request.Prompt ?? "");
 
         for (int i = 0; i < pawns.Count; i++)
         {
@@ -47,69 +68,67 @@ public static class PromptService
             InfoLevel infoLevel = Settings.Get().Context.EnableContextOptimization
                                   && i != 0 ? InfoLevel.Short : InfoLevel.Normal;
 
-            // 生成 Pawn 描述並收集動態項目
-            var (pawnText, builder) = CreatePawnContext(pawn, infoLevel);
+            // 生成 Pawn 描述並收集動態項目 + QueryText
+            var (pawnText, builder, queryText) = CreatePawnContext(pawn, infoLevel);
 
-            // === 補充環境動態項目到 builder ===
-            // (雖然環境是共享的，但是記憶是基於 pawn 的，即使在迴圈外部收集後續仍然要分配給個人，在內部收集是可接受的)
+            // [SIMPLIFIED] 直接附加 ExtractDialogueContext（包含環境資訊）
+            var fullQuerySb = new StringBuilder(queryText);
+            if (filteredLines.Count > 0)
+                fullQuerySb.AppendLine(string.Join("\n", filteredLines));
 
-            // 時間
+            // 加入 StatusNames（唯一需要單獨處理的）
+            if (request.StatusNames != null && request.StatusNames.Count > 0)
+                fullQuerySb.AppendLine($"People: {string.Join(", ", request.StatusNames)}");
+
+            // === 以下保持原有的向量收集邏輯（不改動）===
+
+            // 時間 - 向量化用
             if (contextSettings.IncludeTimeAndDate)
                 builder.CollectText(SemanticMapper.MapTimeToSemantic(gameData.Hour12HString));
 
-            // 季節
+            // 季節 - 向量化用
             if (contextSettings.IncludeSeason && pawn.Map != null)
                 builder.CollectSeason(GenLocalDate.Season(pawn.Map));
 
-            // 天氣
+            // 天氣 - 向量化用
             if (contextSettings.IncludeWeather && pawn.Map?.weatherManager?.curWeather != null)
                 builder.CollectWeather(pawn.Map.weatherManager.curWeather);
 
-            // 位置
+            // 位置 - 向量化用
             var room = pawn.GetRoom();
             if (room is { PsychologicallyOutdoors: false } && room.Role != null)
                 builder.CollectText(room.Role.label);
 
-            // 溫度
+            // 溫度 - 向量化用
             if (contextSettings.IncludeLocationAndTemperature && pawn.Map != null)
             {
                 float temp = pawn.Position.GetTemperature(pawn.Map);
                 builder.CollectTemperature(temp);
             }
 
-            // Surroundings 隨機選物
+            // Surroundings - 向量化用
             if (contextSettings.IncludeSurroundings)
-            {
                 builder.CollectSurrounding(ContextHelper.CollectNearbyItems(pawn, 1));
-            }
 
-            // Status 動作句子（從 TalkRequest 取得）
+            // StatusActivities - 向量化用
             if (request.StatusActivities != null)
             {
                 foreach (var activity in request.StatusActivities)
                     builder.CollectText(activity);
             }
 
-            // Status 人名（從 TalkRequest 取得）
+            // StatusNames - 向量化用
             if (request.StatusNames != null)
-            {
                 builder.AddNames(request.StatusNames);
-            }
 
-            // [NEW] 提取 DialogueType 的純語意部分（清理指令後）
-            string cleanedDialogueContext = ExtractDialogueContext(request.Prompt ?? "");
+            // DialogueContext - 向量化用
+            if (!string.IsNullOrEmpty(request.DialogueType))
+                builder.CollectText(request.DialogueType);
 
-            // 加入清理後的 DialogueType
-            if (!string.IsNullOrEmpty(cleanedDialogueContext))
-                builder.CollectText(cleanedDialogueContext);
-
-            // [NEW] 解析 RimTalk Event+ 的 Ongoing Events 區塊
-            var ongoingEvents = ExtractOngoingEventsList(request.Prompt ?? "");
-            foreach (var eventText in ongoingEvents)
-            {
-                // 每個事件獨立形成一個語意向量
-                builder.CollectText(eventText);
-            }
+            // OngoingEvents - 向量化用
+            if (ongoingEvents.Count > 0)
+                foreach (var eventText in ongoingEvents)
+                    builder.CollectText(eventText);
 
             // === 收集 Pawn 資料到快照 ===
             var pawnData = new PawnSnapshotData
@@ -117,20 +136,16 @@ public static class PromptService
                 PawnId = pawn.thingIDNumber,
                 Items = builder.GetCollectedItems(),
                 Names = builder.GetAllNames(),
-                PawnText = pawnText
+                PawnText = pawnText,
+                QueryText = fullQuerySb.ToString()  // [SIMPLIFIED]
             };
             snapshot.PawnData.Add(pawnData);
 
-            // 累積所有 pawn 文本
             allPawnTexts.AppendLine(pawnText);
-
-            // 快取 Pawn 的描述（暫時不含注入記憶）
             Cache.Get(pawn).Context = pawnText;
         }
 
-        // 常識檢索用的搜索文本
         snapshot.KnowledgeSearchText = allPawnTexts.ToString() + "\n" + (request.Prompt ?? "");
-
         return snapshot;
     }
 
@@ -140,25 +155,69 @@ public static class PromptService
 
     /// <summary>
     /// 後台執行緒解析 Context（批次向量計算 + 記憶檢索 + 記憶注入）
+    /// [MODIFY] 使用預先收集的 QueryText
     /// </summary>
     public static async Task<string> ResolveContextAsync(ContextSnapshot snapshot, List<Pawn> pawns)
     {
         var pawnContexts = new StringBuilder();
         var allKnowledge = new HashSet<string>();
-        // 處理每個 Pawn
-        for (int i = 0; i < snapshot.PawnData.Count; i++)
+
+        // ===================================================================
+        // 階段 1：批次向量計算（為所有 Pawn 計算 Context 向量）
+        // ===================================================================
+        var pawnVectorData = new List<(Pawn pawn, PawnSnapshotData data, List<float[]> vectors)>();
+
+        foreach (var pawnData in snapshot.PawnData)
         {
-            var pawnData = snapshot.PawnData[i];
             var pawn = pawns.FirstOrDefault(p => p.thingIDNumber == pawnData.PawnId);
             if (pawn == null) continue;
-            // === 批次向量計算（異步）===
+
+            // 批次向量計算（異步）
             var contextVectors = await SemanticCache.Instance.GetVectorsBatchAsync(pawnData.Items, isQuery: true);
-            // === 記憶檢索（語意向量 Max-Sim）===
-            var memories = MemoryRetriever.GetRelevantMemoriesBySemantic(
-                contextVectors, pawn, pawnData.Names);
-            // === 常識檢索（關鍵詞匹配）===
+            pawnVectorData.Add((pawn, pawnData, contextVectors));
+        }
+
+        // ===================================================================
+        // 階段 2：記憶檢索（雲端 Reranker 並行 / 本地 Max-Sim）
+        // ===================================================================
+        Dictionary<Pawn, List<MemoryRecord>> memoriesDict;
+
+        bool useCloudReranker = Settings.Get().UseCloudVectorService &&
+                                !CloudRerankerClient.Instance.IsRateLimited;
+
+        if (useCloudReranker && pawnVectorData.Count > 0)
+        {
+            // 雲端模式：使用預先收集的 QueryText
+            var pawnDataList = pawnVectorData.Select(p => (
+                p.pawn,
+                p.vectors,
+                p.data.Names,
+                p.data.QueryText  // [MOD] 直接使用預先收集的 QueryText
+            )).ToList();
+
+            memoriesDict = await MemoryRetriever.GetRelevantMemoriesForMultiplePawnsAsync(pawnDataList);
+        }
+        else
+        {
+            // 本地模式：同步 Max-Sim
+            memoriesDict = new Dictionary<Pawn, List<MemoryRecord>>();
+            foreach (var (pawn, data, vectors) in pawnVectorData)
+            {
+                var memories = MemoryRetriever.GetRelevantMemoriesBySemantic(vectors, pawn, data.Names);
+                memoriesDict[pawn] = memories;
+            }
+        }
+
+        // ===================================================================
+        // 階段 3：記憶注入 + 組合 Context（保持原有邏輯）
+        // ===================================================================
+        for (int i = 0; i < pawnVectorData.Count; i++)
+        {
+            var (pawn, pawnData, _) = pawnVectorData[i];
+
+            var memories = memoriesDict.TryGetValue(pawn, out var mems) ? mems : new List<MemoryRecord>();
             var knowledge = MemoryRetriever.GetRelevantKnowledge(snapshot.KnowledgeSearchText);
-            // === 注入個人記憶 ===
+
             string memoryBlock = "";
             if (!memories.NullOrEmpty())
             {
@@ -166,18 +225,19 @@ public static class PromptService
             }
             string resolvedPawnText = pawnData.PawnText.Replace(
                 "[[MEMORY_INJECTION_POINT]]", memoryBlock.TrimEnd());
-            // 收集常識
+
             if (!knowledge.NullOrEmpty())
             {
                 foreach (var k in knowledge)
                     if (!string.IsNullOrEmpty(k.Summary))
                         allKnowledge.Add(k.Summary);
             }
+
             pawnContexts.AppendLine()
                    .AppendLine($"[Person {i + 1}]")
                    .AppendLine(resolvedPawnText);
         }
-        // === 組合完整 Context ===
+
         var fullContext = new StringBuilder();
         fullContext.AppendLine(Constant.GetInstruction(allKnowledge.ToList())).AppendLine();
         fullContext.Append(pawnContexts);
@@ -233,45 +293,56 @@ public static class PromptService
     }
 
     /// <summary>Creates the full pawn context.</summary>
-    // [MOD] 修改回傳簽名，新增 dynamicContext
-    private static (string text, ContextVectorBuilder builder) CreatePawnContext(
-    Pawn pawn,
-    InfoLevel infoLevel = InfoLevel.Normal)
+    /// [MOD] 新增 queryText 輸出，同步收集 Reranker 查詢文本
+    private static (string text, ContextVectorBuilder builder, string queryText) CreatePawnContext(
+        Pawn pawn,
+        InfoLevel infoLevel = InfoLevel.Normal)
     {
         var sb = new StringBuilder();
+        var querySb = new StringBuilder();  // [NEW] Reranker 查詢文本
         var builder = new ContextVectorBuilder();
 
         sb.Append(CreatePawnBackstory(pawn, infoLevel));
 
-        // Health
-        AppendIfNotEmpty(sb, ContextBuilder.GetHealthContext(pawn, infoLevel));
+        // Health — 對記憶檢索非常重要
+        string health = ContextBuilder.GetHealthContext(pawn, infoLevel);
+        AppendIfNotEmpty(sb, health);
+        AppendIfNotEmpty(querySb, health);  // [NEW]
 
         // [NEW] 收集 Health 向量（事件性 Hediff）
         builder.CollectEventHediffs(pawn.health?.hediffSet?.hediffs);
 
         var personality = Cache.Get(pawn).Personality;
         if (personality != null)
+        {
             sb.AppendLine($"Personality: {personality}");
+        }
 
         // Stop here for invaders
         if (pawn.IsEnemy())
-            return (sb.ToString(), builder);
+            return (sb.ToString(), builder, querySb.ToString());
 
-        // Mood
-        AppendIfNotEmpty(sb, ContextBuilder.GetMoodContext(pawn, infoLevel));
+        // Mood — 對記憶檢索重要
+        string mood = ContextBuilder.GetMoodContext(pawn, infoLevel);
+        AppendIfNotEmpty(sb, mood);
+        AppendIfNotEmpty(querySb, mood);  // [NEW]
 
         // [NEW] 收集 Mood 向量
         if (pawn.needs?.mood != null)
             builder.CollectMood(pawn.needs.mood.CurLevelPercentage);
 
-        // Thoughts
-        AppendIfNotEmpty(sb, ContextBuilder.GetThoughtsContext(pawn, infoLevel));
+        // Thoughts — 對記憶檢索非常重要
+        string thoughts = ContextBuilder.GetThoughtsContext(pawn, infoLevel);
+        AppendIfNotEmpty(sb, thoughts);
+        AppendIfNotEmpty(querySb, thoughts);  // [NEW]
 
         // [NEW] 收集 Thoughts 向量
         builder.CollectThoughts(ContextHelper.GetThoughts(pawn)?.Keys);
 
-        // Prisoner/Slave status
-        AppendIfNotEmpty(sb, ContextBuilder.GetPrisonerSlaveContext(pawn, infoLevel));
+        // Prisoner/Slave status — 對記憶檢索重要
+        string prisonerSlave = ContextBuilder.GetPrisonerSlaveContext(pawn, infoLevel);
+        AppendIfNotEmpty(sb, prisonerSlave);
+        AppendIfNotEmpty(querySb, prisonerSlave);  // [NEW]
 
         // [NEW] 收集 Resistance/Will/Suppression 向量
         if (pawn.IsPrisoner)
@@ -286,7 +357,7 @@ public static class PromptService
                 builder.CollectText(Describer.Suppression(suppressionNeed.CurLevelPercentage * 100f));
         }
 
-        // Visitor activity
+        // Visitor activity — 對記憶檢索有幫助
         if (pawn.IsVisitor())
         {
             var lord = pawn.GetLord() ?? pawn.CurJob?.lord;
@@ -294,14 +365,16 @@ public static class PromptService
             {
                 var cleanName = lord.LordJob.GetType().Name.Replace("LordJob_", "");
                 sb.AppendLine($"Activity: {cleanName}");
+                querySb.AppendLine($"Activity: {cleanName}");  // [NEW]
                 // [NEW] 收集 Activity 向量
                 builder.CollectText(cleanName);
             }
         }
 
-        // Relations
+        // Relations — 對記憶檢索非常重要
         string relations = ContextBuilder.GetRelationsContext(pawn, infoLevel);
         AppendIfNotEmpty(sb, relations);
+        AppendIfNotEmpty(querySb, relations);  // [NEW]
         // [NEW] 收集 Relations 人名和關係詞
         builder.CollectRelations(relations);
 
@@ -311,7 +384,7 @@ public static class PromptService
         if (infoLevel != InfoLevel.Short)
             AppendIfNotEmpty(sb, ContextBuilder.GetEquipmentContext(pawn, infoLevel));
 
-        return (sb.ToString(), builder);
+        return (sb.ToString(), builder, querySb.ToString());
     }
 
     /// <summary>Decorates the prompt with dialogue type, time, weather, location, and environment.</summary>
@@ -324,7 +397,11 @@ public static class PromptService
         var shortName = $"{mainPawn.LabelShort}";
 
         // Dialogue type
-        ContextBuilder.BuildDialogueType(sb, talkRequest, pawns, shortName, mainPawn);
+        // [MOD] 收集 dialogueType
+        string dialogueType = ContextBuilder.BuildDialogueType(sb, talkRequest, pawns, shortName, mainPawn);
+
+        // [NEW] 存入 TalkRequest 供後續使用
+        talkRequest.DialogueType = dialogueType;
 
         // Time and weather
         sb.Append($"\n{status}");
@@ -360,48 +437,6 @@ public static class PromptService
     {
         if (!string.IsNullOrEmpty(text))
             sb.AppendLine(text);
-    }
-
-    /// <summary>
-    /// 從 Prompt 中提取 DialogueType 的語意部分，過濾掉 LLM 指令
-    /// </summary>
-    private static string ExtractDialogueContext(string prompt)
-    {
-        if (string.IsNullOrWhiteSpace(prompt)) return null;
-
-        var lines = prompt.Split('\n').Select(l => l.Trim()).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
-        var result = new List<string>();
-
-        foreach (var line in lines)
-        {
-            var lower = line.ToLowerInvariant();
-
-            // 過濾純 LLM 指令（精準匹配）
-            if (lower.Contains("generate dialogue starting after this") ||
-                lower.Contains("do not generate any further lines") ||
-                lower.Contains("generate multi turn dialogues") ||
-                lower.Contains("do not repeat initial dialogue") ||
-                lower.Contains("starts conversation, taking turns") ||
-                lower.EndsWith("short monologue") ||
-                lower == $"in {Constant.Lang}".ToLowerInvariant())
-            {
-                continue;
-            }
-            // 過濾 ArchivePatch 的指令前綴，但保留方括號內的內容
-            // "(Talk if you want to accept quest)" -> 過濾
-            // "(Talk about quest result)" -> 過濾
-            // "(Talk about incident)" -> 過濾
-            if (lower == "(talk if you want to accept quest)" ||
-                lower == "(talk about quest result)" ||
-                lower == "(talk about incident)")
-            {
-                continue;
-            }
-
-            result.Add(line);
-        }
-
-        return string.Join(" ", result);
     }
 
     /// <summary>

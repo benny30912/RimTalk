@@ -25,6 +25,7 @@ namespace RimTalk.Data
         public List<ContextItem> Items { get; set; } = new();           // 該 Pawn 的 Context 項目
         public HashSet<string> Names { get; set; } = new();             // 收集的人名（用於人名加分）
         public string PawnText { get; set; }                            // 帶 [[MEMORY_INJECTION_POINT]] 的描述
+        public string QueryText { get; set; }                           // [NEW] Reranker 查詢文本
     }
 
     /// <summary>

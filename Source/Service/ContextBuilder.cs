@@ -277,8 +277,14 @@ public static class ContextBuilder
         return null;
     }
 
-    public static void BuildDialogueType(StringBuilder sb, TalkRequest talkRequest, List<Pawn> pawns, string shortName, Pawn mainPawn)
+    /// <summary>
+    /// 建構對話類型到 StringBuilder，並返回純語意的對話類型描述（供向量化使用）
+    /// </summary>
+    /// <returns>對話類型語意描述（如「閒聊，心情不錯」），不含 LLM 指令</returns>
+    public static string BuildDialogueType(StringBuilder sb, TalkRequest talkRequest, List<Pawn> pawns, string shortName, Pawn mainPawn)
     {
+        string dialogueType = null;  // [NEW] 收集純語意描述
+
         if (talkRequest.TalkType == TalkType.User)
         {
             sb.Append($"{pawns[1].LabelShort}({pawns[1].GetRole()}) said to '{shortName}: {talkRequest.Prompt}'.");
@@ -286,12 +292,16 @@ public static class ContextBuilder
                 sb.Append($"Generate dialogue starting after this. Do not generate any further lines for {pawns[1].LabelShort}");
             else if (Settings.Get().PlayerDialogueMode == Settings.PlayerDialogueMode.AIDriven)
                 sb.Append($"Generate multi turn dialogues starting after this (do not repeat initial dialogue), beginning with {mainPawn.LabelShort}");
+
+            // [NEW] 玩家對話的語意描述
+            dialogueType = $"{talkRequest.Prompt}";
         }
         else
         {
             if (pawns.Count == 1)
             {
                 sb.Append($"{shortName} short monologue");
+                dialogueType = "独白";  // [NEW]
             }
             else if (mainPawn.IsInCombat() || mainPawn.GetMapRole() == MapRole.Invading)
             {
@@ -302,19 +312,36 @@ public static class ContextBuilder
                 sb.Append(mainPawn.IsSlave || mainPawn.IsPrisoner
                     ? $"{shortName} dialogue short (worry)"
                     : $"{shortName} dialogue short, urgent tone ({mainPawn.GetMapRole().ToString().ToLower()}/command)");
+
+                // [NEW] 戰鬥/緊急的語意描述
+                dialogueType = mainPawn.IsSlave || mainPawn.IsPrisoner
+                    ? "担忧"
+                    : $"紧急对话({mainPawn.GetMapRole()})";
             }
             else
             {
                 sb.Append($"{shortName} starts conversation, taking turns");
+                dialogueType = null;  // [NEW] 普通對話不需要特別描述
             }
 
             if (mainPawn.InMentalState)
+            {
                 sb.Append("\nbe dramatic (mental break)");
+                dialogueType = "精神崩溃";  // [NEW]
+            }
             else if (mainPawn.Downed && !mainPawn.IsBaby())
+            {
                 sb.Append("\n(downed in pain. Short, strained dialogue)");
-            else
+                dialogueType = "痛苦倒地";  // [NEW]
+            }
+            else if (!string.IsNullOrEmpty(talkRequest.Prompt))
+            {
                 sb.Append($"\n{talkRequest.Prompt}");
+                dialogueType = talkRequest.Prompt;  // [NEW] 使用原始 Prompt 作為語意描述
+            }
         }
+
+        return dialogueType;
     }
 
     public static void BuildLocationContext(StringBuilder sb, ContextSettings contextSettings, Pawn mainPawn)

@@ -123,6 +123,38 @@ namespace RimTalk.Source.Memory
         }
 
         /// <summary>
+        /// 格式化個人回憶字串，供 BuildContext 使用
+        /// </summary>
+        public static string FormatRecalledMemories(List<MemoryRecord> memories)
+        {
+            if (memories.NullOrEmpty()) return "";
+            var sb = new StringBuilder();
+            sb.AppendLine("Recalled Memories:");
+            foreach (var m in memories)
+            {
+                string timeAgo = GetTimeAgo(m.CreatedTick);
+                // [NEW] 顯示 keywords（地點/物品標籤）
+                string tags = m.Keywords.NullOrEmpty() ? "" : $" [{string.Join(", ", m.Keywords)}]";
+                sb.AppendLine($"- [{timeAgo}]{tags} {m.Summary}");
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// 格式化單條記憶供 Reranker 使用
+        /// 加入 Keywords 標籤以提升語意匹配準確度
+        /// </summary>
+        public static string FormatMemoryForRerank(MemoryRecord memory)
+        {
+            if (memory == null || string.IsNullOrEmpty(memory.Summary))
+                return "";
+            string tags = memory.Keywords.NullOrEmpty()
+                ? ""
+                : $"[{string.Join(", ", memory.Keywords)}] ";
+            return $"{tags}{memory.Summary}";
+        }
+
+        /// <summary>
         /// 将游戏 Tick 转换为相对时间描述（执行绪安全）
         /// </summary>
         public static string GetTimeAgo(int createdTick)
@@ -139,24 +171,6 @@ namespace RimTalk.Source.Memory
             if (seasons < 4.0f) return $"{(int)seasons}季前";
             float years = seasons / 4f;
             return $"{(int)years}年前";
-        }
-
-        /// <summary>
-        /// 格式化個人回憶字串，供 BuildContext 使用
-        /// </summary>
-        public static string FormatRecalledMemories(List<MemoryRecord> memories)
-        {
-            if (memories.NullOrEmpty()) return "";
-            var sb = new StringBuilder();
-            sb.AppendLine("Recalled Memories:");
-            foreach (var m in memories)
-            {
-                string timeAgo = GetTimeAgo(m.CreatedTick);
-                // [NEW] 顯示 keywords（地點/物品標籤）
-                string tags = m.Keywords.NullOrEmpty() ? "" : $" [{string.Join(", ", m.Keywords)}]";
-                sb.AppendLine($"- [{timeAgo}]{tags} {m.Summary}");
-            }
-            return sb.ToString();
         }
     }
 }
