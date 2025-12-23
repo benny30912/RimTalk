@@ -159,7 +159,7 @@ public static class PawnUtil
 
         // [NEW] 收集主 Pawn 的動作
         if (!string.IsNullOrEmpty(pawnActivity))
-            collectedActivities.Add(pawnActivity);
+            collectedActivities.Add($"{pawn.LabelShort} {pawnActivity}");
 
         if (pawn.IsInDanger())
             isInDanger = true;

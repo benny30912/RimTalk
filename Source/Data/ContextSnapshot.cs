@@ -26,6 +26,15 @@ namespace RimTalk.Data
         public HashSet<string> Names { get; set; } = new();             // 收集的人名（用於人名加分）
         public string PawnText { get; set; }                            // 帶 [[MEMORY_INJECTION_POINT]] 的描述
         public string QueryText { get; set; }                           // [NEW] Reranker 查詢文本
+                                                                        // [NEW] 動態 QueryText 基本參數
+        /// <summary>
+        /// 當前動作（如「收割野生植物」）
+        /// </summary>
+        public string CurrentAction { get; set; }
+        /// <summary>
+        /// 對話類型語意描述（如「閒聊」「爭吵」）
+        /// </summary>
+        public string DialogueType { get; set; }
     }
 
     /// <summary>

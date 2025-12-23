@@ -137,7 +137,9 @@ namespace RimTalk.Vector
                         _textCache.TryAdd(key, computed[j]);
                 }
             }
-            return results.Where(v => v != null).ToList();
+            // [MOD] 不過濾 null，保持與 items 索引對應
+            // 呼叫方需自行處理 null 向量（如 CalculateMaxSim 已有 null 檢查）
+            return results.ToList();
         }
 
         /// <summary>

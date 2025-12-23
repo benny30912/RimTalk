@@ -128,13 +128,17 @@ public static class PromptService
                     builder.CollectText(eventText);
 
             // === 收集 Pawn 資料到快照 ===
+            // [MOD] 新增動態 QueryText 基本參數
             var pawnData = new PawnSnapshotData
             {
                 PawnId = pawn.thingIDNumber,
                 Items = builder.GetCollectedItems(),
                 Names = builder.GetAllNames(),
                 PawnText = pawnText,
-                QueryText = fullQuerySb.ToString()  // [SIMPLIFIED]
+                QueryText = fullQuerySb.ToString(),  // [保留] 靜態 QueryText（降級用）
+                                                     // [NEW] 動態 QueryText 基本參數
+                CurrentAction = pawn.jobs?.curJob?.GetReport(pawn) ?? "",
+                DialogueType = request.DialogueType ?? "",
             };
             snapshot.PawnData.Add(pawnData);
 
@@ -184,14 +188,13 @@ public static class PromptService
 
         if (useCloudReranker && pawnVectorData.Count > 0)
         {
-            // 雲端模式：使用預先收集的 QueryText
+            // [MOD] 雲端模式：傳遞完整 PawnSnapshotData 供動態 QueryText 生成
             var pawnDataList = pawnVectorData.Select(p => (
                 p.pawn,
                 p.vectors,
                 p.data.Names,
-                p.data.QueryText  // [MOD] 直接使用預先收集的 QueryText
+                p.data  // [MOD] 傳遞完整 PawnSnapshotData
             )).ToList();
-
             memoriesDict = await MemoryRetriever.GetRelevantMemoriesForMultiplePawnsAsync(pawnDataList);
         }
         else

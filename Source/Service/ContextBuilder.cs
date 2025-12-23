@@ -301,7 +301,7 @@ public static class ContextBuilder
             if (pawns.Count == 1)
             {
                 sb.Append($"{shortName} short monologue");
-                dialogueType = "独白";  // [NEW]
+                dialogueType = "自言自语";  // [NEW]
             }
             else if (mainPawn.IsInCombat() || mainPawn.GetMapRole() == MapRole.Invading)
             {
@@ -315,7 +315,7 @@ public static class ContextBuilder
 
                 // [NEW] 戰鬥/緊急的語意描述
                 dialogueType = mainPawn.IsSlave || mainPawn.IsPrisoner
-                    ? "担忧"
+                    ? "感到担忧"
                     : $"紧急对话({mainPawn.GetMapRole()})";
             }
             else

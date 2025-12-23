@@ -60,10 +60,10 @@ namespace RimTalk.Source.Memory
         /// 雲端模式：使用 Embedding 召回 + Reranker 精排
         /// 本地模式：降級為同步 Max-Sim
         /// </summary>
-        /// <param name="pawnDataList">每個角色的資料 (pawn, contextVectors, contextNames, queryText)</param>
+        /// <param name="pawnDataList">每個角色的資料 (pawn, contextVectors, contextNames, pawnData)</param>
         /// <returns>每個角色對應的記憶列表</returns>
         public static async Task<Dictionary<Pawn, List<MemoryRecord>>> GetRelevantMemoriesForMultiplePawnsAsync(
-            List<(Pawn pawn, List<float[]> contextVectors, HashSet<string> contextNames, string queryText)> pawnDataList)
+            List<(Pawn pawn, List<float[]> contextVectors, HashSet<string> contextNames, PawnSnapshotData pawnData)> pawnDataList)
         {
             var result = new Dictionary<Pawn, List<MemoryRecord>>();
             if (pawnDataList == null || pawnDataList.Count == 0)
@@ -78,14 +78,14 @@ namespace RimTalk.Source.Memory
 
             if (useCloudReranker)
             {
-                // 雲端模式：並行呼叫 Reranker
+                // [MOD] 雲端模式：傳遞完整 PawnSnapshotData 供動態 QueryText 生成
                 var tasks = pawnDataList.Select(async data =>
                 {
                     var memories = await GetRelevantMemoriesWithRerankAsync(
                         data.contextVectors,
                         data.pawn,
                         data.contextNames,
-                        data.queryText,
+                        data.pawnData,  // [MOD] 傳遞完整 PawnSnapshotData
                         quotas);
                     return (data.pawn, memories);
                 }).ToList();
@@ -183,12 +183,13 @@ namespace RimTalk.Source.Memory
 
         /// <summary>
         /// [異步] 使用 Embedding 召回 + Reranker 精排的記憶檢索
+        /// [MOD] 使用動態 QueryText 生成
         /// </summary>
         private static async Task<List<MemoryRecord>> GetRelevantMemoriesWithRerankAsync(
             List<float[]> contextVectors,
             Pawn pawn,
             HashSet<string> contextNames,
-            string queryText,
+            PawnSnapshotData pawnData,  // [MOD] 改為接收完整 PawnSnapshotData
             (int total, int stm, int ltm) quotas)
         {
             if (contextVectors == null || contextVectors.Count == 0 || pawn == null)
@@ -203,18 +204,47 @@ namespace RimTalk.Source.Memory
             var candidates = RecallCandidates(allMemories, contextVectors, RECALL_TOP_K, RECALL_THRESHOLD);
             if (candidates.Count == 0) return new List<MemoryRecord>();
 
-            // 3. 階段二：Reranker 精排
-            var documents = candidates.Select(m => MemoryFormatter.FormatMemoryForRerank(m)).ToList();
-            var rerankResults = await CloudRerankerClient.Instance.RerankAsync(queryText, documents, RECALL_TOP_K);
+            // 3. [NEW] 提取記憶匹配的 context 原始文本
+            var matchedContexts = ExtractBestMatchingContexts(
+                candidates,
+                pawnData.Items,
+                contextVectors,
+                RECALL_THRESHOLD);
 
-            // 4. 若 Reranker 失敗，降級為 Embedding-only 模式
+            // [MOD] 合併 Pawn 名稱與當前動作
+            string actionWithName = string.IsNullOrWhiteSpace(pawnData.CurrentAction)
+                ? pawn.LabelShort
+                : $"{pawn.LabelShort} {pawnData.CurrentAction}";
+
+            // 4. [NEW] 動態生成 QueryText
+            string dynamicQuery = BuildDynamicQueryText(
+                actionWithName,
+                pawnData.DialogueType,
+                matchedContexts);
+
+            // 降級：若動態 QueryText 為空，使用靜態版本
+            if (string.IsNullOrWhiteSpace(dynamicQuery))
+            {
+                dynamicQuery = pawnData.QueryText ?? "";
+                Log.Warning("[RimTalk] Dynamic QueryText empty, falling back to static QueryText");
+            }
+
+            // [DEBUG] 記錄動態 QueryText
+            Log.Message($"[RimTalk DEBUG] Dynamic QueryText: {dynamicQuery}");
+            Log.Message($"[RimTalk DEBUG] Matched Contexts: {string.Join(", ", matchedContexts)}");
+
+            // 5. 階段二：Reranker 精排
+            var documents = candidates.Select(m => MemoryFormatter.FormatMemoryForRerank(m)).ToList();
+            var rerankResults = await CloudRerankerClient.Instance.RerankAsync(dynamicQuery, documents, RECALL_TOP_K);
+
+            // 6. 若 Reranker 失敗，降級為 Embedding-only 模式
             if (rerankResults.Count == 0)
             {
                 Log.Warning("[RimTalk] Reranker 失敗，降級為 Embedding-only 模式");
                 return GetRelevantMemoriesInternal(contextVectors, pawn, contextNames, quotas);
             }
 
-            // 5. 將 Reranker 分數映射回記憶
+            // 7. 將 Reranker 分數映射回記憶
             var rerankScoreMap = new Dictionary<MemoryRecord, float>();
             foreach (var rr in rerankResults)
             {
@@ -224,13 +254,136 @@ namespace RimTalk.Source.Memory
                 }
             }
 
-            // 6. 計算最終分數並選擇（使用通用方法）
+            // 8. 計算最終分數並選擇（使用通用方法）
             return SelectMemoriesWithRerankScores(
                 stmList, ltmList,
                 stmList.Concat(mtmList).Concat(ltmList).ToList(),
                 rerankScoreMap,
                 contextNames,
                 quotas);
+        }
+
+        /// <summary>
+        /// 從 Top-20 記憶中提取每條記憶最匹配的 context 原始文本
+        /// </summary>
+        /// <param name="candidates">Top-20 候選記憶</param>
+        /// <param name="contextItems">ContextItem 列表</param>
+        /// <param name="contextVectors">對應的向量列表（索引必須對應）</param>
+        /// <param name="threshold">相似度閾值（與 Embedding 召回閾值一致）</param>
+        /// <returns>去重排序後的 context 原始文本列表</returns>
+        private static List<string> ExtractBestMatchingContexts(
+            List<MemoryRecord> candidates,
+            List<ContextItem> contextItems,
+            List<float[]> contextVectors,
+            float threshold)
+        {
+            // 儲存 (文本, 最高分數) 的結果
+            var results = new List<(string text, float score)>();
+
+            // 防禦性檢查
+            if (candidates == null || contextItems == null || contextVectors == null)
+                return new List<string>();
+
+            foreach (var memory in candidates)
+            {
+                // 取得記憶向量
+                var memVector = VectorDatabase.Instance.GetVector(memory.Id);
+                if (memVector == null) continue;
+
+                float bestScore = 0f;
+                string bestContextText = null;
+
+                // 遍歷所有 context 項目，找出最匹配的
+                for (int i = 0; i < contextVectors.Count && i < contextItems.Count; i++)
+                {
+                    if (contextVectors[i] == null) continue;
+
+                    float sim = VectorService.CosineSimilarity(memVector, contextVectors[i]);
+                    if (sim > bestScore)
+                    {
+                        bestScore = sim;
+                        // 根據 ItemType 提取原始文本
+                        bestContextText = contextItems[i].Type == ContextItem.ItemType.Text
+                            ? contextItems[i].Text
+                            : contextItems[i].Def?.label;
+                    }
+                }
+
+                // 只保留超過閾值的結果
+                if (!string.IsNullOrEmpty(bestContextText) && bestScore >= threshold)
+                {
+                    results.Add((bestContextText, bestScore));
+                }
+            }
+
+            // 按分數降序排列
+            // 返回前去重
+            return results
+                .GroupBy(x => x.text)
+                .Select(g => (text: g.Key, score: g.Max(x => x.score)))
+                .OrderByDescending(x => x.score)
+                .Select(x => x.text)
+                .ToList();
+        }
+
+        /// <summary>
+        /// 動態生成 Reranker 查詢文本
+        /// 結合基本參數與記憶匹配的 context 原始文本
+        /// </summary>
+        /// <param name="currentAction">當前動作（如「收割野生植物」）</param>
+        /// <param name="dialogueType">對話類型（如「閒聊」「爭吵」）</param>
+        /// <param name="matchedContexts">記憶匹配的 context 原始文本</param>
+        /// <returns>自然語言格式的 QueryText</returns>
+        private static string BuildDynamicQueryText(
+            string actionWithName,
+            string dialogueType,
+            List<string> matchedContexts)
+        {
+            // [NEW] 正規化文本：去除前後空白、換行、句號
+            string Normalize(string text)
+            {
+                if (string.IsNullOrWhiteSpace(text)) return null;
+                text = text.Trim().TrimEnd('。', '.').Replace("\r", "").Replace("\n", " ");
+                text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " "); // 統一多個空格為單一空格
+                return string.IsNullOrWhiteSpace(text) ? null : text;
+            }
+
+            // [FIX] 使用 HashSet 去重
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var parts = new List<string>();
+            // [MOD] 去除尾部句號後，只添加非空且不重複的內容
+            void AddIfUnique(string text)
+            {
+                text = Normalize(text);
+                if (text != null && seen.Add(text))
+                    parts.Add(text);
+            }
+
+            // 基本參數：當前動作
+            // [MOD] 特殊處理 actionWithName：
+            // 用基礎文本去重，但輸出帶「中」後綴
+            string normalizedAction = Normalize(actionWithName);
+            if (normalizedAction != null && seen.Add(normalizedAction))
+            {
+                // 若已結尾「中」則直接加入，否則補上「中」
+                parts.Add(normalizedAction.EndsWith("中") ? normalizedAction : $"{normalizedAction}中");
+            }
+
+            // 基本參數：對話類型
+            AddIfUnique(dialogueType);
+
+            // [REMOVED] 不再直接加入 Activities
+            // 若相關會透過 MatchedContexts 捕捉
+
+            // 記憶匹配的 context 原始文本
+            if (matchedContexts?.Count > 0)
+            {
+                foreach (var context in matchedContexts)
+                    AddIfUnique(context);
+            }
+
+            // 使用句號連接（自然語言格式）
+            return string.Join("，", parts) + "。";
         }
 
         /// <summary>
