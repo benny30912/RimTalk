@@ -208,8 +208,7 @@ namespace RimTalk.Source.Memory
             var matchedContexts = ExtractBestMatchingContexts(
                 candidates,
                 pawnData.Items,
-                contextVectors,
-                RECALL_THRESHOLD);
+                contextVectors);
 
             // [MOD] 合併 Pawn 名稱與當前動作
             string actionWithName = string.IsNullOrWhiteSpace(pawnData.CurrentAction)
@@ -228,10 +227,6 @@ namespace RimTalk.Source.Memory
                 dynamicQuery = pawnData.QueryText ?? "";
                 Log.Warning("[RimTalk] Dynamic QueryText empty, falling back to static QueryText");
             }
-
-            // [DEBUG] 記錄動態 QueryText
-            Log.Message($"[RimTalk DEBUG] Dynamic QueryText: {dynamicQuery}");
-            Log.Message($"[RimTalk DEBUG] Matched Contexts: {string.Join(", ", matchedContexts)}");
 
             // 5. 階段二：Reranker 精排
             var documents = candidates.Select(m => MemoryFormatter.FormatMemoryForRerank(m)).ToList();
@@ -264,60 +259,46 @@ namespace RimTalk.Source.Memory
         }
 
         /// <summary>
-        /// 從 Top-20 記憶中提取每條記憶最匹配的 context 原始文本
+        /// 從 Top-20 記憶中提取每條記憶最匹配的 Top-3 context 原始文本
+        /// [MOD] 不再過濾閾值，直接取 Top-3
         /// </summary>
-        /// <param name="candidates">Top-20 候選記憶</param>
-        /// <param name="contextItems">ContextItem 列表</param>
-        /// <param name="contextVectors">對應的向量列表（索引必須對應）</param>
-        /// <param name="threshold">相似度閾值（與 Embedding 召回閾值一致）</param>
-        /// <returns>去重排序後的 context 原始文本列表</returns>
         private static List<string> ExtractBestMatchingContexts(
             List<MemoryRecord> candidates,
             List<ContextItem> contextItems,
-            List<float[]> contextVectors,
-            float threshold)
+            List<float[]> contextVectors)
         {
-            // 儲存 (文本, 最高分數) 的結果
             var results = new List<(string text, float score)>();
 
-            // 防禦性檢查
             if (candidates == null || contextItems == null || contextVectors == null)
                 return new List<string>();
 
             foreach (var memory in candidates)
             {
-                // 取得記憶向量
                 var memVector = VectorDatabase.Instance.GetVector(memory.Id);
                 if (memVector == null) continue;
 
-                float bestScore = 0f;
-                string bestContextText = null;
+                // 收集所有 context 的相似度
+                var scores = new List<(string text, float score)>();
 
-                // 遍歷所有 context 項目，找出最匹配的
                 for (int i = 0; i < contextVectors.Count && i < contextItems.Count; i++)
                 {
                     if (contextVectors[i] == null) continue;
 
                     float sim = VectorService.CosineSimilarity(memVector, contextVectors[i]);
-                    if (sim > bestScore)
-                    {
-                        bestScore = sim;
-                        // 根據 ItemType 提取原始文本
-                        bestContextText = contextItems[i].Type == ContextItem.ItemType.Text
-                            ? contextItems[i].Text
-                            : contextItems[i].Def?.label;
-                    }
+                    string text = contextItems[i].Type == ContextItem.ItemType.Text
+                        ? contextItems[i].Text
+                        : contextItems[i].Def?.label;
+
+                    if (!string.IsNullOrEmpty(text))
+                        scores.Add((text, sim));
                 }
 
-                // 只保留超過閾值的結果
-                if (!string.IsNullOrEmpty(bestContextText) && bestScore >= threshold)
-                {
-                    results.Add((bestContextText, bestScore));
-                }
+                // [MOD] 直接取 Top-3（不過濾閾值）
+                var top3 = scores.OrderByDescending(x => x.score).Take(3);
+                results.AddRange(top3);
             }
 
-            // 按分數降序排列
-            // 返回前去重
+            // 去重，按分數排序
             return results
                 .GroupBy(x => x.text)
                 .Select(g => (text: g.Key, score: g.Max(x => x.score)))
@@ -492,13 +473,13 @@ namespace RimTalk.Source.Memory
         }
 
         /// <summary>
-        /// 計算記憶與 Context 向量池的 Max-Sim
+        /// 計算記憶與 Context 向量池的 Top-3 平均相似度
+        /// [MOD] 先 Top-3 平均，再判斷閾值
         /// </summary>
         private static float CalculateMaxSim(MemoryRecord mem, List<float[]> contextVectors, float threshold)
         {
             var memVector = VectorDatabase.Instance.GetVector(mem.Id);
 
-            // 缺失向量：加入佇列補算
             if (memVector == null)
             {
                 if (!string.IsNullOrEmpty(mem.Summary))
@@ -506,16 +487,25 @@ namespace RimTalk.Source.Memory
                 return 0f;
             }
 
-            // Max-Sim 計算
-            float maxSim = 0f;
+            // 收集所有相似度
+            var similarities = new List<float>();
             foreach (var cv in contextVectors)
             {
                 if (cv == null) continue;
                 float sim = VectorService.CosineSimilarity(cv, memVector);
-                if (sim > maxSim) maxSim = sim;
+                similarities.Add(sim);
             }
 
-            return maxSim >= threshold ? maxSim : 0f;
+            if (similarities.Count == 0)
+                return 0f;
+
+            // [MOD] 先取 Top-3 平均，再判斷閾值
+            float top3Avg = similarities
+                .OrderByDescending(s => s)
+                .Take(3)
+                .Average();
+
+            return top3Avg >= threshold ? top3Avg : 0f;
         }
 
         /// <summary>

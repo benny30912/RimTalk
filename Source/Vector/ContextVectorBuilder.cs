@@ -60,14 +60,19 @@ namespace RimTalk.Vector
 
         /// <summary>
         /// [NEW] 收集 Thoughts
+        /// [FIX] 使用 LabelCap 取得完整標籤（與 ContextBuilder 一致）
         /// </summary>
         public void CollectThoughts(IEnumerable<Thought> thoughts)
         {
             if (thoughts == null) return;
             foreach (var thought in thoughts)
             {
-                if (thought?.def != null)
-                    CollectDef(thought.def);
+                if (thought == null) continue;
+
+                // [FIX] 使用 thought.LabelCap 而非 thought.def.label
+                string label = thought.LabelCap;
+                if (!string.IsNullOrWhiteSpace(label))
+                    CollectText(label);  // 改用 Text 類型
             }
         }
 
