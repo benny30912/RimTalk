@@ -173,6 +173,7 @@ namespace RimTalk.Source.Memory
                                             Keywords = m.Keywords ?? [],
                                             Importance = Mathf.Clamp(m.Importance, 1, 5),
                                             CreatedTick = calculatedTick,
+                                            AccessCount = avgAccess,  // [FIX] 補上遺漏的 AccessCount
                                             SourceIds = resolvedSourceIds
                                         };
                                     }).ToList();
