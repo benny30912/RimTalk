@@ -26,7 +26,7 @@ namespace RimTalk.Source.Memory
         // ========================
         // 硬編碼參數 (Reranker 二階段)
         // ========================
-        private const int RECALL_TOP_K = 20;           // 階段一召回數量
+        private const int RECALL_TOP_K = 25;           // 階段一召回數量
         private const float RECALL_THRESHOLD = 0.25f;   // 召回閾值
         private const float RERANK_THRESHOLD = 0.25f;   // Reranker 閾值
 
