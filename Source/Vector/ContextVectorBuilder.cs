@@ -9,44 +9,51 @@ namespace RimTalk.Vector
 {
     /// <summary>
     /// Context 向量建構器
-    /// 收集動態情境項目，組合成 Context 向量用於記憶檢索。
-    /// [MOD] 改為收集 ContextItem，延遲向量計算到後台執行緒
     /// </summary>
     public class ContextVectorBuilder
     {
-        // [MOD] 改為收集 ContextItem 而非立即計算向量
-        private readonly List<ContextItem> _collectedItems = new List<ContextItem>();
-        private readonly HashSet<string> _collectedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly List<ContextItem> _collectedItems = new();
+        private readonly HashSet<string> _collectedNames = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
-        /// [NEW] 收集 Def 項目（延遲向量化）
+        /// 收集 Def 項目（帶類別標籤）
         /// </summary>
-        public void CollectDef(Def def)
+        public void CollectDef(Def def, ContextItem.Category category = ContextItem.Category.Other)
         {
-            if (def != null)
-                _collectedItems.Add(new ContextItem { Type = ContextItem.ItemType.Def, Def = def });
+            if (def != null && !string.IsNullOrWhiteSpace(def.label))
+                _collectedItems.Add(new ContextItem
+                {
+                    Type = ContextItem.ItemType.Def,
+                    Def = def,
+                    ContextCategory = category
+                });
         }
 
         /// <summary>
-        /// [NEW] 收集固定文本項目（延遲向量化）
+        /// 收集固定文本項目（帶類別標籤）
         /// </summary>
-        public void CollectText(string text)
+        public void CollectText(string text, ContextItem.Category category = ContextItem.Category.Other)
         {
             if (!string.IsNullOrWhiteSpace(text))
-                _collectedItems.Add(new ContextItem { Type = ContextItem.ItemType.Text, Text = text });
+                _collectedItems.Add(new ContextItem
+                {
+                    Type = ContextItem.ItemType.Text,
+                    Text = text,
+                    ContextCategory = category
+                });
         }
 
         /// <summary>
-        /// [NEW] 收集心情（轉換為語意描述後加入）
+        /// 收集心情
         /// </summary>
         public void CollectMood(float moodPercent)
         {
             string semantic = SemanticMapper.MapMoodToSemantic(moodPercent);
-            CollectText(semantic);
+            CollectText(semantic, ContextItem.Category.Mood);
         }
 
         /// <summary>
-        /// [NEW] 收集事件性 Hediff
+        /// 收集事件性 Hediff
         /// </summary>
         public void CollectEventHediffs(IEnumerable<Hediff> hediffs)
         {
@@ -54,13 +61,12 @@ namespace RimTalk.Vector
             foreach (var hediff in eventHediffs)
             {
                 if (hediff?.def != null)
-                    CollectDef(hediff.def);
+                    CollectDef(hediff.def, ContextItem.Category.EventHediff);
             }
         }
 
         /// <summary>
-        /// [NEW] 收集 Thoughts
-        /// [FIX] 使用 LabelCap 取得完整標籤（與 ContextBuilder 一致）
+        /// 收集 Thoughts
         /// </summary>
         public void CollectThoughts(IEnumerable<Thought> thoughts)
         {
@@ -68,80 +74,94 @@ namespace RimTalk.Vector
             foreach (var thought in thoughts)
             {
                 if (thought == null) continue;
-
-                // [FIX] 使用 thought.LabelCap 而非 thought.def.label
                 string label = thought.LabelCap;
                 if (!string.IsNullOrWhiteSpace(label))
-                    CollectText(label);  // 改用 Text 類型
+                    CollectText(label, ContextItem.Category.Thought);
             }
         }
 
         /// <summary>
-        /// 收集 Relations（同時提取關係詞彙和人名）
+        /// 收集 Relations
         /// </summary>
         public void CollectRelations(string relationsText)
         {
             if (string.IsNullOrEmpty(relationsText)) return;
 
-            // 1. 收集關係詞彙
             var relationWords = SemanticMapper.ExtractRelationWords(relationsText);
             foreach (var word in relationWords)
-                CollectText(word);
+                CollectText(word, ContextItem.Category.Relation);
 
-            // 2. 收集人名（用於人名加分）
             var relationNames = SemanticMapper.ExtractRelationNames(relationsText);
             AddNames(relationNames);
         }
 
         /// <summary>
-        /// [MOD] 收集 Surrounding（改為接收 Thing 列表）
+        /// 收集 Surrounding
         /// </summary>
         public void CollectSurrounding(List<Thing> things)
         {
             string text = SemanticMapper.GetSurroundingText(things);
             if (!string.IsNullOrEmpty(text))
-                CollectText(text);
+                CollectText(text, ContextItem.Category.Surrounding);
         }
 
         /// <summary>
-        /// [NEW] 收集天氣
+        /// 收集天氣
         /// </summary>
         public void CollectWeather(WeatherDef weather)
         {
             if (weather != null)
-                CollectDef(weather);
+                CollectDef(weather, ContextItem.Category.Weather);
         }
 
         /// <summary>
-        /// [NEW] 收集季節
+        /// 收集季節
         /// </summary>
         public void CollectSeason(Season season)
         {
             string seasonText = season.Label();
-            CollectText(seasonText);
+            CollectText(seasonText, ContextItem.Category.Season);
         }
 
         /// <summary>
-        /// [NEW] 收集溫度
+        /// 收集溫度
         /// </summary>
         public void CollectTemperature(float celsius)
         {
             string semantic = SemanticMapper.MapTemperatureToSemantic(celsius);
-            CollectText(semantic);
+            CollectText(semantic, ContextItem.Category.Temperature);
         }
 
         /// <summary>
-        /// 加入人名（用於人名加分）
+        /// 收集時間
         /// </summary>
+        public void CollectTime(string timeText)
+        {
+            CollectText(timeText, ContextItem.Category.Time);
+        }
+
+        /// <summary>
+        /// 收集周圍活動
+        /// </summary>
+        public void CollectActivity(string activityText)
+        {
+            CollectText(activityText, ContextItem.Category.Activity);
+        }
+
+        /// <summary>
+        /// 收集對話類型
+        /// </summary>
+        public void CollectDialogueType(string dialogueType)
+        {
+            CollectText(dialogueType, ContextItem.Category.DialogueType);
+        }
+
         public void AddName(string name)
         {
             if (!string.IsNullOrWhiteSpace(name))
                 _collectedNames.Add(name);
         }
 
-        /// <summary>
-        /// 加入多個人名
-        /// </summary>
         public void AddNames(IEnumerable<string> names)
         {
             if (names == null) return;
@@ -149,20 +169,8 @@ namespace RimTalk.Vector
                 AddName(name);
         }
 
-        /// <summary>
-        /// 取得所有收集的人名
-        /// </summary>
-        public HashSet<string> GetAllNames()
-        {
-            return new HashSet<string>(_collectedNames, StringComparer.OrdinalIgnoreCase);
-        }
+        public HashSet<string> GetAllNames() => new(_collectedNames, StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>
-        /// [NEW] 取得收集的項目清單（供批次計算）
-        /// </summary>
-        public List<ContextItem> GetCollectedItems()
-        {
-            return _collectedItems.ToList();
-        }
+        public List<ContextItem> GetCollectedItems() => _collectedItems.ToList();
     }
 }

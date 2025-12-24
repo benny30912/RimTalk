@@ -105,9 +105,11 @@ namespace RimTalk.Source.Memory
 
             lock (data)
             {
+                // [NEW] 檢查是否已有進行中的總結
+                if (data.IsStmSummarizationInProgress) return;
                 var stmSnapshot = data.ShortTermMemories.ToList();
-                int countToRestore = data.NewShortMemoriesSinceSummary;
-                data.NewShortMemoriesSinceSummary = 0;
+                int snapshotCount = data.NewShortMemoriesSinceSummary;  // [MOD] 記錄快照時的數量
+                // [REMOVE] 不再這裡清零計數器
                 int currentTick = GenTicks.TicksGame;
 
                 MemorySummarizer.RunRetryableTask(
@@ -123,20 +125,31 @@ namespace RimTalk.Source.Memory
                             {
                                 lock (d)
                                 {
+                                    // [MOD] 成功才扣：減去快照時的數量
+                                    d.NewShortMemoriesSinceSummary = Math.Max(0,
+                                        d.NewShortMemoriesSinceSummary - snapshotCount);
+                                    d.IsStmSummarizationInProgress = false;  // [NEW] 重置標記
                                     CleanupExcessMemories(d.ShortTermMemories, MaxShortMemories, d.NewShortMemoriesSinceSummary, forceFull: true); // 強制清理到 30
                                 }
+                            }
+                        }
+                        else
+                        {
+                            // [NEW] 空結果也要重置標記
+                            var c = WorldComp;
+                            if (c != null && c.PawnMemories.TryGetValue(pawnId, out var d))
+                            {
+                                lock (d) { d.IsStmSummarizationInProgress = false; }
                             }
                         }
                     },
                     onFailureOrCancel: (isCancelled) =>
                     {
-                        if (!isCancelled)
+                        // [MOD] 失敗時重置標記，計數器不動
+                        var c = WorldComp;
+                        if (c != null && c.PawnMemories.TryGetValue(pawnId, out var d))
                         {
-                            var c = WorldComp;
-                            if (c != null && c.PawnMemories.TryGetValue(pawnId, out var d))
-                            {
-                                d.NewShortMemoriesSinceSummary += countToRestore;
-                            }
+                            lock (d) { d.IsStmSummarizationInProgress = false; }
                         }
                     },
                     token: _cts.Token,
@@ -179,9 +192,11 @@ namespace RimTalk.Source.Memory
 
             lock (data)
             {
+                // [NEW] 檢查是否已有進行中的歸檔
+                if (data.IsMtmConsolidationInProgress) return;
                 var mtmSnapshot = data.MediumTermMemories.ToList();
-                int countToRestore = data.NewMediumMemoriesSinceArchival;
-                data.NewMediumMemoriesSinceArchival = 0;
+                int snapshotCount = data.NewMediumMemoriesSinceArchival;  // [MOD] 記錄快照時的數量
+                // [REMOVE] 不再這裡清零計數器
                 int currentTick = GenTicks.TicksGame;
 
                 MemorySummarizer.RunRetryableTask(
@@ -197,20 +212,31 @@ namespace RimTalk.Source.Memory
                             {
                                 lock (d)
                                 {
+                                    // [MOD] 成功才扣：減去快照時的數量
+                                    d.NewMediumMemoriesSinceArchival = Math.Max(0,
+                                        d.NewMediumMemoriesSinceArchival - snapshotCount);
+                                    d.IsMtmConsolidationInProgress = false;  // [NEW] 重置標記
                                     CleanupExcessMemories(d.MediumTermMemories, MaxMediumMemories, d.NewMediumMemoriesSinceArchival, forceFull: true);
                                 }
+                            }
+                        }
+                        else
+                        {
+                            // [NEW] 空結果也要重置標記
+                            var c = WorldComp;
+                            if (c != null && c.PawnMemories.TryGetValue(pawnId, out var d))
+                            {
+                                lock (d) { d.IsMtmConsolidationInProgress = false; }
                             }
                         }
                     },
                     onFailureOrCancel: (isCancelled) =>
                     {
-                        if (!isCancelled)
+                        // [MOD] 失敗時重置標記，計數器不動
+                        var c = WorldComp;
+                        if (c != null && c.PawnMemories.TryGetValue(pawnId, out var d))
                         {
-                            var c = WorldComp;
-                            if (c != null && c.PawnMemories.TryGetValue(pawnId, out var d))
-                            {
-                                d.NewMediumMemoriesSinceArchival += countToRestore;
-                            }
+                            lock (d) { d.IsMtmConsolidationInProgress = false; }
                         }
                     },
                     token: _cts.Token,

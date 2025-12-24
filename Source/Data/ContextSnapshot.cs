@@ -11,9 +11,27 @@ namespace RimTalk.Data
     {
         public enum ItemType { Def, Text }
 
+        // [NEW] 情境類別標籤
+        public enum Category
+        {
+            Other,          // 其他/未分類
+            Mood,           // 心情
+            EventHediff,    // 事件性狀態（流血、感染）
+            Thought,        // 想法
+            Relation,       // 關係
+            Time,           // 時間
+            Season,         // 季節
+            Weather,        // 天氣
+            Temperature,    // 溫度
+            Surrounding,    // 周圍環境
+            Activity,       // 周圍活動
+            DialogueType    // 對話類型
+        }
+
         public ItemType Type { get; set; }
         public Def Def { get; set; }     // Type == Def 時使用
         public string Text { get; set; } // Type == Text 時使用
+        public Category ContextCategory { get; set; } = Category.Other;  // [NEW]
     }
 
     /// <summary>

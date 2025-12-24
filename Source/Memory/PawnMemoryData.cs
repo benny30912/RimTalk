@@ -41,6 +41,17 @@ namespace RimTalk.Source.Memory
         /// </summary>
         public int NewMediumMemoriesSinceArchival;
 
+        // [NEW] 進行中標記（不持久化，讀檔後自動重置為 false）
+        /// <summary>
+        /// STM → MTM 總結是否進行中
+        /// </summary>
+        public bool IsStmSummarizationInProgress;
+        /// <summary>
+        /// MTM → LTM 歸檔是否進行中
+        /// </summary>
+        public bool IsMtmConsolidationInProgress;
+
+
         public void ExposeData()
         {
             Scribe_References.Look(ref Pawn, "pawn");

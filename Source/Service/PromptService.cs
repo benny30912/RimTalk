@@ -81,7 +81,7 @@ public static class PromptService
 
             // 時間 - 向量化用
             if (contextSettings.IncludeTimeAndDate)
-                builder.CollectText(SemanticMapper.MapTimeToSemantic(gameData.Hour12HString));
+                builder.CollectTime(SemanticMapper.MapTimeToSemantic(gameData.Hour12HString));
 
             // 季節 - 向量化用
             if (contextSettings.IncludeSeason && pawn.Map != null)
@@ -111,7 +111,7 @@ public static class PromptService
             if (request.StatusActivities != null)
             {
                 foreach (var activity in request.StatusActivities)
-                    builder.CollectText(activity);
+                    builder.CollectActivity(activity);
             }
 
             // StatusNames - 向量化用
@@ -120,7 +120,7 @@ public static class PromptService
 
             // DialogueContext - 向量化用
             if (!string.IsNullOrEmpty(request.DialogueType))
-                builder.CollectText(request.DialogueType);
+                builder.CollectDialogueType(request.DialogueType);
 
             // OngoingEvents - 向量化用
             if (ongoingEvents.Count > 0)

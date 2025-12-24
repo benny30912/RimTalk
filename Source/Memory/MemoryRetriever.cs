@@ -27,8 +27,8 @@ namespace RimTalk.Source.Memory
         // 硬編碼參數 (Reranker 二階段)
         // ========================
         private const int RECALL_TOP_K = 20;           // 階段一召回數量
-        private const float RECALL_THRESHOLD = 0.2f;   // 召回閾值
-        private const float RERANK_THRESHOLD = 0.2f;   // Reranker 閾值
+        private const float RECALL_THRESHOLD = 0.25f;   // 召回閾值
+        private const float RERANK_THRESHOLD = 0.25f;   // Reranker 閾值
 
         // 共用權重常數
         private const float W_NAME_BONUS = 1f;
@@ -204,7 +204,7 @@ namespace RimTalk.Source.Memory
             var candidates = RecallCandidates(allMemories, contextVectors, RECALL_TOP_K, RECALL_THRESHOLD);
             if (candidates.Count == 0) return new List<MemoryRecord>();
 
-            // 3. [NEW] 提取記憶匹配的 context 原始文本
+            // 3. [NEW] 提取記憶匹配的 context（帶類別）
             var matchedContexts = ExtractBestMatchingContexts(
                 candidates,
                 pawnData.Items,
@@ -259,112 +259,160 @@ namespace RimTalk.Source.Memory
         }
 
         /// <summary>
-        /// 從 Top-20 記憶中提取每條記憶最匹配的 Top-3 context 原始文本
-        /// [MOD] 不再過濾閾值，直接取 Top-3
+        /// 從 Top-20 記憶中提取每條記憶最匹配的 Top-3 context
+        /// [MOD] 返回帶類別的結果
         /// </summary>
-        private static List<string> ExtractBestMatchingContexts(
+        private static List<(string text, ContextItem.Category category, float score)> ExtractBestMatchingContexts(
             List<MemoryRecord> candidates,
             List<ContextItem> contextItems,
             List<float[]> contextVectors)
         {
-            var results = new List<(string text, float score)>();
-
+            var results = new List<(string text, ContextItem.Category category, float score)>();
             if (candidates == null || contextItems == null || contextVectors == null)
-                return new List<string>();
-
+                return results;
             foreach (var memory in candidates)
             {
                 var memVector = VectorDatabase.Instance.GetVector(memory.Id);
                 if (memVector == null) continue;
-
-                // 收集所有 context 的相似度
-                var scores = new List<(string text, float score)>();
-
+                var scores = new List<(string text, ContextItem.Category category, float score)>();
                 for (int i = 0; i < contextVectors.Count && i < contextItems.Count; i++)
                 {
                     if (contextVectors[i] == null) continue;
-
                     float sim = VectorService.CosineSimilarity(memVector, contextVectors[i]);
                     string text = contextItems[i].Type == ContextItem.ItemType.Text
                         ? contextItems[i].Text
                         : contextItems[i].Def?.label;
-
                     if (!string.IsNullOrEmpty(text))
-                        scores.Add((text, sim));
+                        scores.Add((text, contextItems[i].ContextCategory, sim));
                 }
-
-                // [MOD] 直接取 Top-3（不過濾閾值）
                 var top3 = scores.OrderByDescending(x => x.score).Take(3);
                 results.AddRange(top3);
             }
-
             // 去重，按分數排序
             return results
                 .GroupBy(x => x.text)
-                .Select(g => (text: g.Key, score: g.Max(x => x.score)))
+                .Select(g => (text: g.Key, category: g.First().category, score: g.Max(x => x.score)))
                 .OrderByDescending(x => x.score)
-                .Select(x => x.text)
                 .ToList();
         }
 
         /// <summary>
         /// 動態生成 Reranker 查詢文本
-        /// 結合基本參數與記憶匹配的 context 原始文本
+        /// [MOD] 根據類別添加前/後綴修飾，按固定順序輸出
         /// </summary>
-        /// <param name="currentAction">當前動作（如「收割野生植物」）</param>
-        /// <param name="dialogueType">對話類型（如「閒聊」「爭吵」）</param>
-        /// <param name="matchedContexts">記憶匹配的 context 原始文本</param>
-        /// <returns>自然語言格式的 QueryText</returns>
         private static string BuildDynamicQueryText(
             string actionWithName,
             string dialogueType,
-            List<string> matchedContexts)
+            List<(string text, ContextItem.Category category, float score)> matchedContexts)
         {
-            // [NEW] 正規化文本：去除前後空白、換行、句號
-            string Normalize(string text)
-            {
-                if (string.IsNullOrWhiteSpace(text)) return null;
-                text = text.Trim().TrimEnd('。', '.').Replace("\r", "").Replace("\n", " ");
-                text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " "); // 統一多個空格為單一空格
-                return string.IsNullOrWhiteSpace(text) ? null : text;
-            }
-
-            // [FIX] 使用 HashSet 去重
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var parts = new List<string>();
-            // [MOD] 去除尾部句號後，只添加非空且不重複的內容
-            void AddIfUnique(string text)
+
+            // 按類別分組收集
+            var byCategory = new Dictionary<ContextItem.Category, List<string>>();
+            foreach (ContextItem.Category cat in Enum.GetValues(typeof(ContextItem.Category)))
+                byCategory[cat] = new List<string>();
+
+            string Normalize(string text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
+            void AddIfUnique(string text, ContextItem.Category category)
             {
-                text = Normalize(text);
-                if (text != null && seen.Add(text))
-                    parts.Add(text);
+                string normalized = Normalize(text);
+                if (normalized != null && seen.Add(normalized))
+                    byCategory[category].Add(normalized);
             }
 
-            // 基本參數：當前動作
-            // [MOD] 特殊處理 actionWithName：
-            // 用基礎文本去重，但輸出帶「中」後綴
+            // 1. 處理 actionWithName（加「中」）
             string normalizedAction = Normalize(actionWithName);
+            string actionText = null;
             if (normalizedAction != null && seen.Add(normalizedAction))
             {
-                // 若已結尾「中」則直接加入，否則補上「中」
-                parts.Add(normalizedAction.EndsWith("中") ? normalizedAction : $"{normalizedAction}中");
+                actionText = normalizedAction.EndsWith("中") ? normalizedAction : $"{normalizedAction}中";
             }
 
-            // 基本參數：對話類型
-            AddIfUnique(dialogueType);
-
-            // [REMOVED] 不再直接加入 Activities
-            // 若相關會透過 MatchedContexts 捕捉
-
-            // 記憶匹配的 context 原始文本
-            if (matchedContexts?.Count > 0)
+            // 2. 處理 dialogueType
+            string normalizedDialogue = Normalize(dialogueType);
+            string dialogueText = null;
+            if (normalizedDialogue != null && seen.Add(normalizedDialogue))
             {
-                foreach (var context in matchedContexts)
-                    AddIfUnique(context);
+                dialogueText = normalizedDialogue;
             }
 
-            // 使用句號連接（自然語言格式）
-            return string.Join("，", parts) + "。";
+            // 3. 處理 matchedContexts（按類別分組）
+            if (matchedContexts != null)
+            {
+                foreach (var (text, category, _) in matchedContexts)
+                {
+                    AddIfUnique(text, category);
+                }
+            }
+
+            // 4. 組合輸出（按固定順序）
+            var parts = new List<string>();
+
+            // 第一部分：動作 + 對話類型
+            if (actionText != null || dialogueText != null)
+            {
+                var part1 = string.Join("，", new[] { actionText, dialogueText }.Where(x => x != null));
+                if (!string.IsNullOrEmpty(part1))
+                    parts.Add(part1);
+            }
+
+            // 第二部分：環境（季節+時間+天氣+溫度）
+            var envParts = new List<string>();
+            var seasons = byCategory[ContextItem.Category.Season];
+            var times = byCategory[ContextItem.Category.Time];
+            if (seasons.Any() || times.Any())
+            {
+                var seasonTime = string.Join("的", seasons.Concat(times));
+                if (!string.IsNullOrEmpty(seasonTime))
+                    envParts.Add($"目前是{seasonTime}");
+            }
+            var weathers = byCategory[ContextItem.Category.Weather];
+            if (weathers.Any())
+                envParts.Add($"天气{string.Join("、", weathers)}");
+            var temps = byCategory[ContextItem.Category.Temperature];
+            if (temps.Any())
+                envParts.Add($"气温{string.Join("、", temps)}");
+            if (envParts.Any())
+                parts.Add(string.Join("，", envParts));
+
+            // 第三部分：狀態（心情+身體+想法）
+            var stateParts = new List<string>();
+            var moods = byCategory[ContextItem.Category.Mood];
+            if (moods.Any())
+                stateParts.Add(string.Join("、", moods));
+            var hediffs = byCategory[ContextItem.Category.EventHediff];
+            if (hediffs.Any())
+                stateParts.Add($"身体状况为{string.Join("、", hediffs)}");
+            var thoughts = byCategory[ContextItem.Category.Thought];
+            if (thoughts.Any())
+                stateParts.Add($"内心浮现{string.Join("、", thoughts)}的想法");
+            if (stateParts.Any())
+                parts.Add(string.Join("，", stateParts));
+
+            // 第四部分：周圍（關係+活動+環境）
+            var nearbyParts = new List<string>();
+            var surroundings = byCategory[ContextItem.Category.Surrounding];
+            if (surroundings.Any())
+            {
+                // [NEW] 只保留 label，去掉 ":" 後的 description
+                var labels = surroundings.Select(s =>
+                {
+                    int colonIndex = s.IndexOf(':');
+                    return colonIndex > 0 ? s.Substring(0, colonIndex).Trim() : s;
+                });
+                nearbyParts.Add($"眼前有{string.Join("、", labels)}");
+            }
+            var relations = byCategory[ContextItem.Category.Relation];
+            if (relations.Any())
+                nearbyParts.Add($"身旁有{string.Join("、", relations)}");
+            var activities = byCategory[ContextItem.Category.Activity];
+            if (activities.Any())
+                nearbyParts.Add($"附近的{string.Join("，", activities)}");
+            if (nearbyParts.Any())
+                parts.Add(string.Join("，", nearbyParts));
+
+            return string.Join("。", parts);
         }
 
         /// <summary>
@@ -473,8 +521,7 @@ namespace RimTalk.Source.Memory
         }
 
         /// <summary>
-        /// 計算記憶與 Context 向量池的 Top-3 平均相似度
-        /// [MOD] 先 Top-3 平均，再判斷閾值
+        /// 計算記憶與 Context 向量池的 Max-Sim
         /// </summary>
         private static float CalculateMaxSim(MemoryRecord mem, List<float[]> contextVectors, float threshold)
         {
@@ -487,25 +534,15 @@ namespace RimTalk.Source.Memory
                 return 0f;
             }
 
-            // 收集所有相似度
-            var similarities = new List<float>();
+            // Max-Sim 計算（單一最高分）
+            float maxSim = 0f;
             foreach (var cv in contextVectors)
             {
                 if (cv == null) continue;
                 float sim = VectorService.CosineSimilarity(cv, memVector);
-                similarities.Add(sim);
+                if (sim > maxSim) maxSim = sim;
             }
-
-            if (similarities.Count == 0)
-                return 0f;
-
-            // [MOD] 先取 Top-3 平均，再判斷閾值
-            float top3Avg = similarities
-                .OrderByDescending(s => s)
-                .Take(3)
-                .Average();
-
-            return top3Avg >= threshold ? top3Avg : 0f;
+            return maxSim >= threshold ? maxSim : 0f;
         }
 
         /// <summary>
