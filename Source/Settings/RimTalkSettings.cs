@@ -21,7 +21,7 @@ public class RimTalkSettings : ModSettings
     public string VectorApiKey = "";
 
     // [NEW] Keyword Weight (Missing in current version)
-    public float SemanticWeight = 9.0f;
+    public float SemanticWeight = 10.0f;
 
     public bool UseCloudProviders = true;
     public bool UseSimpleConfig = true;
@@ -235,7 +235,7 @@ public class RimTalkSettings : ModSettings
 
         // [NEW] 儲存權重
         Scribe_Values.Look(ref MemoryImportanceWeight, "memoryImportanceWeight", 3.0f);
-        Scribe_Values.Look(ref SemanticWeight, "SemanticWeight", 9.0f);
+        Scribe_Values.Look(ref SemanticWeight, "SemanticWeight", 10.0f);
 
         // [FIX] 儲存雲端語意向量設定
         Scribe_Values.Look(ref UseCloudVectorService, "useCloudVectorService", false);
