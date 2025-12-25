@@ -43,9 +43,18 @@ public partial class Settings
         // --- 左側：列表 (Scroll View) ---
         Widgets.DrawMenuSection(leftRect);
 
-        float itemHeight = 40f;
-        float viewHeight = ckList.Count * itemHeight;
-        Rect viewRect = new Rect(0, 0, leftRect.width - 16f, viewHeight);
+        // [MOD] 動態計算每條常識的高度
+        float CalculateItemHeight(MemoryRecord data, float width)
+        {
+            string keys = string.Join(", ", data.Keywords);
+            string preview = $"[{keys}] (Imp:{data.Importance}) (Access:{data.AccessCount})\n{data.Summary}";
+            float textHeight = Text.CalcHeight(preview, width - 35f);
+            return Mathf.Max(50f, textHeight + 16f);  // 最小 50f，加上 padding
+        }
+
+        float listWidth = leftRect.width - 16f;
+        float viewHeight = ckList.Sum(data => CalculateItemHeight(data, listWidth));
+        Rect viewRect = new Rect(0, 0, listWidth, viewHeight);
 
         Widgets.BeginScrollView(leftRect, ref _ckListScrollPosition, viewRect);
         float currentY = 0f;
@@ -53,34 +62,40 @@ public partial class Settings
         for (int i = 0; i < ckList.Count; i++)
         {
             var data = ckList[i];
+            float itemHeight = CalculateItemHeight(data, listWidth);  // [MOD] 動態高度
             Rect rowRect = new Rect(0, currentY, viewRect.width, itemHeight);
 
             // 背景高亮
             if (i % 2 == 0) Widgets.DrawLightHighlight(rowRect);
             if (data == _selectedCkData) Widgets.DrawHighlightSelected(rowRect);
 
-            // [MODIFY] Update preview text to include Importance and AccessCount
-            // 內容預覽
+            // [MOD] 改為多行顯示
             string keys = string.Join(", ", data.Keywords);
-            // 適配 MemoryRecord: Content -> Summary
-            string preview = $"[{keys}] (Imp:{data.Importance}) (Access:{data.AccessCount}) {data.Summary}";
+            string header = $"[{keys}] (Imp:{data.Importance}) (Access:{data.AccessCount})";
+            string content = data.Summary;
 
-            Rect textRect = new Rect(rowRect.x + 5f, rowRect.y, rowRect.width - 30f, rowRect.height);
-            Text.Anchor = TextAnchor.MiddleLeft;
-            Widgets.Label(textRect, preview);
-            Text.Anchor = TextAnchor.UpperLeft;
+            // Header（第一行）
+            Rect headerRect = new Rect(rowRect.x + 5f, rowRect.y + 2f, rowRect.width - 35f, 20f);
+            GUI.color = Color.gray;
+            Widgets.Label(headerRect, header);
+            GUI.color = Color.white;
+
+            // Content（多行顯示）
+            float contentHeight = itemHeight - 24f;
+            Rect contentRect = new Rect(rowRect.x + 5f, rowRect.y + 22f, rowRect.width - 35f, contentHeight);
+            Widgets.Label(contentRect, content);
 
             // 點擊選擇
-            if (Widgets.ButtonInvisible(textRect))
+            if (Widgets.ButtonInvisible(rowRect))
             {
                 _selectedCkData = data;
                 _ckKeywordsBuffer = string.Join(", ", data.Keywords);
                 _ckContentBuffer = data.Summary;
-                _ckImportanceBuffer = data.Importance; // [NEW] Sync buffer
+                _ckImportanceBuffer = data.Importance;
             }
 
             // 刪除按鈕
-            Rect deleteRect = new Rect(rowRect.xMax - 25f, rowRect.y + 10f, 20f, 20f);
+            Rect deleteRect = new Rect(rowRect.xMax - 25f, rowRect.y + (itemHeight / 2) - 10f, 20f, 20f);
             if (Widgets.ButtonText(deleteRect, "✖"))
             {
                 ckList.RemoveAt(i);
@@ -90,7 +105,7 @@ public partial class Settings
                     _ckKeywordsBuffer = "";
                     _ckContentBuffer = "";
                 }
-                break; // 重繪列表
+                break;
             }
 
             currentY += itemHeight;

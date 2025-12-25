@@ -32,9 +32,11 @@ namespace RimTalk.Source.Memory
 
         // 共用權重常數
         private const float W_NAME_BONUS = 1f;
-        private const float W_ACCESS = 0.3f;
+        private const float W_ACCESS = 2.0f;  // [MOD] 配合對數衰減調整
         private const float TIME_DECAY_HALF_LIFE_DAYS = 60f;
         private const float GRACE_PERIOD_DAYS = 15f;
+
+        private const float INVALID_SCORE = -9999f;
 
         // ========================
         // 公共方法
@@ -447,7 +449,7 @@ namespace RimTalk.Source.Memory
                 float nameBonus = CalculateNameBonus(mem, contextNames, W_NAME_BONUS);
 
                 // 必須有語意相關或人名匹配才有分數
-                if (semanticScore == 0f && nameBonus == 0f) return -1f;
+                if (semanticScore == 0f && nameBonus == 0f) return INVALID_SCORE;
 
                 // 時間衰減（使用通用方法）
                 float timeDecayFactor = CalculateTimeDecay(mem, currentTick, TIME_DECAY_HALF_LIFE_DAYS, GRACE_PERIOD_DAYS);
@@ -456,7 +458,7 @@ namespace RimTalk.Source.Memory
                 return semanticScore * W_semantic
                      + mem.Importance * W_importance * timeDecayFactor
                      + nameBonus
-                     - mem.AccessCount * W_ACCESS;
+                     - (float)Math.Log(1 + mem.AccessCount) * W_ACCESS;  // [MOD] 對數衰減
             }
 
             // 3. 分層檢索（使用通用方法）
@@ -565,7 +567,7 @@ namespace RimTalk.Source.Memory
             float CalculateFinalScore(MemoryRecord mem)
             {
                 if (!rerankScoreMap.TryGetValue(mem, out float rerankScore))
-                    return -1f;
+                    return -9999f;
 
                 float nameBonus = CalculateNameBonus(mem, contextNames, W_NAME_BONUS);
                 float timeDecayFactor = CalculateTimeDecay(mem, currentTick, TIME_DECAY_HALF_LIFE_DAYS, GRACE_PERIOD_DAYS);
@@ -573,7 +575,7 @@ namespace RimTalk.Source.Memory
                 return rerankScore * W_rerank
                      + mem.Importance * W_importance * timeDecayFactor
                      + nameBonus
-                     - mem.AccessCount * W_ACCESS;
+                     - (float)Math.Log(1 + mem.AccessCount) * W_ACCESS;  // [MOD] 對數衰減
             }
 
             return SelectMemoriesByScore(stmList, ltmList, allMemories, CalculateFinalScore, quotas);
@@ -597,7 +599,7 @@ namespace RimTalk.Source.Memory
             // STM 優先
             var scoredStm = stmList
                 .Select(m => new { Memory = m, Score = scoreFunc(m) })
-                .Where(x => x.Score >= 0)
+                .Where(x => x.Score > INVALID_SCORE)  // [MOD] 允許負分，只排除無效記憶
                 .OrderByDescending(x => x.Score)
                 .ToList();
             if (scoredStm.Any())
@@ -615,7 +617,7 @@ namespace RimTalk.Source.Memory
             // LTM 優先
             var scoredLtm = ltmList
                 .Select(m => new { Memory = m, Score = scoreFunc(m) })
-                .Where(x => x.Score >= 0)
+                .Where(x => x.Score > INVALID_SCORE)  // [MOD] 允許負分，只排除無效記憶
                 .OrderByDescending(x => x.Score)
                 .ToList();
             if (scoredLtm.Any())
@@ -632,7 +634,7 @@ namespace RimTalk.Source.Memory
                 var remainingCandidates = allMemories
                     .Where(m => !alreadySelected.Contains(m))
                     .Select(m => new { Memory = m, Score = scoreFunc(m) })
-                    .Where(x => x.Score >= 0)
+                    .Where(x => x.Score > INVALID_SCORE)  // [MOD] 允許負分，只排除無效記憶
                     .OrderByDescending(x => x.Score)
                     .ToList();
                 if (remainingCandidates.Any())
