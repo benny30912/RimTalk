@@ -35,7 +35,7 @@ public static class Constant
     private const string JsonInstructionTemplate = """
                                                     Output JSONL.
                                                     FORMAT:
-                                                    {{"name":"角色名","text":"对话"}}
+                                                    {{"name":"角色名","text":"(动作神态)口语对话"}}
                                                     ...
                                                     {{"summary":"摘要","keywords":["标签1","标签2",...],"importance":1-5}}
                                                     [summary] 新闻摘要风格概括：

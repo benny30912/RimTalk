@@ -6,10 +6,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using UnityEngine;
 using Verse;
-using Verse.Noise;
 using Logger = RimTalk.Util.Logger;
 
 namespace RimTalk.Source.Memory
@@ -107,6 +105,7 @@ namespace RimTalk.Source.Memory
             {
                 // [NEW] 檢查是否已有進行中的總結
                 if (data.IsStmSummarizationInProgress) return;
+                data.IsStmSummarizationInProgress = true;  // [FIX] 立即設置標記
                 var stmSnapshot = data.ShortTermMemories.ToList();
                 int snapshotCount = data.NewShortMemoriesSinceSummary;  // [MOD] 記錄快照時的數量
                 // [REMOVE] 不再這裡清零計數器
@@ -194,6 +193,7 @@ namespace RimTalk.Source.Memory
             {
                 // [NEW] 檢查是否已有進行中的歸檔
                 if (data.IsMtmConsolidationInProgress) return;
+                data.IsMtmConsolidationInProgress = true;  // [FIX] 立即設置標記
                 var mtmSnapshot = data.MediumTermMemories.ToList();
                 int snapshotCount = data.NewMediumMemoriesSinceArchival;  // [MOD] 記錄快照時的數量
                 // [REMOVE] 不再這裡清零計數器
