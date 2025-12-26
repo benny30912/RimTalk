@@ -174,7 +174,7 @@ public static class PromptService
             if (pawn == null) continue;
 
             // 批次向量計算（異步）
-            var contextVectors = await SemanticCache.Instance.GetVectorsBatchAsync(pawnData.Items, isQuery: true);
+            var contextVectors = await ContextVectorDatabase.Instance.GetVectorsBatchAsync(pawnData.Items, isQuery: true);
             pawnVectorData.Add((pawn, pawnData, contextVectors));
         }
 

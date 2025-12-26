@@ -274,7 +274,7 @@ namespace RimTalk.Source.Memory
                 return results;
             foreach (var memory in candidates)
             {
-                var memVector = VectorDatabase.Instance.GetVector(memory.Id);
+                var memVector = MemoryVectorDatabase.Instance.GetVector(memory.Id);
                 if (memVector == null) continue;
                 var scores = new List<(string text, ContextItem.Category category, float score)>();
                 for (int i = 0; i < contextVectors.Count && i < contextItems.Count; i++)
@@ -527,7 +527,7 @@ namespace RimTalk.Source.Memory
         /// </summary>
         private static float CalculateMaxSim(MemoryRecord mem, List<float[]> contextVectors, float threshold)
         {
-            var memVector = VectorDatabase.Instance.GetVector(mem.Id);
+            var memVector = MemoryVectorDatabase.Instance.GetVector(mem.Id);
 
             if (memVector == null)
             {

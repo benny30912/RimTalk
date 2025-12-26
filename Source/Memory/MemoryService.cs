@@ -64,7 +64,7 @@ namespace RimTalk.Source.Memory
                     lock (comp.PawnMemories)
                     {
                         comp.PawnMemories.Clear();
-                        VectorDatabase.Instance.Clear();  // [NEW] 在 lock 內清空向量
+                        MemoryVectorDatabase.Instance.Clear();  // [NEW] 在 lock 內清空向量
                     }
                 }
             }
@@ -274,7 +274,7 @@ namespace RimTalk.Source.Memory
 
             for (int i = 0; i < safeToDelete; i++)
             {
-                VectorDatabase.Instance.RemoveVector(memories[0].Id);
+                MemoryVectorDatabase.Instance.RemoveVector(memories[0].Id);
                 memories.RemoveAt(0);
             }
         }
@@ -352,7 +352,7 @@ namespace RimTalk.Source.Memory
 
                         if (removed)
                         {
-                            VectorDatabase.Instance.RemoveVector(memory.Id);
+                            MemoryVectorDatabase.Instance.RemoveVector(memory.Id);
                         }
                     }
                 }

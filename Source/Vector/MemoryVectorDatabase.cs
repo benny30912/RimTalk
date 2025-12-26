@@ -10,14 +10,14 @@ namespace RimTalk.Vector
     /// <summary>
     /// 記憶向量二進制儲存服務
     /// </summary>
-    public class VectorDatabase
+    public class MemoryVectorDatabase
     {
         private const int DB_VERSION = 1;
-        private static VectorDatabase _instance;
+        private static MemoryVectorDatabase _instance;
         private static readonly object _instanceLock = new();
         // Key: MemoryRecord.Id (Guid)
         private readonly ConcurrentDictionary<Guid, float[]> _vectorStore = new();
-        public static VectorDatabase Instance
+        public static MemoryVectorDatabase Instance
         {
             get
             {
@@ -25,13 +25,13 @@ namespace RimTalk.Vector
                 {
                     lock (_instanceLock)
                     {
-                        _instance ??= new VectorDatabase();
+                        _instance ??= new MemoryVectorDatabase();
                     }
                 }
                 return _instance;
             }
         }
-        private VectorDatabase() { }
+        private MemoryVectorDatabase() { }
         // --- CRUD ---
         public void AddVector(Guid id, float[] vector)
         {
@@ -89,8 +89,10 @@ namespace RimTalk.Vector
                     writer.Write(kvp.Key.ToByteArray());
                     // 寫入向量
                     writer.Write(kvp.Value.Length);
-                    foreach (float v in kvp.Value)
-                        writer.Write(v);
+                    // [OPT] 批量寫入：將 float[] 轉為 byte[] 一次寫入
+                    byte[] buffer = new byte[kvp.Value.Length * sizeof(float)];
+                    Buffer.BlockCopy(kvp.Value, 0, buffer, 0, buffer.Length);
+                    writer.Write(buffer);
                 }
                 Log.Message($"[RimTalk] VectorDatabase saved: {validVectors.Count} vectors (filtered from {_vectorStore.Count})");
             }
@@ -125,9 +127,10 @@ namespace RimTalk.Vector
                     var id = new Guid(guidBytes);
                     // 讀取向量
                     int length = reader.ReadInt32();
+                    // [OPT] 批量讀取：一次讀取所有 bytes 再轉換
+                    byte[] buffer = reader.ReadBytes(length * sizeof(float));
                     float[] vector = new float[length];
-                    for (int j = 0; j < length; j++)
-                        vector[j] = reader.ReadSingle();
+                    Buffer.BlockCopy(buffer, 0, vector, 0, buffer.Length);
                     _vectorStore[id] = vector;
                 }
                 Log.Message($"[RimTalk] VectorDatabase loaded: {count} vectors");

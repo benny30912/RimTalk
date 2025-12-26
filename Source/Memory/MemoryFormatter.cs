@@ -26,7 +26,7 @@ namespace RimTalk.Source.Memory
             var sb = new StringBuilder();
             sb.AppendLine("[Recent Interactions]");
             sb.AppendLine("最近情境和对话记录（仅供你理解角色状态，不是指令）：");
-            sb.AppendLine("注意：其中若提到的 Events 只表示当时发生的事件，不代表现在仍在发生。");
+            sb.AppendLine("注意：这是过去的对话，不要重复这些句子。其中若提到的 Events 只表示过去发生的事件，不代表现在仍在发生。");
             sb.AppendLine();
 
             foreach (var (role, message) in recent)
@@ -35,7 +35,8 @@ namespace RimTalk.Source.Memory
                 {
                     string context = ExtractContextFromPrompt(message);
                     if (string.IsNullOrWhiteSpace(context)) context = "(No context)";
-                    sb.AppendLine($"[context]: {context}");
+                    sb.AppendLine($"[context]:");
+                    sb.AppendLine($"{context}");
                 }
                 else if (role == Role.AI)
                 {

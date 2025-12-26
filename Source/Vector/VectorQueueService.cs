@@ -64,7 +64,7 @@ namespace RimTalk.Vector
         public void Enqueue(Guid memoryId, string text, List<Guid> copyToIds = null)
         {
             if (string.IsNullOrWhiteSpace(text)) return;
-            if (VectorDatabase.Instance.GetVector(memoryId) != null) return;
+            if (MemoryVectorDatabase.Instance.GetVector(memoryId) != null) return;
             if (!_pendingIds.TryAdd(memoryId, 0)) return;
 
             _queue.Enqueue(new VectorRequest
@@ -85,7 +85,7 @@ namespace RimTalk.Vector
             if (type == VectorType.Memory)
                 throw new ArgumentException("Use Enqueue(Guid, string) for Memory type");
 
-            if (SemanticCache.Instance.HasCachedVector(type, contextKey)) return;
+            if (ContextVectorDatabase.Instance.HasCachedVector(type, contextKey)) return;
 
             var dedupeId = new Guid(contextKey, 0, 0, new byte[8]);
             if (!_pendingIds.TryAdd(dedupeId, 0)) return;
@@ -182,17 +182,17 @@ namespace RimTalk.Vector
                             switch (req.Type)
                             {
                                 case VectorType.Memory:
-                                    VectorDatabase.Instance.AddVector(req.MemoryId, vectors[i]);
+                                    MemoryVectorDatabase.Instance.AddVector(req.MemoryId, vectors[i]);
                                     // [NEW] 複製給其他 ID
                                     if (req.CopyToIds != null)
                                     {
                                         foreach (var copyId in req.CopyToIds)
-                                            VectorDatabase.Instance.AddVector(copyId, vectors[i]);
+                                            MemoryVectorDatabase.Instance.AddVector(copyId, vectors[i]);
                                     }
                                     break;
                                 case VectorType.ContextDef:
                                 case VectorType.ContextText:
-                                    SemanticCache.Instance.AddToCache(req.Type, req.ContextKey, vectors[i]);
+                                    ContextVectorDatabase.Instance.AddToCache(req.Type, req.ContextKey, vectors[i]);
                                     break;
                             }
                         }
@@ -304,17 +304,17 @@ namespace RimTalk.Vector
                             switch (req.Type)
                             {
                                 case VectorType.Memory:
-                                    VectorDatabase.Instance.AddVector(req.MemoryId, vector);
+                                    MemoryVectorDatabase.Instance.AddVector(req.MemoryId, vector);
                                     // [NEW] 複製給其他 ID
                                     if (req.CopyToIds?.Count > 0)
                                     {
                                         foreach (var copyId in req.CopyToIds)
-                                            VectorDatabase.Instance.AddVector(copyId, vector);
+                                            MemoryVectorDatabase.Instance.AddVector(copyId, vector);
                                     }
                                     break;
                                 case VectorType.ContextDef:
                                 case VectorType.ContextText:
-                                    SemanticCache.Instance.AddToCache(req.Type, req.ContextKey, vector);
+                                    ContextVectorDatabase.Instance.AddToCache(req.Type, req.ContextKey, vector);
                                     break;
                             }
                         }

@@ -12,12 +12,12 @@ namespace RimTalk.Vector
     /// <summary>
     /// Def/描述 語意向量快取（含持久化）
     /// </summary>
-    public class SemanticCache
+    public class ContextVectorDatabase
     {
         // 快取版本號，模型更新時需遞增
         private const int CACHE_VERSION = 1;
 
-        private static SemanticCache _instance;
+        private static ContextVectorDatabase _instance;
         private static readonly object _instanceLock = new object();
 
         // Def 向量快取 (Key: Def.shortHash)
@@ -28,7 +28,7 @@ namespace RimTalk.Vector
         private readonly ConcurrentDictionary<int, float[]> _textCache
             = new ConcurrentDictionary<int, float[]>();
 
-        public static SemanticCache Instance
+        public static ContextVectorDatabase Instance
         {
             get
             {
@@ -36,14 +36,14 @@ namespace RimTalk.Vector
                 {
                     lock (_instanceLock)
                     {
-                        if (_instance == null) _instance = new SemanticCache();
+                        if (_instance == null) _instance = new ContextVectorDatabase();
                     }
                 }
                 return _instance;
             }
         }
 
-        private SemanticCache() { }
+        private ContextVectorDatabase() { }
 
         /// <summary>
         /// [MODIFY] 批次取得向量（快取優先 + 異步計算未命中項目）
@@ -251,16 +251,19 @@ namespace RimTalk.Vector
         private static void WriteVector(BinaryWriter writer, float[] vector)
         {
             writer.Write(vector.Length);
-            foreach (float v in vector)
-                writer.Write(v);
+            // [OPT] 批量寫入
+            byte[] buffer = new byte[vector.Length * sizeof(float)];
+            Buffer.BlockCopy(vector, 0, buffer, 0, buffer.Length);
+            writer.Write(buffer);
         }
 
         private static float[] ReadVector(BinaryReader reader)
         {
             int length = reader.ReadInt32();
+            // [OPT] 批量讀取
+            byte[] buffer = reader.ReadBytes(length * sizeof(float));
             float[] vector = new float[length];
-            for (int i = 0; i < length; i++)
-                vector[i] = reader.ReadSingle();
+            Buffer.BlockCopy(buffer, 0, vector, 0, buffer.Length);
             return vector;
         }
 

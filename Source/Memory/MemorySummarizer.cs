@@ -111,7 +111,7 @@ namespace RimTalk.Source.Memory
                         - 保留独有细节（绰号、玩笑、承诺、激烈语气），必须保留涉及人名
                         - 若事件判定为刻骨铭心 (Importance=5)，请保留「闪光灯式」的细节
                         - 禁止相对时间（"昨天"等）
-                        - **严格长度限制**：每条 summary 不得超过100字
+                        - **严格长度限制**：每条 summary 不得超过120字
       
                     2. 'keywords'：
                         列出本段记忆最具有戏剧张力或标志性的具体概念标签（最多4个）
@@ -227,7 +227,7 @@ namespace RimTalk.Source.Memory
                   - 多维度归纳：找出这段时期的主要生活基调。
                   - 去芜存菁：忽略琐事，除非它是生活基调的一部分，保留可能影响未来的关键痛点（如「资源短缺」「某人的背叛」），並以具体事件作为例证。
                   - 语意折叠：将琐碎的细节 (如具体吃了什么) 折叠为高层次描述 (如生活困苦)，聚焦长期影响。
-                  - **严格长度限制**：每条 summary 不得超过200字。
+                  - **严格长度限制**：每条 summary 不得超过180字。
                   2. 'keywords'：列出来源片段中**最具标志性**的概念（最多5个），忽略琐碎细节，无则留空。
                   3. 'importance'：参考来源片段，若高重要性可提升分数
                     1=琐碎日常（闲聊、抱怨）
@@ -384,7 +384,7 @@ namespace RimTalk.Source.Memory
                 {
                     if (candidates[i].Score >= 9900f) break;
                     // [NEW] 刪除對應向量
-                    VectorDatabase.Instance.RemoveVector(candidates[i].Memory.Id);
+                    MemoryVectorDatabase.Instance.RemoveVector(candidates[i].Memory.Id);
                     ltm.Remove(candidates[i].Memory);
                 }
             }

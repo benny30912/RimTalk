@@ -266,8 +266,8 @@ public partial class Settings
                 () => {
                     settings.UseCloudVectorService = _pendingVectorModeValue;
                     // 清除快取
-                    VectorDatabase.Instance.Clear();
-                    SemanticCache.Instance.Clear();
+                    MemoryVectorDatabase.Instance.Clear();
+                    ContextVectorDatabase.Instance.Clear();
                     // [NEW] 觸發佇列服務模式切換
                     VectorQueueService.Instance.OnModeChanged(_pendingVectorModeValue);
                     Messages.Message("RimTalk.Settings.VectorCacheCleared".Translate(), MessageTypeDefOf.NeutralEvent, false);

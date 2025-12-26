@@ -80,8 +80,8 @@ public class RimTalkWorldComponent(World world) : WorldComponent(world)
             // 移除 null 的項目 (雖不應發生，但以防萬一)
             _memoryDataList.RemoveAll(x => x == null);
             // [NEW] 保存向量資料（傳入 PawnMemories 以過濾孤兒向量）
-            VectorDatabase.Instance.SaveToDisk(GetVectorDbPath(), PawnMemories);
-            SemanticCache.Instance.SaveToDisk(GetSemanticCachePath());
+            MemoryVectorDatabase.Instance.SaveToDisk(GetVectorDbPath(), PawnMemories);
+            ContextVectorDatabase.Instance.SaveToDisk(GetSemanticCachePath());
         }
         // 這會保存所有的 Short/Medium/Long Term Memories
         Scribe_Collections.Look(ref _memoryDataList, "pawnMemories", LookMode.Deep);
@@ -103,8 +103,8 @@ public class RimTalkWorldComponent(World world) : WorldComponent(world)
             CommonKnowledgeStore ??= [];
 
             // [NEW] 載入向量資料並還原
-            SemanticCache.Instance.LoadFromDisk(GetSemanticCachePath());
-            VectorDatabase.Instance.LoadFromDisk(GetVectorDbPath());
+            ContextVectorDatabase.Instance.LoadFromDisk(GetSemanticCachePath());
+            MemoryVectorDatabase.Instance.LoadFromDisk(GetVectorDbPath());
         }
 
         try 
