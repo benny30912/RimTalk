@@ -125,6 +125,12 @@ public partial class Settings
         rightListing.Label("RimTalk.Settings.CKKeywords".Translate());
         _ckKeywordsBuffer = rightListing.TextEntry(_ckKeywordsBuffer);
 
+        // [NEW] 關鍵詞語法說明
+        Text.Font = GameFont.Tiny;
+        GUI.color = Color.gray;
+        rightListing.Label("RimTalk.Settings.CKKeywordsSyntaxHint".Translate());
+        GUI.color = Color.white;
+        Text.Font = GameFont.Small;
         rightListing.Gap();
 
         rightListing.Label("RimTalk.Settings.CKContent".Translate());
@@ -145,7 +151,7 @@ public partial class Settings
         {
             if (!string.IsNullOrWhiteSpace(_ckKeywordsBuffer) && !string.IsNullOrWhiteSpace(_ckContentBuffer))
             {
-                List<string> keys = _ckKeywordsBuffer.Split(new[] { ',', '，' }, StringSplitOptions.RemoveEmptyEntries)
+                List<string> keys = _ckKeywordsBuffer.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                     .Select(s => s.Trim())
                     .Where(s => !string.IsNullOrEmpty(s))
                     .ToList();

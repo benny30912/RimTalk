@@ -76,6 +76,7 @@
   <RimTalk.Describer.Suppression.Cowed>完全顺从，不太可能反抗</RimTalk.Describer.Suppression.Cowed>
 
   <RimTalk.Keywords>关键词（以逗号分隔）</RimTalk.Keywords>
+  <RimTalk.Settings.CKKeywordsSyntaxHint>语法：使用 "&amp;" 表示 AND，"|" 表示 OR，"()" 表示分组。示例：(战斗|受伤) &amp; 紧急</RimTalk.Settings.CKKeywordsSyntaxHint>
 
   <RimTalk.Settings.VectorServiceHeader>语意向量服务</RimTalk.Settings.VectorServiceHeader>
   <RimTalk.Settings.UseCloudVector>使用云端服务 (SiliconFlow bge-m3)</RimTalk.Settings.UseCloudVector>

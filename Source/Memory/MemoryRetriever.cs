@@ -136,14 +136,23 @@ namespace RimTalk.Source.Memory
             foreach (var k in allKnowledge)
             {
                 if (k.Keywords.NullOrEmpty()) continue;
-                int matchCount = 0;
-                foreach (var key in k.Keywords)
+
+                // [NEW] 使用 KeywordMatcher 支援進階語法
+                int totalMatchCount = 0;
+                bool anyExpressionMatched = false;
+
+                foreach (var expr in k.Keywords)
                 {
-                    if (context.IndexOf(key, StringComparison.OrdinalIgnoreCase) >= 0)
-                        matchCount++;
+                    var (matched, count) = KeywordMatcher.Evaluate(expr, context);
+                    if (matched)
+                    {
+                        anyExpressionMatched = true;
+                        totalMatchCount += count;
+                    }
                 }
 
-                if (matchCount == 0) continue;
+                if (!anyExpressionMatched) continue;
+                int matchCount = totalMatchCount;
 
                 float keywordScore = matchCount;
                 float lengthMultiplier = standardLength / Math.Max(k.Keywords.Count, 1);
