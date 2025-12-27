@@ -11,7 +11,6 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;  // [NEW] 為了 Task<T>
 using Verse;
 using Verse.AI.Group;
-using static Verse.AI.ThingCountTracker;
 using Cache = RimTalk.Data.Cache;
 
 namespace RimTalk.Service;

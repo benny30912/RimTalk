@@ -164,7 +164,7 @@ public class Player2Client : IAIClient
 
             // If health check passed, get API key through local authentication
             string loginUrl = $"http://localhost:4315/v1/login/web/{GameClientId}";
-            byte[] bodyRaw = "{}"u8.ToArray();
+            byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes("{}");
 
             using (var webRequest = new UnityWebRequest(loginUrl, "POST"))
             {

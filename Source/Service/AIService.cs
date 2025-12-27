@@ -14,9 +14,8 @@ namespace RimTalk.Service;
 // In most cases, you should NOT modify this file.
 public static class AIService
 {
-    private static string _instruction = "";
+    // [Upstream] 移除 _instruction 和 _contextUpdating
     private static bool _busy;
-    private static bool _contextUpdating;
     private static bool _firstInstruction = true;
 
     /// <summary>
@@ -28,7 +27,7 @@ public static class AIService
         Action<T, TalkResponse> onPlayerResponseReceived)
     {
         var currentMessages = new List<(Role role, string message)>(messages) { (Role.User, request.Prompt) };
-        var initApiLog = ApiHistory.AddRequest(request, _instruction);
+        var initApiLog = ApiHistory.AddRequest(request);  // [Upstream] 移除 context 參數
         var lastApiLog = initApiLog;
 
         _busy = true;
@@ -38,7 +37,8 @@ public static class AIService
             {
                 var client = await AIClientFactory.GetAIClientAsync();
                 if (client == null) return null;
-                return await client.GetStreamingChatCompletionAsync<TalkResponse>(_instruction, currentMessages,
+
+                return await client.GetStreamingChatCompletionAsync<TalkResponse>(request.Context, currentMessages,
                     talkResponse =>
                     {
                         // [NEW] 檢查是否為 Metadata 專用物件
@@ -48,7 +48,6 @@ public static class AIService
                         if (isMetadataOnly)
                         {
                             // Metadata 物件不需要匹配 Pawn，直接傳遞給回調
-                            // 使用一個特殊的 player 值（可以是 players 中的任意一個，或 default）
                             var firstPlayer = players.Values.FirstOrDefault();
                             if (firstPlayer != null)
                             {
@@ -68,10 +67,10 @@ public static class AIService
                         int elapsedMs = (int)(DateTime.Now - lastApiLog.Timestamp).TotalMilliseconds;
                         if (lastApiLog == initApiLog)
                             elapsedMs -= lastApiLog.ElapsedMs;
-                        
-                        var newApiLog = ApiHistory.AddResponse(initApiLog.Id, talkResponse.Text, talkResponse.Name, talkResponse.InteractionRaw, elapsedMs:elapsedMs);
+
+                        var newApiLog = ApiHistory.AddResponse(initApiLog.Id, talkResponse.Text, talkResponse.Name, talkResponse.InteractionRaw, elapsedMs: elapsedMs);
                         talkResponse.Id = newApiLog.Id;
-                        
+
                         lastApiLog = newApiLog;
 
                         onPlayerResponseReceived?.Invoke(player, talkResponse);
@@ -82,7 +81,64 @@ public static class AIService
             {
                 initApiLog.Response = "Failed";
             }
-            
+
+            ApiHistory.UpdatePayload(initApiLog.Id, payload);
+
+            Stats.IncrementCalls();
+            Stats.IncrementTokens(payload?.TokenCount ?? 0);
+
+            _firstInstruction = false;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>
+    /// [Upstream] Simplified streaming chat for Debug Resend (uses Cache.GetByName)
+    /// </summary>
+    public static async Task ChatStreaming(TalkRequest request,
+        List<(Role role, string message)> messages,
+        Action<TalkResponse> onPlayerResponseReceived)
+    {
+        var currentMessages = new List<(Role role, string message)>(messages) { (Role.User, request.Prompt) };
+        var initApiLog = ApiHistory.AddRequest(request);
+        var lastApiLog = initApiLog;
+
+        _busy = true;
+        try
+        {
+            var payload = await AIErrorHandler.HandleWithRetry(async () =>
+            {
+                var client = await AIClientFactory.GetAIClientAsync();
+                if (client == null) return null;
+                return await client.GetStreamingChatCompletionAsync<TalkResponse>(request.Context, currentMessages,
+                    talkResponse =>
+                    {
+                        if (Cache.GetByName(talkResponse.Name) == null) return;
+
+                        talkResponse.TalkType = request.TalkType;
+
+                        // Add logs
+                        int elapsedMs = (int)(DateTime.Now - lastApiLog.Timestamp).TotalMilliseconds;
+                        if (lastApiLog == initApiLog)
+                            elapsedMs -= lastApiLog.ElapsedMs;
+
+                        var newApiLog = ApiHistory.AddResponse(initApiLog.Id, talkResponse.Text, talkResponse.Name, talkResponse.InteractionRaw, elapsedMs: elapsedMs);
+                        talkResponse.Id = newApiLog.Id;
+
+                        lastApiLog = newApiLog;
+
+                        onPlayerResponseReceived?.Invoke(talkResponse);
+                    });
+            });
+
+            if (payload == null || string.IsNullOrEmpty(initApiLog.Response))
+            {
+                initApiLog.Response = "Failed";
+            }
+
             ApiHistory.UpdatePayload(initApiLog.Id, payload);
 
             Stats.IncrementCalls();
@@ -101,10 +157,8 @@ public static class AIService
         List<(Role role, string message)> messages)
     {
         var currentMessages = new List<(Role role, string message)>(messages) { (Role.User, request.Prompt) };
-
-        var apiLog = ApiHistory.AddRequest(request, _instruction);
-
-        var payload = await ExecuteAIRequest(_instruction, currentMessages);
+        var apiLog = ApiHistory.AddRequest(request);
+        var payload = await ExecuteAIRequest(request.Context, currentMessages);
 
         if (payload == null)
         {
@@ -112,7 +166,6 @@ public static class AIService
             return null;
         }
 
-        // This needs to be changed if JSONL is used
         var talkResponses = JsonUtil.DeserializeFromJson<List<TalkResponse>>(payload.Response);
 
         if (talkResponses != null)
@@ -133,10 +186,8 @@ public static class AIService
     public static async Task<T> Query<T>(TalkRequest request) where T : class, IJsonData
     {
         List<(Role role, string message)> message = [(Role.User, request.Prompt)];
-
-        var apiLog = ApiHistory.AddRequest(request, _instruction);
-
-        var payload = await ExecuteAIRequest(_instruction, message);
+        var apiLog = ApiHistory.AddRequest(request);
+        var payload = await ExecuteAIRequest(request.Context, message);
 
         if (payload == null)
         {
@@ -145,7 +196,6 @@ public static class AIService
         }
 
         var jsonData = JsonUtil.DeserializeFromJson<T>(payload.Response);
-
         ApiHistory.AddResponse(apiLog.Id, jsonData.GetText(), null, null, payload: payload);
 
         return jsonData;
@@ -178,17 +228,6 @@ public static class AIService
         }
     }
 
-    public static void UpdateContext(string context)
-    {
-        Logger.Debug($"UpdateContext:\n{context}");
-        _instruction = context;
-    }
-
-    public static string GetContext()
-    {
-        return _instruction;
-    }
-
     public static bool IsFirstInstruction()
     {
         return _firstInstruction;
@@ -196,19 +235,13 @@ public static class AIService
 
     public static bool IsBusy()
     {
-        return _busy || _contextUpdating;
-    }
-
-    public static bool IsContextUpdating()
-    {
-        return _contextUpdating;
+        return _busy;  // [Upstream] 移除 _contextUpdating
     }
 
     public static void Clear()
     {
         _busy = false;
-        _contextUpdating = false;
         _firstInstruction = true;
-        _instruction = "";
+        // [Upstream] 移除 _instruction 和 _contextUpdating 的清理
     }
 }

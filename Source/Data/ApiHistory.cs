@@ -1,17 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 using RimTalk.Client;
 
 namespace RimTalk.Data;
 
-public class ApiLog(string name, string prompt, string response, Payload payload, DateTime timestamp, List<string> contexts = null)
+// [Upstream] 改為儲存 TalkRequest 物件
+public class ApiLog(string name, TalkRequest talkRequest, string response, Payload payload, DateTime timestamp)
 {
     public Guid Id { get; } = Guid.NewGuid();
     public int ConversationId { get; set; }
+    public TalkRequest TalkRequest { get; set; } = talkRequest;  // [NEW] 儲存完整請求
     public string Name { get; set; } = name;
-    public List<string> Contexts { get; set; } = contexts ?? [];
-    public string Prompt { get; set; } = prompt;
     public string Response { get; set; } = response;
     public string InteractionType;
     public bool IsFirstDialogue;
@@ -21,43 +20,23 @@ public class ApiLog(string name, string prompt, string response, Payload payload
     public DateTime Timestamp { get; } = timestamp;
     public int ElapsedMs;
     public int SpokenTick { get; set; } = 0;
-
-    public static List<string> ExtractContextBlocks(string context)
-    {
-        var blocks = new List<string>();
-        if (string.IsNullOrEmpty(context)) return blocks;
-
-        // [MODIFIED] 新 pattern：匹配 [Person 0], [Person 1], [Person 2]... 格式
-        // 原本：@"\[P\d+\]\s*(.*?)(?=\[P\d+\]|$)"
-        // 修改後：@"\[Person \d+\]\s*(.*?)(?=\[Person \d+\]|$)"
-        string pattern = @"\[Person \d+\]\s*(.*?)(?=\[Person \d+\]|$)";
-        var matches = Regex.Matches(context, pattern, RegexOptions.Singleline);
-
-        foreach (Match match in matches)
-        {
-            var block = match.Groups[1].Value.Trim();
-            if (!string.IsNullOrEmpty(block))
-                blocks.Add(block);
-        }
-
-        return blocks;
-    }
 }
 
 public static class ApiHistory
 {
     private static readonly Dictionary<Guid, ApiLog> History = new();
     private static int _conversationIdIndex = 0;
-    
+
     public static ApiLog GetApiLog(Guid id) => History.TryGetValue(id, out var apiLog) ? apiLog : null;
 
-    public static ApiLog AddRequest(TalkRequest request, string context)
+    // [Upstream] 改為接收 TalkRequest（Context 已包含在內）
+    public static ApiLog AddRequest(TalkRequest request)
     {
-        var log = new ApiLog(request.Initiator.LabelShort, request.Prompt, null, null, DateTime.Now, ApiLog.ExtractContextBlocks(context))
-            {
-                IsFirstDialogue = true,
-                ConversationId = request.IsMonologue ? -1 : _conversationIdIndex++
-            };
+        var log = new ApiLog(request.Initiator.LabelShort, request, null, null, DateTime.Now)
+        {
+            IsFirstDialogue = true,
+            ConversationId = request.IsMonologue ? -1 : _conversationIdIndex++
+        };
         History[log.Id] = log;
         return log;
     }
@@ -88,16 +67,16 @@ public static class ApiHistory
             originalLog.ElapsedMs = (int)(DateTime.Now - originalLog.Timestamp).TotalMilliseconds;
             return originalLog;
         }
-        
-        // multi-turn messages
-        var newLog = new ApiLog(name, originalLog.Prompt, response, payload, DateTime.Now, originalLog.Contexts);
+
+        // multi-turn messages - [Upstream] 使用 TalkRequest
+        var newLog = new ApiLog(name, originalLog.TalkRequest, response, payload, DateTime.Now);
         History[newLog.Id] = newLog;
         newLog.InteractionType = interactionType;
         newLog.ElapsedMs = elapsedMs;
         newLog.ConversationId = originalLog.ConversationId;
         return newLog;
     }
-    
+
     public static ApiLog AddUserHistory(string name, string text)
     {
         var log = new ApiLog(name, null, text, null, DateTime.Now);

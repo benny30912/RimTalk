@@ -73,15 +73,13 @@ public static class UIUtil
 
             foreach (var log in apiLogs)
             {
-                string combinedContexts = "";
-                if (log.Contexts != null && log.Contexts.Any())
-                {
-                    var escapedContexts = log.Contexts.Select(c => c.Replace("\"", "\"\""));
-                    combinedContexts = string.Join(" | ", escapedContexts);
-                }
+                // [Upstream] 從 TalkRequest 讀取 Prompt 和 Context
+                string prompt = log.TalkRequest?.Prompt ?? "";
+                string context = log.TalkRequest?.Context ?? "";
+                string escapedContext = context.Replace("\"", "\"\"");
 
                 sb.AppendLine(
-                    $"\"{log.Timestamp}\",\"{log.Name}\",\"{log.Response}\",\"{log.InteractionType}\",{log.TokenCount},{log.ElapsedMs},\"{log.Prompt}\",\"{combinedContexts}\"");
+                    $"\"{log.Timestamp}\",\"{log.Name}\",\"{log.Response}\",\"{log.InteractionType}\",{log.TokenCount},{log.ElapsedMs},\"{prompt}\",\"{escapedContext}\"");
             }
 
             string fileName = $"RimTalk_Export_{DateTime.Now:yyyyMMdd_HHmmss}.csv";

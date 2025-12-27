@@ -127,9 +127,8 @@ public static class TalkService
         {
             Cache.Get(initiator).IsGeneratingTalk = true;
 
-            // [NEW] 在後台執行緒解析 Context（批次向量計算 + 記憶檢索）
-            string context = await PromptService.ResolveContextAsync(contextSnapshot, pawns);
-            AIService.UpdateContext(context);
+            // [Upstream] 在後台執行緒解析 Context，賦值給 TalkRequest
+            talkRequest.Context = await PromptService.ResolveContextAsync(contextSnapshot, pawns);
 
             var receivedResponses = new List<TalkResponse>();
 
@@ -275,6 +274,58 @@ public static class TalkService
 
             VectorQueueService.Instance.Enqueue(primaryId, summary, copyToIds);
         }
+    }
+
+    /// <summary>
+    /// [Upstream] Calls AI service directly for debug purpose.
+    /// </summary>
+    public static void GenerateTalkDebug(TalkRequest talkRequest)
+    {
+        Task.Run(async () =>
+        {
+            var initiator = talkRequest.Initiator;
+            try
+            {
+                Cache.Get(initiator).IsGeneratingTalk = true;
+
+                var receivedResponses = new List<TalkResponse>();
+
+                // 使用 TalkHistory 作為歷史
+                await AIService.ChatStreaming(
+                    talkRequest,
+                    TalkHistory.GetMessageHistory(initiator),
+                    talkResponse =>
+                    {
+                        Logger.Debug($"Streamed (Debug): {talkResponse}");
+
+                        PawnState pawnState = Cache.GetByName(talkResponse.Name);
+                        if (pawnState == null) return;
+
+                        talkResponse.Name = pawnState.Pawn.LabelShort;
+
+                        if (receivedResponses.Any())
+                        {
+                            talkResponse.ParentTalkId = receivedResponses.Last().Id;
+                        }
+
+                        receivedResponses.Add(talkResponse);
+
+                        lock (pawnState.TalkResponses)
+                        {
+                            pawnState.TalkResponses.Add(talkResponse);
+                        }
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex.StackTrace);
+            }
+            finally
+            {
+                Cache.Get(initiator).IsGeneratingTalk = false;
+            }
+        });
     }
 
     /// <summary>

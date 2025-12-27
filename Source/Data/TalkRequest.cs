@@ -9,6 +9,12 @@ namespace RimTalk.Data;
 public class TalkRequest
 {
     public TalkType TalkType { get; set; }
+
+    /// <summary>
+    /// [Upstream] Context 字串，供 AIService 使用
+    /// </summary>
+    public string Context { get; set; }
+
     public string Prompt { get; set; }
     public Pawn Initiator { get; set; }
     public Pawn Recipient { get; set; }
@@ -61,10 +67,19 @@ public class TalkRequest
             {
                 return true;
             }
-        } else if (TalkType == TalkType.Thought)
+        }
+        else if (TalkType == TalkType.Thought)
         {
             return !ThoughtTracker.IsThoughtStillActive(Initiator, Prompt);
         }
         return GenTicks.TicksGame - CreatedTick > CommonUtil.GetTicksForDuration(duration);
+    }
+
+    /// <summary>
+    /// [Upstream] 複製請求（DebugWindow Resend 功能使用）
+    /// </summary>
+    public TalkRequest Clone()
+    {
+        return (TalkRequest)MemberwiseClone();
     }
 }
