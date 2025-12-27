@@ -1,18 +1,14 @@
 ﻿using RimTalk.Client.OpenAI;
 using RimTalk.Data;
-using RimTalk.Util;
 using RimTalk.Vector;
 using RimWorld;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using RimTalk.Client.Gemini;
 using RimTalk.Client.Player2;
 using UnityEngine;
-using UnityEngine.Networking;
 using Verse;
-using Logger = RimTalk.Util.Logger;
 
 namespace RimTalk;
 
@@ -425,6 +421,10 @@ public partial class Settings
                     config.Provider = AIProvider.Grok;
                     config.SelectedModel = Constant.ChooseModel;
                 }),
+                new(nameof(AIProvider.GLM), () => {
+                    config.Provider = AIProvider.GLM;
+                    config.SelectedModel = Constant.ChooseModel;
+                }),
                 new(nameof(AIProvider.OpenRouter), () => {
                     config.Provider = AIProvider.OpenRouter;
                     config.SelectedModel = Constant.ChooseModel;
@@ -549,6 +549,7 @@ public partial class Settings
             case AIProvider.OpenAI: return "https://api.openai.com/v1/models";
             case AIProvider.DeepSeek: return "https://api.deepseek.com/models";
             case AIProvider.Grok: return "https://api.x.ai/v1/models";
+            case AIProvider.GLM: return "https://open.bigmodel.cn/api/paas/v4/models";
             case AIProvider.OpenRouter: return "https://openrouter.ai/api/v1/models";
             case AIProvider.Player2:
             default: return null;

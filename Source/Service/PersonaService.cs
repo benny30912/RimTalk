@@ -49,8 +49,11 @@ public static class PersonaService
             // [NEW] 檢查是否已取消
             if (_cts.Token.IsCancellationRequested) return null;
 
-            AIService.UpdateContext($"[Character]\n{pawnBackstory}");
-            var request = new TalkRequest(Constant.PersonaGenInstruction, pawn);
+            // [Upstream] 使用 request.Context 而非 AIService.UpdateContext
+            var request = new TalkRequest(Constant.PersonaGenInstruction, pawn)
+            {
+                Context = $"[Character]\n{pawnBackstory}"
+            };
             PersonalityData personalityData = await AIService.Query<PersonalityData>(request);
 
             // [NEW] 再次檢查是否已取消 (防止在等待期間遊戲被重置)
