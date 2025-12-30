@@ -65,15 +65,16 @@ public static class CustomDialogueService
         if (recipientState != null && recipientState.CanDisplayTalk())
             recipientState.AddTalkRequest(message, initiator, TalkType.User);
 
+        // [Upstream] AddUserHistory 新簽名
+        ApiLog apiLog = ApiHistory.AddUserHistory(initiator, recipient, message);
+
         if (initiator.IsPlayer())
         {
-            ApiLog apiLog = ApiHistory.AddUserHistory(Settings.Get().PlayerName, message);
             apiLog.SpokenTick = GenTicks.TicksGame;
             Overlay.NotifyLogUpdated();
         }
         else
         {
-            ApiLog apiLog = ApiHistory.AddUserHistory(initiator.LabelShort, message);
             TalkResponse talkResponse = new(TalkType.User, initiator.LabelShort, message)
             {
                 Id = apiLog.Id

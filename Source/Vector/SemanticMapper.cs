@@ -171,25 +171,6 @@ namespace RimTalk.Vector
         #endregion
 
         /// <summary>
-        /// 從周遭物品中選一個，取得其語意文本 (Surrounding本來就是隨機的)
-        /// 模擬「看到某物觸發聯想」
-        /// </summary>
-        public static string GetSurroundingText(List<Thing> things)
-        {
-            if (things == null || things.Count == 0)
-                return null;
-
-            var thing = things[0];
-
-            if (thing?.def == null) return null;
-
-            string label = thing.def.label ?? thing.def.defName;
-            string desc = thing.def.description ?? "";
-
-            return string.IsNullOrWhiteSpace(desc) ? label : $"{label}: {desc}";
-        }
-
-        /// <summary>
         /// 從 Def 取得語意文本 (label + description)
         /// </summary>
         public static string GetSemanticTextFromDef(Def def)

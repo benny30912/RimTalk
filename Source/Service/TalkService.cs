@@ -281,9 +281,13 @@ public static class TalkService
     /// </summary>
     public static void GenerateTalkDebug(TalkRequest talkRequest)
     {
+        var initiator = talkRequest.Initiator;
+        // ★ 修改點：使用 BuildMemoryBlockFromHistory
+        // 這會回傳經過清洗的 List<(Role, string)>
+        var memoryBlock = MemoryFormatter.BuildMemoryBlockFromHistory(initiator);
+
         Task.Run(async () =>
         {
-            var initiator = talkRequest.Initiator;
             try
             {
                 Cache.Get(initiator).IsGeneratingTalk = true;
@@ -293,7 +297,7 @@ public static class TalkService
                 // 使用 TalkHistory 作為歷史
                 await AIService.ChatStreaming(
                     talkRequest,
-                    TalkHistory.GetMessageHistory(initiator),
+                    memoryBlock, //傳入清洗過的歷史
                     talkResponse =>
                     {
                         Logger.Debug($"Streamed (Debug): {talkResponse}");
