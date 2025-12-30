@@ -387,13 +387,11 @@ public static class ContextBuilder
 
         if (contextSettings.IncludeSurroundings)
         {
-            var items = ContextHelper.CollectNearbyItems(mainPawn, 3);
-            if (items.Any())
+            var surroundingsText = ContextHelper.CollectNearbyContextText(mainPawn, distance: 3, maxPerKind: 3);
+            if (!string.IsNullOrEmpty(surroundingsText))
             {
-                // [MOD] 改為從 Thing 取得 LabelCap
-                var labels = items.Select(t => t.LabelCap.ToString()).ToList();
-                var grouped = labels.GroupBy(l => l).Select(g => g.Count() > 1 ? $"{g.Key} x {g.Count()}" : g.Key);
-                sb.Append($"\nSurroundings: {string.Join(", ", grouped)}");
+                sb.Append("\nSurroundings:\n");
+                sb.Append(surroundingsText);
             }
         }
     }

@@ -1,26 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using RimTalk.Client;
+using RimTalk.Source.Data;
+using Verse;
 
 namespace RimTalk.Data;
-
-// [Upstream] 改為儲存 TalkRequest 物件
-public class ApiLog(string name, TalkRequest talkRequest, string response, Payload payload, DateTime timestamp)
-{
-    public Guid Id { get; } = Guid.NewGuid();
-    public int ConversationId { get; set; }
-    public TalkRequest TalkRequest { get; set; } = talkRequest;  // [NEW] 儲存完整請求
-    public string Name { get; set; } = name;
-    public string Response { get; set; } = response;
-    public string InteractionType;
-    public bool IsFirstDialogue;
-    public string RequestPayload { get; set; } = payload?.Request;
-    public string ResponsePayload { get; set; } = payload?.Response;
-    public int TokenCount { get; set; } = payload?.TokenCount ?? 0;
-    public DateTime Timestamp { get; } = timestamp;
-    public int ElapsedMs;
-    public int SpokenTick { get; set; } = 0;
-}
 
 public static class ApiHistory
 {
@@ -29,10 +13,9 @@ public static class ApiHistory
 
     public static ApiLog GetApiLog(Guid id) => History.TryGetValue(id, out var apiLog) ? apiLog : null;
 
-    // [Upstream] 改為接收 TalkRequest（Context 已包含在內）
-    public static ApiLog AddRequest(TalkRequest request)
+    public static ApiLog AddRequest(TalkRequest request, Channel channel)
     {
-        var log = new ApiLog(request.Initiator.LabelShort, request, null, null, DateTime.Now)
+        var log = new ApiLog(request.Initiator.LabelShort, request, null, null, DateTime.Now, channel)
         {
             IsFirstDialogue = true,
             ConversationId = request.IsMonologue ? -1 : _conversationIdIndex++
@@ -68,8 +51,8 @@ public static class ApiHistory
             return originalLog;
         }
 
-        // multi-turn messages - [Upstream] 使用 TalkRequest
-        var newLog = new ApiLog(name, originalLog.TalkRequest, response, payload, DateTime.Now);
+        // multi-turn messages
+        var newLog = new ApiLog(name, originalLog.TalkRequest, response, payload, DateTime.Now, originalLog.Channel);
         History[newLog.Id] = newLog;
         newLog.InteractionType = interactionType;
         newLog.ElapsedMs = elapsedMs;
@@ -77,9 +60,11 @@ public static class ApiHistory
         return newLog;
     }
 
-    public static ApiLog AddUserHistory(string name, string text)
+    public static ApiLog AddUserHistory(Pawn initiator, Pawn recipient, string text)
     {
-        var log = new ApiLog(name, null, text, null, DateTime.Now);
+        var prompt = $"{initiator.LabelShort} talked to {recipient.LabelShort}";
+        TalkRequest talkRequest = new(prompt, initiator, recipient, TalkType.User);
+        var log = new ApiLog(initiator.LabelShort, talkRequest, text, null, DateTime.Now, Channel.User);
         History[log.Id] = log;
         return log;
     }

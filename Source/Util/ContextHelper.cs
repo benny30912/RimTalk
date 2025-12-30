@@ -7,6 +7,24 @@ using static RimTalk.Service.PromptService;
 
 namespace RimTalk.Util;
 
+public enum NearbyKind
+{
+    Building,
+    Item,
+    Plant,
+    Animal,
+    Filth
+}
+
+public struct NearbyAgg
+{
+    public NearbyKind Kind;
+    public string Key;        // Stable aggregation key
+    public string Label;      // Display label
+    public int Count;
+    public int StackSum;      // For items: sum of stackCount
+}
+
 public static class ContextHelper
 {
     public static string GetPawnLocationStatus(Pawn pawn)
@@ -15,8 +33,8 @@ public static class ContextHelper
             return null;
 
         var room = pawn.GetRoom();
-        return room is { PsychologicallyOutdoors: false } 
-            ? "Indoors".Translate() 
+        return room is { PsychologicallyOutdoors: false }
+            ? "Indoors".Translate()
             : "Outdoors".Translate();
     }
 
@@ -50,7 +68,7 @@ public static class ContextHelper
         var data = thing.def.graphicData;
         return data != null && data.linkFlags.HasFlag((Enum)LinkFlags.Wall);
     }
-    
+
     public static string Sanitize(string text, Pawn pawn = null)
     {
         if (pawn != null)
@@ -85,65 +103,206 @@ public static class ContextHelper
         return cells;
     }
 
-    /// <summary>
-    /// [MOD] 改為回傳 List<Thing>，由呼叫端決定如何處理
-    /// </summary>
-    public static List<Thing> CollectNearbyItems(Pawn pawn, int maxItems)
+    private static List<IntVec3> GetNearbyCellsRadial(Pawn pawn, int radius, bool sameRoomOnly)
     {
-        var items = new List<Thing>();
-        var seenThings = new HashSet<Thing>();
-        var nearbyCells = GetNearbyCells(pawn);
+        var map = pawn.Map;
+        var origin = pawn.Position;
 
-        foreach (var cell in nearbyCells.InRandomOrder())
+        Room room = null;
+        if (sameRoomOnly)
+            room = origin.GetRoom(map);
+
+        var cells = new List<IntVec3>(128);
+
+        foreach (var c in GenRadial.RadialCellsAround(origin, radius, true))
         {
-            if (items.Count >= maxItems)
-                break;
+            if (!c.InBounds(map)) continue;
 
-            var thingsHere = cell.GetThingList(pawn.Map);
+            if (sameRoomOnly && room != null)
+            {
+                var r2 = c.GetRoom(map);
+                if (r2 != room) continue;
+            }
+
+            cells.Add(c);
+        }
+
+        return cells;
+    }
+
+    public static bool IsHiddenForPlayer(Thing thing)
+    {
+        if (thing?.def == null) return false;
+        if (Find.HiddenItemsManager == null) return false;
+        return Find.HiddenItemsManager.Hidden(thing.def);
+    }
+
+    public static List<NearbyAgg> CollectNearbyContext(
+        Pawn pawn,
+        int distance = 5,
+        int maxPerKind = 12,
+        int maxCellsToScan = 18,
+        int maxThingsTotal = 200,
+        int maxItemThings = 120)
+    {
+        if (pawn?.Map == null || pawn.Position == IntVec3.Invalid)
+            return new List<NearbyAgg>();
+
+        var map = pawn.Map;
+        var sameRoomOnly = pawn.GetRoom() is { PsychologicallyOutdoors: false };
+        var cells = GetNearbyCellsRadial(pawn, distance, sameRoomOnly);
+        if (cells.Count > maxCellsToScan)
+            cells = cells.Take(maxCellsToScan).ToList();
+
+        var aggs = new Dictionary<string, NearbyAgg>();
+        int processedTotal = 0;
+        int processedItems = 0;
+
+        foreach (var cell in cells)
+        {
+            var thingsHere = cell.GetThingList(map);
             if (thingsHere == null || thingsHere.Count == 0)
                 continue;
 
-            // Skip cells with pawns/animals
-            if (thingsHere.Any(t => t?.def != null &&
-                t.def.category != ThingCategory.Building &&
-                t.def.category != ThingCategory.Plant &&
-                t.def.category != ThingCategory.Item &&
-                !t.def.IsFilth))
-                continue;
-
-            // Get one valid thing per category
-            var candidatesByCategory = new Dictionary<ThingCategory, Thing>();
-            foreach (var thing in thingsHere)
+            for (int i = 0; i < thingsHere.Count; i++)
             {
-                if (thing?.def == null)
+                if (processedTotal >= maxThingsTotal)
+                    goto DONE;
+
+                var thing = thingsHere[i];
+                if (thing?.def == null) continue;
+                if (thing.DestroyedOrNull()) continue;
+
+                if (Find.HiddenItemsManager != null && Find.HiddenItemsManager.Hidden(thing.def))
                     continue;
 
-                var isValid = thing.def.category == ThingCategory.Building ||
-                              thing.def.category == ThingCategory.Plant ||
-                              thing.def.category == ThingCategory.Item ||
-                              thing.def.IsFilth;
+                if (thing.def.category == ThingCategory.Item)
+                {
+                    if (thing.Position.GetSlotGroup(map) != null)
+                        continue;
 
-                if (!isValid)
+                    processedItems++;
+                    if (processedItems > maxItemThings)
+                        goto DONE;
+
+                    if (thing.stackCount >= 1000 && thing.def.stackLimit < 1000)
+                        continue;
+                }
+
+                processedTotal++;
+
+                if (thing is Pawn otherPawn)
+                {
+                    if (otherPawn == pawn) continue;
+                    if (!otherPawn.Spawned || otherPawn.Dead) continue;
+                    if (!otherPawn.RaceProps.Animal) continue;
+                    AddAgg(aggs, otherPawn, NearbyKind.Animal);
                     continue;
+                }
 
-                if (thing.def.category == ThingCategory.Building && IsWall(thing))
-                    continue;
+                var cat = thing.def.category;
 
-                if (!candidatesByCategory.ContainsKey(thing.def.category))
-                    candidatesByCategory[thing.def.category] = thing;
+                if (cat == ThingCategory.Building)
+                {
+                    if (IsWall(thing)) continue;
+                    AddAgg(aggs, thing, NearbyKind.Building);
+                }
+                else if (cat == ThingCategory.Item)
+                {
+                    AddAgg(aggs, thing, NearbyKind.Item);
+                }
+                else if (cat == ThingCategory.Plant)
+                {
+                    AddAgg(aggs, thing, NearbyKind.Plant);
+                }
+                else if (thing.def.IsFilth)
+                {
+                    AddAgg(aggs, thing, NearbyKind.Filth);
+                }
             }
-
-            if (candidatesByCategory.Count == 0)
-                continue;
-
-            var picked = candidatesByCategory.Values.ToList().RandomElement();
-            if (seenThings.Contains(picked))
-                continue;
-
-            seenThings.Add(picked);
-            items.Add(picked);
         }
 
-        return items;
+    DONE:
+        return aggs.Values
+            .GroupBy(a => a.Kind)
+            .SelectMany(g => g
+                .OrderByDescending(x => x.Count)
+                .Take(maxPerKind))
+            .ToList();
+    }
+
+    private static void AddAgg(Dictionary<string, NearbyAgg> aggs, Thing thing, NearbyKind kind)
+    {
+        var def = thing.def;
+        var label = def.LabelCap;
+        var key = $"{kind}|{def.defName}";
+
+        if (!aggs.TryGetValue(key, out var agg))
+        {
+            agg = new NearbyAgg
+            {
+                Kind = kind,
+                Key = key,
+                Label = label,
+                Count = 0,
+                StackSum = 0
+            };
+        }
+
+        agg.Count++;
+
+        if (kind == NearbyKind.Item)
+            agg.StackSum += thing.stackCount;
+
+        aggs[key] = agg;
+    }
+
+    public static string FormatNearbyContext(List<NearbyAgg> aggs)
+    {
+        if (aggs == null || aggs.Count == 0)
+            return null;
+
+        string FmtGroup(NearbyKind kind, string title)
+        {
+            var list = aggs.Where(a => a.Kind == kind).ToList();
+            if (list.Count == 0) return null;
+
+            var parts = list.Select(a =>
+            {
+                if (kind == NearbyKind.Item)
+                {
+                    if (a.Count > 1)
+                        return $"{a.Label} ×{a.StackSum} ({a.Count} stacks)";
+                    return $"{a.Label} ×{a.StackSum}";
+                }
+
+                return a.Count > 1 ? $"{a.Label} ×{a.Count}" : a.Label;
+            });
+
+            return $"{title}: {string.Join(", ", parts)}";
+        }
+
+        var sections = new List<string>
+        {
+            FmtGroup(NearbyKind.Building, "Buildings"),
+            FmtGroup(NearbyKind.Item, "Items"),
+            FmtGroup(NearbyKind.Plant, "Plants"),
+            FmtGroup(NearbyKind.Animal, "Animals"),
+            FmtGroup(NearbyKind.Filth, "Filth"),
+        }.Where(s => !string.IsNullOrWhiteSpace(s));
+
+        return string.Join("\n", sections);
+    }
+
+    public static string CollectNearbyContextText(
+        Pawn pawn,
+        int distance = 5,
+        int maxPerKind = 12,
+        int maxCellsToScan = 18,
+        int maxThingsTotal = 200,
+        int maxItemThings = 120)
+    {
+        var aggs = CollectNearbyContext(pawn, distance, maxPerKind, maxCellsToScan, maxThingsTotal, maxItemThings);
+        return FormatNearbyContext(aggs);
     }
 }

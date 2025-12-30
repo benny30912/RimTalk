@@ -1,4 +1,5 @@
 ﻿using RimTalk.Data;
+using RimTalk.Util;
 using RimWorld;
 using System;
 using System.Collections.Generic;
@@ -96,13 +97,27 @@ namespace RimTalk.Vector
         }
 
         /// <summary>
-        /// 收集 Surrounding
+        /// 收集 Surrounding（NearbyAgg 版本）
+        /// 每個類別隨機取一項，包含 label + description
         /// </summary>
-        public void CollectSurrounding(List<Thing> things)
+        public void CollectSurrounding(List<NearbyAgg> aggs)
         {
-            string text = SemanticMapper.GetSurroundingText(things);
-            if (!string.IsNullOrEmpty(text))
+            if (aggs == null || aggs.Count == 0) return;
+
+            foreach (var group in aggs.GroupBy(a => a.Kind))
+            {
+                var picked = group.RandomElement();
+                var defName = picked.Key.Split('|').LastOrDefault();
+                if (string.IsNullOrEmpty(defName)) continue;
+
+                var def = DefDatabase<ThingDef>.GetNamedSilentFail(defName);
+                if (def == null) continue;
+
+                string label = def.label ?? def.defName;
+                string desc = def.description ?? "";
+                string text = string.IsNullOrWhiteSpace(desc) ? label : $"{label}: {desc}";
                 CollectText(text, ContextItem.Category.Surrounding);
+            }
         }
 
         /// <summary>

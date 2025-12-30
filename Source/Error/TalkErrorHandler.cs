@@ -10,8 +10,11 @@ public static class AIErrorHandler
 {
     private static bool _quotaWarningShown;
 
-    // [MODIFY] Add optional parameter isMemoryOperation
-    public static async Task<T> HandleWithRetry<T>(Func<Task<T>> operation, bool isMemory = false)
+    // [整合] 同時保留 isMemory（本地）和 onFailure（Upstream）
+    public static async Task<T> HandleWithRetry<T>(
+        Func<Task<T>> operation,
+        bool isMemory = false,
+        Action<Exception> onFailure = null)
     {
         try
         {
@@ -21,10 +24,10 @@ public static class AIErrorHandler
         catch (Exception ex)
         {
             var settings = Settings.Get();
-            // [MODIFY] Pass isMemoryOperation
+            // [本地] Pass isMemoryOperation
             if (CanRetryGeneration(settings, isMemory))
             {
-                // [MODIFY] Get correct model name for message
+                // [本地] Get correct model name for message
                 string nextModel = isMemory
                     ? settings.GetActiveMemoryConfig()?.SelectedModel ?? "Unknown"
                     : settings.GetCurrentModel();
@@ -43,16 +46,18 @@ public static class AIErrorHandler
                 {
                     Logger.Warning($"Retry failed: {retryEx.Message}");
                     HandleFinalFailure(ex);
+                    onFailure?.Invoke(retryEx);  // [Upstream] 新增
                     return default;
                 }
             }
 
             HandleFinalFailure(ex);
+            onFailure?.Invoke(ex);  // [Upstream] 新增
             return default;
         }
     }
 
-    // [MODIFY] Update logic to rotate correct config
+    // [本地] Update logic to rotate correct config
     private static bool CanRetryGeneration(RimTalkSettings settings, bool isMemory)
     {
         if (settings.UseSimpleConfig)
@@ -67,7 +72,7 @@ public static class AIErrorHandler
 
         if (isMemory && settings.EnableMemoryModel)
         {
-            // [NEW] Rotate Memory Config
+            // [本地] Rotate Memory Config
             int originalIndex = settings.CurrentMemoryConfigIndex;
             settings.TryNextMemoryConfig();
             return settings.CurrentMemoryConfigIndex != originalIndex;

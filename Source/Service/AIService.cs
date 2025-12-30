@@ -1,6 +1,7 @@
 ﻿using RimTalk.Client;
 using RimTalk.Data;
 using RimTalk.Error;
+using RimTalk.Source.Data;  // [Upstream] 新增
 using RimTalk.Util;
 using System;
 using System.Collections.Generic;
@@ -14,12 +15,11 @@ namespace RimTalk.Service;
 // In most cases, you should NOT modify this file.
 public static class AIService
 {
-    // [Upstream] 移除 _instruction 和 _contextUpdating
     private static bool _busy;
     private static bool _firstInstruction = true;
 
     /// <summary>
-    /// Streaming chat that invokes callback as each player's dialogue is parsed
+    /// [本地] Streaming chat with player dictionary (supports Metadata objects)
     /// </summary>
     public static async Task ChatStreaming<T>(TalkRequest request,
         List<(Role role, string message)> messages,
@@ -27,7 +27,7 @@ public static class AIService
         Action<T, TalkResponse> onPlayerResponseReceived)
     {
         var currentMessages = new List<(Role role, string message)>(messages) { (Role.User, request.Prompt) };
-        var initApiLog = ApiHistory.AddRequest(request);  // [Upstream] 移除 context 參數
+        var initApiLog = ApiHistory.AddRequest(request, Channel.Stream);  // [Upstream] 新增 Channel
         var lastApiLog = initApiLog;
 
         _busy = true;
@@ -41,7 +41,7 @@ public static class AIService
                 return await client.GetStreamingChatCompletionAsync<TalkResponse>(request.Context, currentMessages,
                     talkResponse =>
                     {
-                        // [NEW] 檢查是否為 Metadata 專用物件
+                        // [本地] 檢查是否為 Metadata 專用物件
                         bool isMetadataOnly = string.IsNullOrEmpty(talkResponse.Name) &&
                                               !string.IsNullOrEmpty(talkResponse.Summary);
 
@@ -75,11 +75,22 @@ public static class AIService
 
                         onPlayerResponseReceived?.Invoke(player, talkResponse);
                     });
+            }, onFailure: ex =>  // [Upstream] 新增錯誤回調
+            {
+                initApiLog.Response = $"API Error: {ex.Message}";
+                initApiLog.IsError = true;
             });
 
             if (payload == null || string.IsNullOrEmpty(initApiLog.Response))
             {
-                initApiLog.Response = "Failed";
+                // [Upstream] 更詳細的錯誤訊息
+                if (!initApiLog.IsError)
+                {
+                    initApiLog.Response = payload != null
+                        ? $"Json Deserialization Failed\n\nRaw Response:\n{payload.Response}"
+                        : "Unknown Error (No payload received)";
+                    initApiLog.IsError = true;
+                }
             }
 
             ApiHistory.UpdatePayload(initApiLog.Id, payload);
@@ -103,7 +114,7 @@ public static class AIService
         Action<TalkResponse> onPlayerResponseReceived)
     {
         var currentMessages = new List<(Role role, string message)>(messages) { (Role.User, request.Prompt) };
-        var initApiLog = ApiHistory.AddRequest(request);
+        var initApiLog = ApiHistory.AddRequest(request, Channel.Stream);
         var lastApiLog = initApiLog;
 
         _busy = true;
@@ -113,6 +124,7 @@ public static class AIService
             {
                 var client = await AIClientFactory.GetAIClientAsync();
                 if (client == null) return null;
+
                 return await client.GetStreamingChatCompletionAsync<TalkResponse>(request.Context, currentMessages,
                     talkResponse =>
                     {
@@ -120,30 +132,36 @@ public static class AIService
 
                         talkResponse.TalkType = request.TalkType;
 
-                        // Add logs
                         int elapsedMs = (int)(DateTime.Now - lastApiLog.Timestamp).TotalMilliseconds;
                         if (lastApiLog == initApiLog)
                             elapsedMs -= lastApiLog.ElapsedMs;
 
-                        var newApiLog = ApiHistory.AddResponse(initApiLog.Id, talkResponse.Text, talkResponse.Name, talkResponse.InteractionRaw, elapsedMs: elapsedMs);
+                        var newApiLog = ApiHistory.AddResponse(initApiLog.Id, talkResponse.Text, talkResponse.Name,
+                            talkResponse.InteractionRaw, elapsedMs: elapsedMs);
                         talkResponse.Id = newApiLog.Id;
 
                         lastApiLog = newApiLog;
 
                         onPlayerResponseReceived?.Invoke(talkResponse);
                     });
+            }, onFailure: ex =>
+            {
+                initApiLog.Response = $"API Error: {ex.Message}";
+                initApiLog.IsError = true;
             });
 
             if (payload == null || string.IsNullOrEmpty(initApiLog.Response))
             {
-                initApiLog.Response = "Failed";
+                if (!initApiLog.IsError)
+                {
+                    initApiLog.Response = payload != null
+                        ? $"Json Deserialization Failed\n\nRaw Response:\n{payload.Response}"
+                        : "Unknown Error (No payload received)";
+                    initApiLog.IsError = true;
+                }
             }
 
             ApiHistory.UpdatePayload(initApiLog.Id, payload);
-
-            Stats.IncrementCalls();
-            Stats.IncrementTokens(payload?.TokenCount ?? 0);
-
             _firstInstruction = false;
         }
         finally
@@ -152,50 +170,34 @@ public static class AIService
         }
     }
 
-    // Original non-streaming method
-    public static async Task<List<TalkResponse>> Chat(TalkRequest request,
-        List<(Role role, string message)> messages)
-    {
-        var currentMessages = new List<(Role role, string message)>(messages) { (Role.User, request.Prompt) };
-        var apiLog = ApiHistory.AddRequest(request);
-        var payload = await ExecuteAIRequest(request.Context, currentMessages);
-
-        if (payload == null)
-        {
-            apiLog.Response = "Failed";
-            return null;
-        }
-
-        var talkResponses = JsonUtil.DeserializeFromJson<List<TalkResponse>>(payload.Response);
-
-        if (talkResponses != null)
-        {
-            foreach (var talkResponse in talkResponses)
-            {
-                apiLog = ApiHistory.AddResponse(apiLog.Id, talkResponse.Text, talkResponse.Name, talkResponse.InteractionRaw, payload);
-                talkResponse.Id = apiLog.Id;
-            }
-        }
-
-        _firstInstruction = false;
-
-        return talkResponses;
-    }
-
     // One time query - used for generating persona, etc
     public static async Task<T> Query<T>(TalkRequest request) where T : class, IJsonData
     {
         List<(Role role, string message)> message = [(Role.User, request.Prompt)];
-        var apiLog = ApiHistory.AddRequest(request);
+        var apiLog = ApiHistory.AddRequest(request, Channel.Query);  // [Upstream] Channel.Query
         var payload = await ExecuteAIRequest(request.Context, message);
 
         if (payload == null)
         {
             apiLog.Response = "Failed";
+            apiLog.IsError = true;
             return null;
         }
 
-        var jsonData = JsonUtil.DeserializeFromJson<T>(payload.Response);
+        T jsonData;
+        try
+        {
+            jsonData = JsonUtil.DeserializeFromJson<T>(payload.Response);
+        }
+        catch (Exception)
+        {
+            // [Upstream] 更詳細的錯誤處理
+            apiLog.Response = $"Json Deserialization Failed\n\nRaw Response:\n{payload.Response}";
+            apiLog.IsError = true;
+            ApiHistory.UpdatePayload(apiLog.Id, payload);
+            return null;
+        }
+
         ApiHistory.AddResponse(apiLog.Id, jsonData.GetText(), null, null, payload: payload);
 
         return jsonData;
@@ -235,13 +237,12 @@ public static class AIService
 
     public static bool IsBusy()
     {
-        return _busy;  // [Upstream] 移除 _contextUpdating
+        return _busy;
     }
 
     public static void Clear()
     {
         _busy = false;
         _firstInstruction = true;
-        // [Upstream] 移除 _instruction 和 _contextUpdating 的清理
     }
 }
