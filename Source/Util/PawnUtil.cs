@@ -68,7 +68,11 @@ public static class PawnUtil
         if (pawn.mindState.enemyTarget != null) return true;
 
         if (pawn.stances?.curStance is Stance_Busy busy && busy.verb != null)
-            return true;
+        {
+            // 檢查 Verb 目標是否為 Pawn（任何攻擊行為都視為戰鬥）
+            if (busy.focusTarg.Thing is Pawn)
+                return true;
+        }
 
         Pawn hostilePawn = pawn.GetHostilePawnNearBy();
         return hostilePawn != null && pawn.Position.DistanceTo(hostilePawn.Position) <= 20f;
@@ -470,6 +474,12 @@ public static class PawnUtil
 
         // Exclude roaming mech cluster pawns
         if (threat.RaceProps.IsMechanoid && lord is { CurLordToil: LordToil_DefendPoint })
+            return false;
+
+        // [NEW] 排除未發動攻擊的野生動物
+        if (threat.RaceProps.Animal &&
+            threat.Faction == null &&
+            threat.mindState.enemyTarget == null)
             return false;
 
         return true;

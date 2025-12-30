@@ -29,7 +29,7 @@ namespace RimTalk.Source.Memory
         public const int MaxShortMemories = 30;
         public const int MaxMediumMemories = 60;
         public const int MaxLongMemories = 40;
-        public const int MemoryBuffer = 5;  // [NEW] 共用緩衝
+        public const int MemoryBuffer = 10;  // [NEW] 共用緩衝
 
         private static RimTalkWorldComponent WorldComp => Find.World?.GetComponent<RimTalkWorldComponent>();
 
