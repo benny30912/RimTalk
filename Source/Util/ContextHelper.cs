@@ -275,7 +275,10 @@ public static class ContextHelper
                         return $"{a.Label} ×{a.StackSum} ({a.Count} stacks)";
                     return $"{a.Label} ×{a.StackSum}";
                 }
-
+                else if (kind == NearbyKind.Building)
+                {
+                    return $"{a.Label}";
+                }
                 return a.Count > 1 ? $"{a.Label} ×{a.Count}" : a.Label;
             });
 

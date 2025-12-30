@@ -61,21 +61,71 @@ public static class PawnUtil
         return false;
     }
 
+    // [FIX] 修改 IsInCombat 邏輯，引入 VerbUtility 進行嚴格判定
+    // 修正原因：
+    // 1. 舊邏輯僅檢查 Target 是否為 Pawn，導致「馴服/訓練」也會觸發戰鬥。
+    // 2. 引入 VerbUtility.HarmsHealth() 等方法，確保只有「具傷害性」的動作才算戰鬥。
+    // 3. 移除 Target 類型限制，現在攻擊建築或地面(如手榴彈)也會正確觸發戰鬥。
     public static bool IsInCombat(this Pawn pawn)
     {
         if (pawn == null) return false;
 
         if (pawn.mindState.enemyTarget != null) return true;
 
+        // 2. 檢查當前動作 (Stance)
         if (pawn.stances?.curStance is Stance_Busy busy && busy.verb != null)
         {
-            // 檢查 Verb 目標是否為 Pawn（任何攻擊行為都視為戰鬥）
-            if (busy.focusTarg.Thing is Pawn)
-                return true;
+            // [CHECK 1] 動作本質檢查：必須是具威脅性的動作
+            // HarmsHealth(): 造成傷害 (排除馴服/治療/互動)
+            // IsEMP(): 電磁脈衝 (雖無傷害但屬攻擊)
+            // UsesExplosiveProjectiles(): 發射爆裂物 (手榴彈/火箭筒)
+            if (busy.verb.HarmsHealth() || busy.verb.IsEMP() || busy.verb.UsesExplosiveProjectiles())
+            {
+                var targetThing = busy.focusTarg.Thing;
+                // [CHECK 2] 目標類型過濾：避免「訓練」或「拆除」誤判為戰鬥
+
+                // 情況 A: 目標不存在 (例如強制攻擊地面)
+                if (targetThing == null)
+                {
+                    // 例外：如果是丟手榴彈/發射火箭，即使炸地板也算戰鬥 (太危險了)
+                    if (busy.verb.UsesExplosiveProjectiles()) return true;
+                    // 一般槍械射擊地板 (測試武器?) -> 視為非戰鬥
+                    return false;
+                }
+                // 情況 B: 目標存在
+                // 條件：目標必須是「生物 (Pawn)」或者「敵對勢力 (Hostile)」
+                // 這能有效【排除】：
+                //  - 練習格鬥打假人 (非生物、非敵對)
+                //  - 拆牆/挖礦 (除非牆壁屬於敵對派系)
+                //  - 對一般物品開槍
+                if (targetThing is Pawn || targetThing.HostileTo(pawn))
+                {
+                    return true;
+                }
+            }
         }
 
         Pawn hostilePawn = pawn.GetHostilePawnNearBy();
-        return hostilePawn != null && pawn.Position.DistanceTo(hostilePawn.Position) <= 20f;
+        if (hostilePawn != null)
+        {
+            float dist = pawn.Position.DistanceTo(hostilePawn.Position);
+            if (dist <= 20f)
+            {
+                // [NEW] 1. 陣營檢查：敵人必須正在攻擊「我方陣營」(Faction.OfPlayer)
+                // 這能過濾掉「掠食動物獵殺野生動物」或「路過的敵對派系互打」
+                var target = hostilePawn.mindState.enemyTarget;
+                if (target != null && target.Faction == pawn.Faction)
+                {
+                    // [NEW] 2. 視線與距離檢查：避免隔著牆壁的遠處戰鬥觸發室內驚恐
+                    // 規則：距離 > 10 且 無視線 (Blocked) -> 忽略 (IsCombat=false)
+                    // 規則：距離 ≤ 10 -> 即使無視線也視為威脅 (聽得到)
+                    if (dist > 10f && !GenSight.LineOfSight(pawn.Position, hostilePawn.Position, pawn.Map))
+                        return false;
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public static string GetRole(this Pawn pawn, bool includeFaction = false)
