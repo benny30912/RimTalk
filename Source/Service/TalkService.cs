@@ -81,7 +81,16 @@ public static class TalkService
         // 1. 先裝飾 Prompt (注入時間、天氣、事件標籤)
         // 注意：無需呼叫 GetEnvironmentContext，DecoratePrompt 內部已處理
         PromptService.DecoratePrompt(talkRequest, pawns, status);
-        //此時 talkRequest.Prompt 已經包含了 Ongoing Events！
+        // 此時 talkRequest.Prompt 已經包含了 Ongoing Events！
+        // [NEW] 新版需自行將 Ongoing Events 橋接回 talkRequest.Prompt
+        // [COMPAT] 將外部 Mod 透過 Context 注入的內容轉移到 Prompt
+        if (!talkRequest.Context.NullOrEmpty())
+        {
+            talkRequest.Prompt = talkRequest.Prompt.NullOrEmpty()
+                ? talkRequest.Context
+                : talkRequest.Prompt + "\n\n" + talkRequest.Context;
+            talkRequest.Context = null;
+        }
 
         // [NEW] 將 status 收集的資訊傳遞給 BuildContextSnapshot
         talkRequest.StatusActivities = statusActivities;

@@ -105,7 +105,7 @@ public static class PromptService
             // Surroundings - 向量化用
             if (contextSettings.IncludeSurroundings)
             {
-                var aggs = ContextHelper.CollectNearbyContext(pawn, distance: 3, maxPerKind: 3);
+                var aggs = ContextHelper.CollectNearbyContext(pawn, distance: 5, maxPerKind: 3);
                 builder.CollectSurrounding(aggs);
             }
 
@@ -436,6 +436,7 @@ public static class PromptService
 
         // 當此方法結束時，RimTalk Event+ 的 Postfix 會自動執行
         // 並將 Ongoing Events 追加到 talkRequest.Prompt 的尾端
+        // [NEW] 新版 RimTalk Event+ 改為追加到 talkRequest.Context 的尾端，需要自行橋接回 talkRequest.Prompt 回復舊版行為
     }
 
     private static void AppendIfNotEmpty(StringBuilder sb, string text)
@@ -492,7 +493,8 @@ public static class PromptService
         string content = prompt.Substring(contentStart, endIdx - contentStart);
         var lines = content.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
 
-        StringBuilder currentEvent = null;
+        string currentLabel = null;
+        StringBuilder currentBody = null;
 
         foreach (var line in lines)
         {
@@ -503,26 +505,33 @@ public static class PromptService
             if (trimmed.Length > 2 && char.IsDigit(trimmed[0]) && trimmed[1] == ')')
             {
                 // 儲存前一個事件
-                if (currentEvent != null && currentEvent.Length > 0)
+                if (currentLabel != null)
                 {
-                    events.Add(currentEvent.ToString().Trim());
+                    string body = currentBody?.ToString().Trim() ?? "";
+                    // [修改] 使用「標題: 內容」格式
+                    events.Add(string.IsNullOrEmpty(body)
+                        ? currentLabel
+                        : $"{currentLabel}: {body}");
                 }
                 // 開始新事件（移除編號前綴）
-                currentEvent = new StringBuilder();
-                currentEvent.Append(trimmed.Substring(2).Trim());
+                currentLabel = trimmed.Substring(2).Trim();
+                currentBody = new StringBuilder();
             }
-            else if (currentEvent != null)
+            else if (currentBody != null)
             {
                 // 續接描述（縮排行屬於當前事件）
-                currentEvent.Append(" ");
-                currentEvent.Append(trimmed);
+                if (currentBody.Length > 0) currentBody.Append(" ");
+                currentBody.Append(trimmed);
             }
         }
 
         // 儲存最後一個事件
-        if (currentEvent != null && currentEvent.Length > 0)
+        if (currentLabel != null)
         {
-            events.Add(currentEvent.ToString().Trim());
+            string body = currentBody?.ToString().Trim() ?? "";
+            events.Add(string.IsNullOrEmpty(body)
+                ? currentLabel
+                : $"{currentLabel}: {body}");
         }
 
         return events;

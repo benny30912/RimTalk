@@ -387,7 +387,7 @@ public static class ContextBuilder
 
         if (contextSettings.IncludeSurroundings)
         {
-            var surroundingsText = ContextHelper.CollectNearbyContextText(mainPawn, distance: 3, maxPerKind: 3);
+            var surroundingsText = ContextHelper.CollectNearbyContextText(mainPawn, distance: 5, maxPerKind: 3);
             if (!string.IsNullOrEmpty(surroundingsText))
             {
                 sb.Append("\nSurroundings:\n");
