@@ -79,7 +79,7 @@ public static class PromptService
             // === 以下保持原有的向量收集邏輯（不改動）===
 
             // 時間 - 向量化用
-            if (contextSettings.IncludeTimeAndDate)
+            if (contextSettings.IncludeTime)
                 builder.CollectTime(SemanticMapper.MapTimeToSemantic(gameData.Hour12HString));
 
             // 季節 - 向量化用

@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-﻿using RimTalk.Client;
-=======
-using RimTalk.Client;
->>>>>>> upstream/main
+﻿﻿using RimTalk.Client;
 
 namespace RimTalk.Error;
 
