@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <LanguageData>
     <!-- BioTabPersonalityPatch.cs -->
     <RimTalk.BioTab.RimTalkPersona>Personnalité</RimTalk.BioTab.RimTalkPersona>
@@ -202,7 +202,8 @@
     <RimTalk.Settings.IncludeRelations>Les relations</RimTalk.Settings.IncludeRelations>
     <RimTalk.Settings.IncludeEquipment>L'équipement</RimTalk.Settings.IncludeEquipment>
     <RimTalk.Settings.Environment>Environnement</RimTalk.Settings.Environment>
-    <RimTalk.Settings.IncludeTimeAndDate>L'heure et la date</RimTalk.Settings.IncludeTimeAndDate>
+    <RimTalk.Settings.IncludeTime>L'heure</RimTalk.Settings.IncludeTime>
+    <RimTalk.Settings.IncludeDate>La date</RimTalk.Settings.IncludeDate>
     <RimTalk.Settings.IncludeSeason>La saison</RimTalk.Settings.IncludeSeason>
     <RimTalk.Settings.IncludeWeather>La météo</RimTalk.Settings.IncludeWeather>
     <RimTalk.Settings.IncludeLocationAndTemperature>Le lieu et la température</RimTalk.Settings.IncludeLocationAndTemperature>
@@ -231,6 +232,8 @@
     <RimTalk.DebugWindow.ResendTooltip>Modifiez le contexte et le prompt, puis renvoyez pour tester le dialogue.</RimTalk.DebugWindow.ResendTooltip>
     <RimTalk.DebugWindow.ResendSuccess>La requête a été renvoyée avec succès.</RimTalk.DebugWindow.ResendSuccess>
     <RimTalk.DebugWindow.ResendError>L’IA est actuellement occupée. Réessayez lorsque le statut est Idle.</RimTalk.DebugWindow.ResendError>
+    <RimTalk.DebugWindow.ApiLog>Journal API</RimTalk.DebugWindow.ApiLog>
+    <RimTalk.DebugWindow.FailMsg>La requête a échoué. Cliquez sur « Journal API » pour générer un journal pour le support.</RimTalk.DebugWindow.FailMsg>
     <RimTalk.DebugWindow.CopyAll>Tout copier</RimTalk.DebugWindow.CopyAll>
     <RimTalk.DebugWindow.Copy>Copier</RimTalk.DebugWindow.Copy>
     <RimTalk.DebugWindow.Copied>Copié</RimTalk.DebugWindow.Copied>
@@ -243,7 +246,7 @@
     <RimTalk.DebugWindow.StatusProcessing>En traitement</RimTalk.DebugWindow.StatusProcessing>
     <RimTalk.DebugWindow.StatusIdle>Inactif</RimTalk.DebugWindow.StatusIdle>
     <RimTalk.DebugWindow.GroupByPawn>Grouper par Pion</RimTalk.DebugWindow.GroupByPawn>
-    <RimTalk.DebugWindow.ModSettings>Paramètres du Mod</RimTalk.DebugWindow.ModSettings>
+    <RimTalk.DebugWindow.ModSettings>Paramètres</RimTalk.DebugWindow.ModSettings>
     <RimTalk.DebugWindow.Export>Exporter</RimTalk.DebugWindow.Export>
     <RimTalk.DebugWindow.ResetLogs>Réinit. logs</RimTalk.DebugWindow.ResetLogs>
     <RimTalk.DebugWindow.EnableRimTalk>Activer RimTalk</RimTalk.DebugWindow.EnableRimTalk>

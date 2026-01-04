@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <LanguageData>
     <!-- BioTabPersonalityPatch.cs -->
     <RimTalk.BioTab.RimTalkPersona>ペルソナ</RimTalk.BioTab.RimTalkPersona>
@@ -202,7 +202,8 @@
     <RimTalk.Settings.IncludeRelations>関係</RimTalk.Settings.IncludeRelations>
     <RimTalk.Settings.IncludeEquipment>装備</RimTalk.Settings.IncludeEquipment>
     <RimTalk.Settings.Environment>環境</RimTalk.Settings.Environment>
-    <RimTalk.Settings.IncludeTimeAndDate>日時</RimTalk.Settings.IncludeTimeAndDate>
+    <RimTalk.Settings.IncludeTime>時間</RimTalk.Settings.IncludeTime>
+    <RimTalk.Settings.IncludeDate>日付</RimTalk.Settings.IncludeDate>
     <RimTalk.Settings.IncludeSeason>季節</RimTalk.Settings.IncludeSeason>
     <RimTalk.Settings.IncludeWeather>天気</RimTalk.Settings.IncludeWeather>
     <RimTalk.Settings.IncludeLocationAndTemperature>場所と温度</RimTalk.Settings.IncludeLocationAndTemperature>
@@ -231,6 +232,8 @@
     <RimTalk.DebugWindow.ResendTooltip>コンテキストとプロンプトを編集し、再送信して会話をテストします。</RimTalk.DebugWindow.ResendTooltip>
     <RimTalk.DebugWindow.ResendSuccess>リクエストが正常に再送信されました。</RimTalk.DebugWindow.ResendSuccess>
     <RimTalk.DebugWindow.ResendError>AIは現在処理中です。ステータスがIdleになったら再試行してください。</RimTalk.DebugWindow.ResendError>
+    <RimTalk.DebugWindow.ApiLog>API ログ</RimTalk.DebugWindow.ApiLog>
+    <RimTalk.DebugWindow.FailMsg>リクエストに失敗しました。「API ログ」をクリックしてサポート用ログを生成してください。</RimTalk.DebugWindow.FailMsg>
     <RimTalk.DebugWindow.CopyAll>すべてコピー</RimTalk.DebugWindow.CopyAll>
     <RimTalk.DebugWindow.Copy>コピー</RimTalk.DebugWindow.Copy>
     <RimTalk.DebugWindow.Copied>コピーしました</RimTalk.DebugWindow.Copied>

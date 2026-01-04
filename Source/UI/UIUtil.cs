@@ -79,7 +79,7 @@ public static class UIUtil
                 string escapedContext = context.Replace("\"", "\"\"");
 
                 sb.AppendLine(
-                    $"\"{log.Timestamp}\",\"{log.Name}\",\"{log.Response}\",\"{log.InteractionType}\",{log.TokenCount},{log.ElapsedMs},\"{prompt}\",\"{escapedContext}\"");
+                    $"\"{log.Timestamp}\",\"{log.Name}\",\"{log.Response}\",\"{log.InteractionType}\",{log.Payload?.TokenCount},{log.ElapsedMs},\"{prompt}\",\"{escapedContext}\"");
             }
 
             string fileName = $"RimTalk_Export_{DateTime.Now:yyyyMMdd_HHmmss}.csv";

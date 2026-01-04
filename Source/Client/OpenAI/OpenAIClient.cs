@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,14 +13,16 @@ namespace RimTalk.Client.OpenAI;
 
 public class OpenAIClient : IAIClient
 {
-    public const string OpenAIPath = "/v1/chat/completions";
+    private const string OpenAIPath = "/v1/chat/completions";
     private readonly string _apiKey;
     private readonly string _model;
+    private readonly Dictionary<string, string> _extraHeaders;
 
-    public OpenAIClient(string baseUrl, string model, string apiKey = null)
+    public OpenAIClient(string baseUrl, string model, string apiKey = null, Dictionary<string, string> extraHeaders = null)
     {
         _model = model;
         _apiKey = apiKey;
+        _extraHeaders = extraHeaders;
         if (!string.IsNullOrEmpty(baseUrl))
         {
             var trimmedUrl = baseUrl.Trim().TrimEnd('/');
@@ -102,6 +104,14 @@ public class OpenAIClient : IAIClient
             webRequest.downloadHandler = streamingHandler;
             webRequest.SetRequestHeader("Content-Type", "application/json");
 
+            if (_extraHeaders != null)
+            {
+                foreach (var header in _extraHeaders)
+                {
+                    webRequest.SetRequestHeader(header.Key, header.Value);
+                }
+            }
+
             if (!string.IsNullOrEmpty(_apiKey))
             {
                 webRequest.SetRequestHeader("Authorization", $"Bearer {_apiKey}");
@@ -114,29 +124,48 @@ public class OpenAIClient : IAIClient
                 if (Current.Game == null) return null;
                 await Task.Delay(100);
             }
+            
+            string responseText = webRequest.downloadHandler?.text;
+
+            if (webRequest.responseCode >= 400 || webRequest.isNetworkError || webRequest.isHttpError)
+            {
+                 responseText = streamingHandler.GetAllReceivedText();
+            }
+
+            if (string.IsNullOrEmpty(responseText) && streamingHandler != null)
+            {
+                 responseText = streamingHandler.GetRawJson();
+            }
 
             if (webRequest.responseCode == 429)
-                throw new QuotaExceededException("Quota exceeded");
+            {
+                string errorMsg = ErrorUtil.ExtractErrorMessage(responseText) ?? "Quota exceeded";
+                var payload = new Payload(EndpointUrl, _model, jsonContent, responseText, 0, errorMsg);
+                throw new QuotaExceededException(errorMsg, payload);
+            }
 
             if (webRequest.isNetworkError || webRequest.isHttpError)
             {
-                Logger.Error($"Request failed: {webRequest.responseCode} - {webRequest.error}");
-                throw new Exception(webRequest.error);
+                string errorMsg = ErrorUtil.ExtractErrorMessage(responseText) ?? webRequest.error;
+                Logger.Error($"Request failed: {webRequest.responseCode} - {errorMsg}");
+                var payload = new Payload(EndpointUrl, _model, jsonContent, responseText, 0, errorMsg);
+                throw new AIRequestException(errorMsg, payload);
             }
             
             var fullResponse = streamingHandler.GetFullText();
             var tokens = streamingHandler.GetTotalTokens();
             Logger.Debug($"API response: \n{streamingHandler.GetRawJson()}");
-            return new Payload(jsonContent, fullResponse, tokens);
+            return new Payload(EndpointUrl, _model, jsonContent, fullResponse, tokens);
         }
-        catch (QuotaExceededException)
+        catch (AIRequestException)
         {
             throw;
         }
         catch (Exception ex)
         {
             Logger.Error($"Exception in API request: {ex.Message}");
-            throw;
+            var payload = new Payload(EndpointUrl, _model, jsonContent, null, 0, ex.Message);
+            throw new AIRequestException(ex.Message, payload);
         }
     }
 
@@ -170,7 +199,7 @@ public class OpenAIClient : IAIClient
         var response = await GetCompletionAsync(jsonContent);
         var content = response?.Choices?[0]?.Message?.Content;
         var tokens = response?.Usage?.TotalTokens ?? 0;
-        return new Payload(jsonContent, content, tokens);
+        return new Payload(EndpointUrl, _model, jsonContent, content, tokens);
     }
 
     private async Task<OpenAIResponse> GetCompletionAsync(string jsonContent)
@@ -192,6 +221,14 @@ public class OpenAIClient : IAIClient
             webRequest.downloadHandler = new DownloadHandlerBuffer();
             webRequest.SetRequestHeader("Content-Type", "application/json");
 
+            if (_extraHeaders != null)
+            {
+                foreach (var header in _extraHeaders)
+                {
+                    webRequest.SetRequestHeader(header.Key, header.Value);
+                }
+            }
+
             if (!string.IsNullOrEmpty(_apiKey))
             {
                 webRequest.SetRequestHeader("Authorization", $"Bearer {_apiKey}");
@@ -207,25 +244,34 @@ public class OpenAIClient : IAIClient
 
             Logger.Debug($"API response: \n{webRequest.downloadHandler.text}");
 
+            string responseText = webRequest.downloadHandler.text;
+
             if (webRequest.responseCode == 429)
-                throw new QuotaExceededException("Quota exceeded");
+            {
+                string errorMsg = ErrorUtil.ExtractErrorMessage(responseText) ?? "Quota exceeded";
+                var payload = new Payload(EndpointUrl, _model, jsonContent, responseText, 0, errorMsg);
+                throw new QuotaExceededException(errorMsg, payload);
+            }
 
             if (webRequest.isNetworkError || webRequest.isHttpError)
             {
-                Logger.Error($"Request failed: {webRequest.responseCode} - {webRequest.error}");
-                throw new Exception(webRequest.error);
+                string errorMsg = ErrorUtil.ExtractErrorMessage(responseText) ?? webRequest.error;
+                Logger.Error($"Request failed: {webRequest.responseCode} - {errorMsg}");
+                var payload = new Payload(EndpointUrl, _model, jsonContent, responseText, 0, errorMsg);
+                throw new AIRequestException(errorMsg, payload);
             }
 
-            return JsonUtil.DeserializeFromJson<OpenAIResponse>(webRequest.downloadHandler.text);
+            return JsonUtil.DeserializeFromJson<OpenAIResponse>(responseText);
         }
-        catch (QuotaExceededException)
+        catch (AIRequestException)
         {
             throw;
         }
         catch (Exception ex)
         {
             Logger.Error($"Exception in API request: {ex.Message}");
-            throw;
+            var payload = new Payload(EndpointUrl, _model, jsonContent, null, 0, ex.Message);
+            throw new AIRequestException(ex.Message, payload);
         }
     }
 

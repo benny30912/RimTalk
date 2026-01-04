@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <LanguageData>
     <!-- BioTabPersonalityPatch.cs -->
     <RimTalk.BioTab.RimTalkPersona>Persona</RimTalk.BioTab.RimTalkPersona>
@@ -202,7 +202,8 @@
     <RimTalk.Settings.IncludeRelations>Relations</RimTalk.Settings.IncludeRelations>
     <RimTalk.Settings.IncludeEquipment>Equipment</RimTalk.Settings.IncludeEquipment>
     <RimTalk.Settings.Environment>Environment</RimTalk.Settings.Environment>
-    <RimTalk.Settings.IncludeTimeAndDate>Time &amp; Date</RimTalk.Settings.IncludeTimeAndDate>
+    <RimTalk.Settings.IncludeTime>Time</RimTalk.Settings.IncludeTime>
+    <RimTalk.Settings.IncludeDate>Date</RimTalk.Settings.IncludeDate>
     <RimTalk.Settings.IncludeSeason>Season</RimTalk.Settings.IncludeSeason>
     <RimTalk.Settings.IncludeWeather>Weather</RimTalk.Settings.IncludeWeather>
     <RimTalk.Settings.IncludeLocationAndTemperature>Location &amp; Temperature</RimTalk.Settings.IncludeLocationAndTemperature>
@@ -231,6 +232,8 @@
     <RimTalk.DebugWindow.ResendTooltip>Edit context and prompt, then resend to test dialogue.</RimTalk.DebugWindow.ResendTooltip>
     <RimTalk.DebugWindow.ResendSuccess>Request resent successfully.</RimTalk.DebugWindow.ResendSuccess>
     <RimTalk.DebugWindow.ResendError>AI is currently busy. Retry when status is Idle.</RimTalk.DebugWindow.ResendError>
+    <RimTalk.DebugWindow.ApiLog>API Log</RimTalk.DebugWindow.ApiLog>
+    <RimTalk.DebugWindow.FailMsg>Request failed. Click "API Log" to generate a log for support.</RimTalk.DebugWindow.FailMsg>
     <RimTalk.DebugWindow.CopyAll>Copy All</RimTalk.DebugWindow.CopyAll>
     <RimTalk.DebugWindow.Copy>Copy</RimTalk.DebugWindow.Copy>
     <RimTalk.DebugWindow.Copied>Copied</RimTalk.DebugWindow.Copied>
@@ -243,7 +246,7 @@
     <RimTalk.DebugWindow.StatusProcessing>Processing</RimTalk.DebugWindow.StatusProcessing>
     <RimTalk.DebugWindow.StatusIdle>Idle</RimTalk.DebugWindow.StatusIdle>
     <RimTalk.DebugWindow.GroupByPawn>Group by Pawn</RimTalk.DebugWindow.GroupByPawn>
-    <RimTalk.DebugWindow.ModSettings>Mod Settings</RimTalk.DebugWindow.ModSettings>
+    <RimTalk.DebugWindow.ModSettings>Settings</RimTalk.DebugWindow.ModSettings>
     <RimTalk.DebugWindow.Export>Export</RimTalk.DebugWindow.Export>
     <RimTalk.DebugWindow.ResetLogs>Reset Logs</RimTalk.DebugWindow.ResetLogs>
     <RimTalk.DebugWindow.EnableRimTalk>Enable RimTalk</RimTalk.DebugWindow.EnableRimTalk>
