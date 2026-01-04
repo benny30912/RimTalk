@@ -103,13 +103,15 @@ public static class TalkService
         var allInvolvedPawns = pawns.Union(nearbyPawns).Distinct().ToList();
 
         // [CHANGE] 執行緒安全強化
-        // 預先在主執行緒建立 Name->Pawn 映射，避免在 Task.Run 中存取 Pawn.LabelShort
+        // 1. 預先在主執行緒建立 Name->Pawn 映射，避免在 Task.Run 中存取 Pawn.LabelShort
+        // 2. 註冊到顯示格式化快取（人名著色用）
         var playerDict = new Dictionary<string, Pawn>();
         foreach (var p in allInvolvedPawns)
         {
             if (p?.LabelShort != null)
             {
                 playerDict[p.LabelShort] = p;
+                DisplayFormatter.RegisterPawn(p); // [NEW] 人名著色快取
             }
         }
 

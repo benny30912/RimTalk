@@ -1,9 +1,10 @@
-﻿using System;
+﻿using HarmonyLib;
+using RimTalk.Data;
+using RimTalk.Util;
+using RimWorld;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using HarmonyLib;
-using RimTalk.Data;
-using RimWorld;
 using UnityEngine;
 using Verse;
 using Cache = RimTalk.Data.Cache;
@@ -83,6 +84,16 @@ public class Overlay : MapComponent
             float contentWidth = settings.OverlayRectNonDebug.width - 10f;
 
             var newCache = new List<CachedMessageLine>();
+
+            // [New] 預先找出每個 ConversationId 中 "最新" 的一條訊息
+            // 這些訊息將被標記為 ●，其他的為 ○
+            var lastMessagesInConv = allRequests
+                .GroupBy(r => r.ConversationId)
+                .Select(g => g.OrderByDescending(r => r.SpokenTick).ThenByDescending(r => r.Timestamp).FirstOrDefault())
+                .Where(r => r != null)
+                .Select(r => r.Id)
+                .ToHashSet();
+
             var messages = allRequests
                 .Where(r => r.SpokenTick > 0)
                 .Reverse()
@@ -92,24 +103,32 @@ public class Overlay : MapComponent
             foreach (var message in messages)
             {
                 string pawnName = message.Name ?? "Unknown";
-                string dialogue = message.Response ?? "";
+
+                // [New] 檢查是否為該輪對話的最後一句
+                bool isLast = lastMessagesInConv.Contains(message.Id);
+
+                // [New] 使用 DisplayFormatter 格式化內容 (包含符號 ○/● 與動作變灰)
+                // 這裡傳入 true 以顯示符號
+                string dialogue = DisplayFormatter.FormatMessage(message, isLast, true);
+
                 string formattedName = $"[{pawnName}]";
-                
+
+                // 以下寬度計算邏輯保持不變
                 float nameWidth = Text.CalcSize(formattedName).x;
                 float availableDialogueWidth = contentWidth - nameWidth - TextPadding;
-                
+
                 if (availableDialogueWidth < 0)
                 {
                     availableDialogueWidth = contentWidth * 0.5f;
                 }
-                
+
                 const float safetyMargin = 3f;
                 float dialogueWidthForCalc = Mathf.Max(0f, availableDialogueWidth - safetyMargin);
-                
+
                 float dialogueHeight = Text.CalcHeight(dialogue, dialogueWidthForCalc);
                 float nameHeight = Text.CalcHeight(formattedName, nameWidth);
                 float lineHeight = Mathf.Max(dialogueHeight, nameHeight);
-                
+
                 lineHeight += 2f;
 
                 var foundPawn = Cache.GetByName(pawnName)?.Pawn ??

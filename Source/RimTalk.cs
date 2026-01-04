@@ -4,6 +4,7 @@ using RimTalk.Error;
 using RimTalk.Patch;
 using RimTalk.Service;
 using RimTalk.Source.Memory;
+using RimTalk.Util;
 using RimTalk.Vector;
 using System;
 using System.IO;
@@ -97,5 +98,6 @@ public class RimTalk : GameComponent
         ApiHistory.Clear();
         TalkHistory.Clear();
         MemoryService.Clear(keepSavedData); // [NEW] 單獨呼叫
+        DisplayFormatter.ResetCache(); // [NEW] 重置人名快取
     }
 }

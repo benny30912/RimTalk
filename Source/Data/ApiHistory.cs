@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using RimTalk.Client;
 using RimTalk.Source.Data;
@@ -18,8 +18,8 @@ public static class ApiHistory
         var log = new ApiLog(request.Initiator.LabelShort, request, null, null, DateTime.Now, channel)
             {
                 IsFirstDialogue = true,
-                ConversationId = request.IsMonologue ? -1 : _conversationIdIndex++
-            };
+                ConversationId = _conversationIdIndex++ // [FIX] 獨白也應該有獨立的 ConversationId
+        };
         History[log.Id] = log;
         return log;
     }

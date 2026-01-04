@@ -1,12 +1,13 @@
+﻿using RimTalk.Data;
+using RimTalk.Service;
+using RimTalk.Source.Data;
+using RimTalk.Util;
+using RimWorld;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using RimTalk.Data;
-using RimTalk.Service;
-using RimTalk.Source.Data;
-using RimWorld;
 using UnityEngine;
 using Verse;
 using Verse.Sound;
@@ -58,6 +59,8 @@ public class DebugWindow : Window
     private List<PawnState> _pawnStates;
     private List<ApiLog> _requests;
     private readonly Dictionary<string, List<ApiLog>> _talkLogsByPawn = new();
+
+    private HashSet<Guid> _lastMessagesInConv = new(); // 在 UpdateData 中計算
 
     // Controls
     private int _maxRows;
@@ -205,6 +208,13 @@ public class DebugWindow : Window
         var apiLogs = filtered as ApiLog[] ?? filtered.ToArray();
         int count = apiLogs.Count();
         _requests = count > _maxRows ? apiLogs.Skip(count - _maxRows).ToList() : apiLogs.ToList();
+        // [NEW] 預先計算每輪對話的最後一條訊息 ID
+        _lastMessagesInConv = _requests
+            .GroupBy(r => r.ConversationId)
+            .Select(g => g.OrderByDescending(r => r.SpokenTick).ThenByDescending(r => r.Timestamp).FirstOrDefault())
+            .Where(r => r != null)
+            .Select(r => r.Id)
+            .ToHashSet();
 
         _talkLogsByPawn.Clear();
         foreach (var request in _requests.Where(r => r.Name != null))
@@ -407,15 +417,13 @@ public class DebugWindow : Window
         bool isSelected = _selectedLog != null && _selectedLog.Id == request.Id;
         if (isSelected) Widgets.DrawBoxSolid(rowRect, new Color(0.2f, 0.25f, 0.35f, 0.45f));
 
-        string resp = request.Response ?? _generating;
-        int maxChars = Mathf.FloorToInt(responseColumnWidth / 7f);
-        if (maxChars < 1) maxChars = 1;
-        if (resp.Length > maxChars)
-        {
-            int targetLen = maxChars - 3;
-            targetLen = Mathf.Clamp(targetLen, 1, resp.Length);
-            resp = resp.Substring(0, targetLen) + "...";
-        }
+        // [NEW] 判斷是否為該輪對話的最後一條
+        bool isLastInConversation = _lastMessagesInConv?.Contains(request.Id) ?? false;
+
+        // [SIMPLIFIED] 直接呼叫 FormatMessage，移除手動截斷與重複邏輯
+        string displayResp = request.Response == null
+            ? _generating
+            : DisplayFormatter.FormatMessage(request, isLastInConversation, showSymbols: true);
 
         float currentX = xOffset + 5f;
         Widgets.Label(new Rect(currentX, rowRect.y, TimestampColumnWidth, RowHeight),
@@ -431,7 +439,7 @@ public class DebugWindow : Window
             currentX += PawnColumnWidth + ColumnPadding;
         }
 
-        Widgets.Label(new Rect(currentX, rowRect.y, responseColumnWidth, RowHeight), resp);
+        Widgets.Label(new Rect(currentX, rowRect.y, responseColumnWidth, RowHeight), displayResp);
         currentX += responseColumnWidth + ColumnPadding;
 
         string interactionType = request.InteractionType ?? "-";

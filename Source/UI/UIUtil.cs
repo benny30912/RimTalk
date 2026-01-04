@@ -15,7 +15,7 @@ public static class UIUtil
 {
     /// <summary>
     /// Draws a pawn's name that is clickable to jump to their location.
-    /// The name is color-coded based on the pawn's status (e.g., dead, colonist).
+    /// The name is color-coded based on the pawn's Ideology favorite color or a random unique color.
     /// </summary>
     /// <param name="rect">The rectangle area to draw in.</param>
     /// <param name="pawnName">The name of the pawn to display.</param>
@@ -27,10 +27,23 @@ public static class UIUtil
             var originalColor = GUI.color;
             Widgets.DrawHighlightIfMouseover(rect);
 
-            GUI.color =
-                pawn.IsPlayer() ? new Color(1f, 0.75f, 0.8f) :
-                pawn.Dead ? Color.gray :
-                PawnNameColorUtility.PawnNameColorOf(pawn);
+            // [MOD] 使用 DisplayFormatter 取得自定義專屬顏色
+            // 原邏輯：pawn.IsPlayer() ? new Color(1f, 0.75f, 0.8f) : pawn.Dead ? Color.gray : PawnNameColorUtility.PawnNameColorOf(pawn);
+            // 新邏輯：死亡時仍顯示灰色，其他情況使用 Ideology/隨機色
+            if (pawn.Dead)
+            {
+                GUI.color = Color.gray;
+            }
+            else if (pawn.IsPlayer())
+            {
+                // 玩家角色保持原有的粉色系
+                GUI.color = new Color(1f, 0.75f, 0.8f);
+            }
+            else
+            {
+                // [NEW] 使用 DisplayFormatter 取得 Ideology 最愛顏色或隨機專屬色
+                GUI.color = DisplayFormatter.GetPawnColor(pawn);
+            }
 
             Widgets.Label(rect, $"[{pawnName}]");
 
@@ -53,7 +66,7 @@ public static class UIUtil
             Widgets.Label(rect, $"[{pawnName}]");
         }
     }
-    
+
     /// <summary>
     /// Exports the provided API logs to a CSV file located in the user's config folder.
     /// </summary>
