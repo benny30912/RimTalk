@@ -23,10 +23,11 @@ namespace RimTalk.Data
         public bool IncludePrisonerSlaveStatus = false;
 
         // Environment
-        public bool IncludeTimeAndDate = true;
+        public bool IncludeTime = true;
+        public bool IncludeDate = false;
         public bool IncludeSeason = true;
         public bool IncludeWeather = true;
-        public bool IncludeLocationAndTemperature = false;
+        public bool IncludeLocationAndTemperature = true;
         public bool IncludeTerrain = false;
         public bool IncludeBeauty = false;
         public bool IncludeCleanliness = false;
@@ -51,10 +52,11 @@ namespace RimTalk.Data
             Scribe_Values.Look(ref IncludeEquipment, "IncludeEquipment", true);
             Scribe_Values.Look(ref IncludePrisonerSlaveStatus, "IncludePrisonerSlaveStatus", false);
 
-            Scribe_Values.Look(ref IncludeTimeAndDate, "IncludeTimeAndDate", true);
+            Scribe_Values.Look(ref IncludeTime, "IncludeTime", true);
+            Scribe_Values.Look(ref IncludeDate, "IncludeDate", false);
             Scribe_Values.Look(ref IncludeSeason, "IncludeSeason", true);
             Scribe_Values.Look(ref IncludeWeather, "IncludeWeather", true);
-            Scribe_Values.Look(ref IncludeLocationAndTemperature, "IncludeLocationAndTemperature", false);
+            Scribe_Values.Look(ref IncludeLocationAndTemperature, "IncludeLocationAndTemperature", true);
             Scribe_Values.Look(ref IncludeTerrain, "IncludeTerrain", false);
             Scribe_Values.Look(ref IncludeBeauty, "IncludeBeauty", false);
             Scribe_Values.Look(ref IncludeCleanliness, "IncludeCleanliness", false);
