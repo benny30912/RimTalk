@@ -184,8 +184,7 @@ public static class PawnUtil
     }
 
     public static (string status, bool isInDanger, List<string> activities, List<string> names) GetPawnStatusFullExtend(
-    this Pawn pawn,
-    List<Pawn> nearbyPawns)
+        this Pawn pawn, List<Pawn> nearbyPawns)
     {
         var settings = Settings.Get();
 
@@ -209,57 +208,36 @@ public static class PawnUtil
         // Main pawn activity
         string pawnLabel = GetPawnLabel(pawn, relevantPawns, useOptimization);
         string pawnActivity = GetPawnActivity(pawn, relevantPawns, useOptimization);
-        lines.Add($"{pawnLabel} {pawnActivity}");
 
         // [NEW] 收集主 Pawn 的動作
         if (!string.IsNullOrEmpty(pawnActivity))
             collectedActivities.Add($"{pawn.LabelShort} {pawnActivity}");
-
         if (pawn.IsInDanger())
-            isInDanger = true;
-
-        bool hasAnyNearbyLog = false;
-
-        // Nearby pawns in danger
-        if (nearbyPawns != null && nearbyPawns.Any())
         {
-            var (notablePawns, nearbyInDanger) = GetNearbyPawnsInDanger(pawn, nearbyPawns, relevantPawns, useOptimization, settings.Context.MaxPawnContextCount);
-            if (nearbyInDanger.Any())
-            {
-                lines.Add("People in condition nearby: " + string.Join("; ", nearbyInDanger));
-                isInDanger = true;
-                hasAnyNearbyLog = true;
-
-                // [NEW] 收集附近危險狀態的人名和動作
-                foreach (var p in notablePawns)
-                {
-                    collectedNames.Add(p.LabelShort);
-                    string activity = GetPawnActivity(p, relevantPawns, useOptimization);
-                    if (!string.IsNullOrEmpty(activity))
-                        collectedActivities.Add($"{p.LabelShort} {activity}");
-                }
-            }
-
-            string nearbyList = GetNearbyPawnsList(nearbyPawns, relevantPawns, useOptimization, settings.Context.MaxPawnContextCount, excludePawns: notablePawns);
-
-            if (nearbyList != "none")
-            {
-                lines.Add("Nearby: " + nearbyList);
-                hasAnyNearbyLog = true;
-
-                // [NEW] 收集附近每個人的活動（分開收集）
-                foreach (var np in nearbyPawns.Where(p => !relevantPawns.Contains(p) && (notablePawns == null || !notablePawns.Contains(p))))
-                {
-                    collectedNames.Add(np.LabelShort);
-                    // [NEW] 每個人的活動分開收集
-                    string activity = GetPawnActivity(np, relevantPawns, useOptimization);
-                    if (!string.IsNullOrEmpty(activity))
-                        collectedActivities.Add($"{np.LabelShort} {activity}");  // [MOD] 加入人名+活動
-                }
-            }
+            lines.Add($"{pawnLabel} {pawnActivity} [IN DANGER]");
+            isInDanger = true;
+        }
+        else
+        {
+            lines.Add($"{pawnLabel} {pawnActivity}");
         }
 
-        if (!hasAnyNearbyLog)
+        // Combined Nearby List (Upstream 邏輯)
+        if (nearbyPawns != null && nearbyPawns.Any())
+        {
+            string nearbyList = GetCombinedNearbyList(pawn, nearbyPawns, relevantPawns,
+                useOptimization, settings.Context.MaxPawnContextCount, ref isInDanger);
+            lines.Add("Nearby: " + nearbyList);
+            // [NEW] 收集附近人的活動和人名
+            foreach (var p in nearbyPawns.Take(settings.Context.MaxPawnContextCount))
+            {
+                collectedNames.Add(p.LabelShort);
+                string activity = GetPawnActivity(p, relevantPawns, useOptimization);
+                if (!string.IsNullOrEmpty(activity))
+                    collectedActivities.Add($"{p.LabelShort} {activity}");
+            }
+        }
+        else
         {
             lines.Add("Nearby people: none");
         }
@@ -323,60 +301,49 @@ public static class PawnUtil
         return DecorateText(activity, relevantPawns);
     }
 
-    // 增加回傳篩選結果
-    private static (List<Pawn>, List<string>) GetNearbyPawnsInDanger(Pawn mainPawn, List<Pawn> nearbyPawns,
-        HashSet<Pawn> relevantPawns, bool useOptimization, int maxCount)
+    // [UPSTREAM] 整合的 Nearby 顯示方法
+    private static string GetCombinedNearbyList(Pawn mainPawn, List<Pawn> nearbyPawns,
+    HashSet<Pawn> relevantPawns, bool useOptimization, int maxCount, ref bool situationIsCritical)
     {
-        // 這裡維持邏輯封裝：先篩選出 Pawn
-        var identifiedPawns = nearbyPawns
-            .Where(p => p.Faction == mainPawn.Faction && p.IsInDanger(true))
-            .Take(maxCount - 1)
-            .ToList();
-
-        var descriptions = identifiedPawns
-            .Select(p =>
-            {
-                string label = GetPawnLabel(p, relevantPawns, useOptimization);
-                string activity = GetPawnActivity(p, relevantPawns, useOptimization);
-                return $"{label} in {activity.Replace("\n", "; ")}";
-            })
-            .ToList();
-
-        return (identifiedPawns, descriptions);
-    }
-
-    // 增加 excludePawns 參數
-    private static string GetNearbyPawnsList(List<Pawn> nearbyPawns, HashSet<Pawn> relevantPawns,
-        bool useOptimization, int maxCount, List<Pawn> excludePawns = null)
-    {
-        // 過濾邏輯封裝在此：排除 context 中的人 + 排除 notable 的人
-        var validPawns = nearbyPawns
-            .Where(p => !relevantPawns.Contains(p)) // [NEW] 過濾掉已經是 relevantPawns 的人，避免重複顯示
-            .Where(p => excludePawns == null || !excludePawns.Contains(p)) // 使用傳入的排除清單
-            .ToList();
-
-        if (!validPawns.Any())
+        if (nearbyPawns == null || !nearbyPawns.Any())
             return "none";
 
-        var pawnDescriptions = validPawns
-            .Select(p =>
-            {
-                string label = GetPawnLabel(p, relevantPawns, useOptimization);
-                
-                if (Cache.Get(p) != null)
-                {
-                    string activity = GetPawnActivity(p, relevantPawns, useOptimization);
-                    return $"{label} {activity.StripTags()}";
-                }
-                
-                return label;
-            })
-            .ToList();
+        var descriptions = new List<string>();
+        bool localDangerFound = false;
 
-        if (pawnDescriptions.Count > maxCount)
-            return string.Join(", ", pawnDescriptions.Take(maxCount)) + ", and others";
-        
-        return string.Join(", ", pawnDescriptions);
+        var pawnsToScan = nearbyPawns.Take(maxCount);
+
+        foreach (var p in pawnsToScan)
+        {
+            string label = GetPawnLabel(p, relevantPawns, useOptimization);
+            string extraStatus = "";
+
+            if (p.IsInDanger(true))
+            {
+                if (p.Faction == mainPawn.Faction)
+                    localDangerFound = true;
+
+                extraStatus = " [!]";
+            }
+
+            string entry;
+            if (Cache.Get(p) != null)
+            {
+                string activity = GetPawnActivity(p, relevantPawns, useOptimization);
+                entry = $"{label} {activity.StripTags()}{extraStatus}";
+            }
+            else
+            {
+                entry = $"{label}{extraStatus}";
+            }
+
+            descriptions.Add(entry);
+        }
+
+        if (localDangerFound)
+            situationIsCritical = true;
+
+        return "\n- " + string.Join("\n- ", descriptions);
     }
 
     private static void AddContextualInfo(Pawn pawn, List<string> lines, ref bool isInDanger)

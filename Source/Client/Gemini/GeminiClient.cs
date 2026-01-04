@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,7 +13,7 @@ namespace RimTalk.Client.Gemini;
 
 public class GeminiClient : IAIClient
 {
-    private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta";
+    private static string BaseUrl => AIProvider.Google.GetEndpointUrl();
     private static string CurrentApiKey => Settings.Get().GetActiveConfig()?.ApiKey;
     private static string CurrentModel => Settings.Get().GetCurrentModel();
     private static string EndpointUrl => $"{BaseUrl}/models/{CurrentModel}:generateContent?key={CurrentApiKey}";
@@ -32,7 +32,7 @@ public class GeminiClient : IAIClient
         var content = response?.Candidates?[0]?.Content?.Parts?[0]?.Text;
         var tokens = response?.UsageMetadata?.TotalTokenCount ?? 0;
 
-        return new Payload(jsonContent, content, tokens);
+        return new Payload(BaseUrl, CurrentModel, jsonContent, content, tokens);
     }
 
     /// <summary>
@@ -60,7 +60,7 @@ public class GeminiClient : IAIClient
         var tokens = streamingHandler.GetTotalTokens();
 
         Logger.Debug($"API response: \n{streamingHandler.GetRawJson()}");
-        return new Payload(jsonContent, fullResponse, tokens);
+        return new Payload(BaseUrl, CurrentModel, jsonContent, fullResponse, tokens);
     }
 
     /// <summary>
@@ -139,39 +139,64 @@ public class GeminiClient : IAIClient
             {
                 Logger.Debug($"API response: \n{webRequest.downloadHandler.text}");
             }
+            
+            string responseText = webRequest.downloadHandler?.text;
+            if (downloadHandler is GeminiStreamHandler streamHandler)
+            {
+                 if (webRequest.responseCode >= 400 || webRequest.isNetworkError || webRequest.isHttpError)
+                 {
+                     responseText = streamHandler.GetAllReceivedText();
+                 }
+
+                 if (string.IsNullOrEmpty(responseText))
+                     responseText = streamHandler.GetRawJson();
+            }
 
             if (webRequest.responseCode == 429)
-                throw new QuotaExceededException("Quota exceeded");
+            {
+                string errorMsg = ErrorUtil.ExtractErrorMessage(responseText) ?? "Quota exceeded";
+                var payload = new Payload(BaseUrl, CurrentModel, jsonContent, responseText, 0, errorMsg);
+                throw new QuotaExceededException(errorMsg, payload);
+            }
             if (webRequest.responseCode == 503)
-                throw new QuotaExceededException("Model overloaded");
+            {
+                string errorMsg = ErrorUtil.ExtractErrorMessage(responseText) ?? "Model overloaded";
+                var payload = new Payload(BaseUrl, CurrentModel, jsonContent, responseText, 0, errorMsg);
+                throw new QuotaExceededException(errorMsg, payload);
+            }
 
             if (webRequest.isNetworkError || webRequest.isHttpError)
             {
-                var errorMessage = $"Request failed: {webRequest.responseCode} - {webRequest.error}";
-                Logger.Error(errorMessage);
-                throw new Exception(errorMessage);
+                string errorMsg = ErrorUtil.ExtractErrorMessage(responseText) ?? $"Request failed: {webRequest.responseCode} - {webRequest.error}";
+                Logger.Error(errorMsg);
+                var payload = new Payload(BaseUrl, CurrentModel, jsonContent, responseText, 0, errorMsg);
+                throw new AIRequestException(errorMsg, payload);
             }
 
             // For non-streaming, deserialize the response. For streaming, the handler processes data, and we return null.
             if (downloadHandler is DownloadHandlerBuffer)
             {
-                var response = JsonUtil.DeserializeFromJson<GeminiResponse>(webRequest.downloadHandler.text);
+                var response = JsonUtil.DeserializeFromJson<GeminiResponse>(responseText);
                 if (response?.Candidates?[0]?.FinishReason == "MAX_TOKENS")
-                    throw new QuotaExceededException("Quota exceeded (MAX_TOKENS)");
+                {
+                    var payload = new Payload(BaseUrl, CurrentModel, jsonContent, responseText, response?.UsageMetadata?.TotalTokenCount ?? 0, "Quota exceeded (MAX_TOKENS)");
+                    throw new QuotaExceededException("Quota exceeded (MAX_TOKENS)", payload);
+                }
 
                 return response as T;
             }
 
             return null; // For streaming, the result is handled by the callback.
         }
-        catch (QuotaExceededException)
+        catch (AIRequestException)
         {
             throw; // Re-throw specific exceptions to be handled upstream.
         }
         catch (Exception ex)
         {
             Logger.Error($"Exception in API request: {ex.Message}");
-            throw;
+            var payload = new Payload(BaseUrl, CurrentModel, jsonContent, null, 0, ex.Message);
+            throw new AIRequestException(ex.Message, payload);
         }
     }
 

@@ -303,7 +303,6 @@ public static class TalkService
 
                 var receivedResponses = new List<TalkResponse>();
 
-                // 使用 TalkHistory 作為歷史
                 await AIService.ChatStreaming(
                     talkRequest,
                     memoryBlock, //傳入清洗過的歷史

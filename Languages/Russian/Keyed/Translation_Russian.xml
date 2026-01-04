@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <LanguageData>
     <!-- BioTabPersonalityPatch.cs -->
     <RimTalk.BioTab.RimTalkPersona>Персонаж</RimTalk.BioTab.RimTalkPersona>
@@ -202,7 +202,8 @@
     <RimTalk.Settings.IncludeRelations>Отношения</RimTalk.Settings.IncludeRelations>
     <RimTalk.Settings.IncludeEquipment>Снаряжение</RimTalk.Settings.IncludeEquipment>
     <RimTalk.Settings.Environment>Окружающая среда</RimTalk.Settings.Environment>
-    <RimTalk.Settings.IncludeTimeAndDate>Время и дату</RimTalk.Settings.IncludeTimeAndDate>
+    <RimTalk.Settings.IncludeTime>Время</RimTalk.Settings.IncludeTime>
+    <RimTalk.Settings.IncludeDate>Дату</RimTalk.Settings.IncludeDate>
     <RimTalk.Settings.IncludeSeason>Время года</RimTalk.Settings.IncludeSeason>
     <RimTalk.Settings.IncludeWeather>Погоду</RimTalk.Settings.IncludeWeather>
     <RimTalk.Settings.IncludeLocationAndTemperature>Местоположение и температуру</RimTalk.Settings.IncludeLocationAndTemperature>
@@ -231,6 +232,8 @@
     <RimTalk.DebugWindow.ResendTooltip>Измените контекст и запрос, затем отправьте снова для тестирования диалога.</RimTalk.DebugWindow.ResendTooltip>
     <RimTalk.DebugWindow.ResendSuccess>Запрос успешно отправлен повторно.</RimTalk.DebugWindow.ResendSuccess>
     <RimTalk.DebugWindow.ResendError>ИИ в данный момент занят. Повторите попытку, когда статус будет Idle.</RimTalk.DebugWindow.ResendError>
+    <RimTalk.DebugWindow.ApiLog>Журнал API</RimTalk.DebugWindow.ApiLog>
+    <RimTalk.DebugWindow.FailMsg>Запрос не выполнен. Нажмите «Журнал API», чтобы создать журнал для поддержки.</RimTalk.DebugWindow.FailMsg>
     <RimTalk.DebugWindow.CopyAll>Копировать всё</RimTalk.DebugWindow.CopyAll>
     <RimTalk.DebugWindow.Copy>Копировать</RimTalk.DebugWindow.Copy>
     <RimTalk.DebugWindow.Copied>Скопировано</RimTalk.DebugWindow.Copied>
@@ -243,7 +246,7 @@
     <RimTalk.DebugWindow.StatusProcessing>Обработка</RimTalk.DebugWindow.StatusProcessing>
     <RimTalk.DebugWindow.StatusIdle>Ожидание</RimTalk.DebugWindow.StatusIdle>
     <RimTalk.DebugWindow.GroupByPawn>Группировать по пешке</RimTalk.DebugWindow.GroupByPawn>
-    <RimTalk.DebugWindow.ModSettings>Настройки мода</RimTalk.DebugWindow.ModSettings>
+    <RimTalk.DebugWindow.ModSettings>Настройки</RimTalk.DebugWindow.ModSettings>
     <RimTalk.DebugWindow.Export>Экспорт</RimTalk.DebugWindow.Export>
     <RimTalk.DebugWindow.ResetLogs>Сброс лога</RimTalk.DebugWindow.ResetLogs>
     <RimTalk.DebugWindow.EnableRimTalk>Включить RimTalk</RimTalk.DebugWindow.EnableRimTalk>

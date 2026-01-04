@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <LanguageData>
     <!-- BioTabPersonalityPatch.cs -->
     <RimTalk.BioTab.RimTalkPersona>페르소나</RimTalk.BioTab.RimTalkPersona>
@@ -202,7 +202,8 @@
     <RimTalk.Settings.IncludeRelations>관계</RimTalk.Settings.IncludeRelations>
     <RimTalk.Settings.IncludeEquipment>장비</RimTalk.Settings.IncludeEquipment>
     <RimTalk.Settings.Environment>환경</RimTalk.Settings.Environment>
-    <RimTalk.Settings.IncludeTimeAndDate>시간 및 날짜</RimTalk.Settings.IncludeTimeAndDate>
+    <RimTalk.Settings.IncludeTime>시간</RimTalk.Settings.IncludeTime>
+    <RimTalk.Settings.IncludeDate>날짜</RimTalk.Settings.IncludeDate>
     <RimTalk.Settings.IncludeSeason>계절</RimTalk.Settings.IncludeSeason>
     <RimTalk.Settings.IncludeWeather>날씨</RimTalk.Settings.IncludeWeather>
     <RimTalk.Settings.IncludeLocationAndTemperature>위치 및 온도</RimTalk.Settings.IncludeLocationAndTemperature>
@@ -231,6 +232,8 @@
     <RimTalk.DebugWindow.ResendTooltip>컨텍스트와 프롬프트를 수정한 뒤 재전송하여 대화를 테스트합니다.</RimTalk.DebugWindow.ResendTooltip>
     <RimTalk.DebugWindow.ResendSuccess>요청이 성공적으로 재전송되었습니다.</RimTalk.DebugWindow.ResendSuccess>
     <RimTalk.DebugWindow.ResendError>AI가 현재 사용 중입니다. 상태가 Idle일 때 다시 시도하세요.</RimTalk.DebugWindow.ResendError>
+    <RimTalk.DebugWindow.ApiLog>API 로그</RimTalk.DebugWindow.ApiLog>
+    <RimTalk.DebugWindow.FailMsg>요청에 실패했습니다. 지원을 위해 "API 로그"를 클릭하여 로그를 생성하세요.</RimTalk.DebugWindow.FailMsg>
     <RimTalk.DebugWindow.CopyAll>모두 복사</RimTalk.DebugWindow.CopyAll>
     <RimTalk.DebugWindow.Copy>복사</RimTalk.DebugWindow.Copy>
     <RimTalk.DebugWindow.Copied>복사 완료</RimTalk.DebugWindow.Copied>
@@ -284,6 +287,6 @@
     <RimTalk.Gizmo.ChatWithTargetDesc>{0}와(과) 대화를 시작합니다.</RimTalk.Gizmo.ChatWithTargetDesc>
     <RimTalk.FloatMenu.WhatToSayToSelf>{0}에게 무엇을 말하고 싶으세요?</RimTalk.FloatMenu.WhatToSayToSelf>
     <RimTalk.FloatMenu.WhatToSayToOther>{0}가 {1}에게 무엇을 말하기를 원하세요?</RimTalk.FloatMenu.WhatToSayToOther>
-    <RimTalk.FloatMenu.Send>보내기</RimTalk.FloatMenu.Send>
+    <RimTalk.FloatMenu.Send>전송</RimTalk.FloatMenu.Send>
     <RimTalk.FloatMenu.Cancel>취소</RimTalk.FloatMenu.Cancel>
 </LanguageData>
