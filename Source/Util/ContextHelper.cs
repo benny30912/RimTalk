@@ -19,10 +19,10 @@ public enum NearbyKind
 public struct NearbyAgg
 {
     public NearbyKind Kind;
-    public string Key;        // Stable aggregation key
-    public string Label;      // Display label
-    public int Count;
-    public int StackSum;      // For items: sum of stackCount
+    public string Key;        // Stable aggregation key (do NOT use dynamic labels)
+    public string Label;      // Display label (human readable)
+    public int Count;         // Number of instances aggregated
+    public int StackSum;      // For items: sum of stackCount across instances
 }
 
 public static class ContextHelper
@@ -114,6 +114,7 @@ public static class ContextHelper
 
         var cells = new List<IntVec3>(128);
 
+        // GenRadial is the standard RimWorld radial cell enumeration
         foreach (var c in GenRadial.RadialCellsAround(origin, radius, true))
         {
             if (!c.InBounds(map)) continue;
@@ -130,6 +131,11 @@ public static class ContextHelper
         return cells;
     }
 
+
+    /// <summary>
+    /// RimWorld 1.6 "hidden" is handled by HiddenItemsManager (player discovery / codex),
+    /// not by a ThingComp (CompHiddenable no longer exists in 1.6).
+    /// </summary>
     public static bool IsHiddenForPlayer(Thing thing)
     {
         if (thing?.def == null) return false;
@@ -137,6 +143,10 @@ public static class ContextHelper
         return Find.HiddenItemsManager.Hidden(thing.def);
     }
 
+    /// <summary>
+    /// Collect structured nearby context with strong limits to avoid freezing on storage/compression mods.
+    /// The limits are conservative by design; tune if needed.
+    /// </summary>
     public static List<NearbyAgg> CollectNearbyContext(
         Pawn pawn,
         int distance = 5,
@@ -149,12 +159,16 @@ public static class ContextHelper
             return new List<NearbyAgg>();
 
         var map = pawn.Map;
+
+        // Limit the number of cells to scan (hard cap).
         var sameRoomOnly = pawn.GetRoom() is { PsychologicallyOutdoors: false };
         var cells = GetNearbyCellsRadial(pawn, distance, sameRoomOnly);
         if (cells.Count > maxCellsToScan)
             cells = cells.Take(maxCellsToScan).ToList();
 
         var aggs = new Dictionary<string, NearbyAgg>();
+        var seenBuildingIds = new HashSet<int>();
+
         int processedTotal = 0;
         int processedItems = 0;
 
@@ -164,6 +178,7 @@ public static class ContextHelper
             if (thingsHere == null || thingsHere.Count == 0)
                 continue;
 
+            // Use index loop to reduce foreach iterator overhead under heavy lists.
             for (int i = 0; i < thingsHere.Count; i++)
             {
                 if (processedTotal >= maxThingsTotal)
@@ -173,11 +188,16 @@ public static class ContextHelper
                 if (thing?.def == null) continue;
                 if (thing.DestroyedOrNull()) continue;
 
+                // Skip hidden defs (player undiscovered / codex-hidden).
                 if (Find.HiddenItemsManager != null && Find.HiddenItemsManager.Hidden(thing.def))
                     continue;
 
+                // Hard cap on number of item-things processed. This is the main safeguard against
+                // storage/compression mods that can expose extremely large item lists or expensive enumeration.
                 if (thing.def.category == ThingCategory.Item)
                 {
+                    // Skip items in storage/stockpiles/shelves to avoid huge enumerations
+                    // and compatibility issues with compression storage mods.
                     if (thing.Position.GetSlotGroup(map) != null)
                         continue;
 
@@ -191,6 +211,7 @@ public static class ContextHelper
 
                 processedTotal++;
 
+                // Animals (Pawn) are handled separately.
                 if (thing is Pawn otherPawn)
                 {
                     if (otherPawn == pawn) continue;
@@ -204,6 +225,7 @@ public static class ContextHelper
 
                 if (cat == ThingCategory.Building)
                 {
+                    if (!seenBuildingIds.Add(thing.thingIDNumber)) continue;
                     if (IsWall(thing)) continue;
                     AddAgg(aggs, thing, NearbyKind.Building);
                 }
@@ -222,7 +244,8 @@ public static class ContextHelper
             }
         }
 
-    DONE:
+DONE:
+        // Output compression: take top N per kind by instance count.
         return aggs.Values
             .GroupBy(a => a.Kind)
             .SelectMany(g => g
@@ -231,10 +254,20 @@ public static class ContextHelper
             .ToList();
     }
 
+    /// <summary>
+    /// Add/update aggregation entry.
+    /// IMPORTANT: aggregation key must be stable; do NOT use Thing.LabelCap/LabelNoCount as key,
+    /// because many items (books/art) have dynamic labels (title/quality/hp) and will not dedupe.
+    /// </summary>
     private static void AddAgg(Dictionary<string, NearbyAgg> aggs, Thing thing, NearbyKind kind)
     {
         var def = thing.def;
+
+        // Stable display label: for context, prefer def.LabelCap instead of Thing.LabelCap
+        // to avoid embedding dynamic info like book titles, author names, quality, hitpoints, etc.
         var label = def.LabelCap;
+
+        // Stable key: kind + defName (optionally add stuff if you want to distinguish materials).
         var key = $"{kind}|{def.defName}";
 
         if (!aggs.TryGetValue(key, out var agg))
@@ -271,14 +304,12 @@ public static class ContextHelper
             {
                 if (kind == NearbyKind.Item)
                 {
+                    // Reduce noise: only show "(N stacks)" when N > 1.
                     if (a.Count > 1)
                         return $"{a.Label} ×{a.StackSum} ({a.Count} stacks)";
                     return $"{a.Label} ×{a.StackSum}";
                 }
-                else if (kind == NearbyKind.Building)
-                {
-                    return $"{a.Label}";
-                }
+
                 return a.Count > 1 ? $"{a.Label} ×{a.Count}" : a.Label;
             });
 
