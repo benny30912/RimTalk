@@ -12,8 +12,11 @@ namespace RimTalk.Util
     /// </summary>
     public static class DisplayFormatter
     {
-        // 匹配動作/心理活動：(內容), （內容）, **內容**, 【內容】, [內容]
+        // 匹配動作：(內容), （內容）, **內容**, 【內容】, [內容]
         private static readonly Regex ActionRegex = new Regex(@"(\(.*?\)|（.*?）|\*\*.*?\*\*|【.*?】|\[.*?\])", RegexOptions.Compiled);
+
+        // [NEW] 匹配心聲：〖內容〗
+        private static readonly Regex ThoughtRegex = new Regex(@"〖.*?〗", RegexOptions.Compiled);
 
         // [OPTIMIZED] 人名-顏色快取 (只增不減)
         private static readonly Dictionary<string, Color> _nameColorCache = new();
@@ -32,8 +35,11 @@ namespace RimTalk.Util
             // [NEW] 人名上色 (使用快取 + Regex 優化)
             text = ColorizeAllKnownNames(text);
 
-            // 1. 動作/心理活動格式化 (變灰 + 斜體)
+            // 1. 動作格式化 (變灰 + 斜體)
             text = FormatActionText(text);
+
+            // [NEW] 2. 心聲格式化 (變淡藍 + 斜體)
+            text = FormatThoughtText(text);
 
             if (showSymbols && log.TalkRequest != null)
             {
@@ -61,6 +67,14 @@ namespace RimTalk.Util
             if (string.IsNullOrEmpty(text)) return text;
             // 灰色 (#808080) + 斜體
             return ActionRegex.Replace(text, "<color=#808080><i>$1</i></color>");
+        }
+
+        // [NEW] 格式化心聲
+        public static string FormatThoughtText(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            // 淡藍色(#A0D0FF) + 斜體
+            return ThoughtRegex.Replace(text, "<color=#A0D0FF><i>$0</i></color>");
         }
 
         /// <summary>
